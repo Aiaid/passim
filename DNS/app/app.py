@@ -1,14 +1,17 @@
 from pymongo import MongoClient
 import os,re
+import urllib.request
 from datetime import datetime
 from datetime import timezone
-from nserver import NameServer, Response, A, NS, TXT,Settings
+from nserver import NameServer, Response, A, NS, TXT,Settings,SOA
 
 MONGOURL = os.getenv("MONGOURL")
 base_domain=os.getenv("BASE_DOMAIN")
-MONGOURL = "***REDACTED***"
-base_domain=".passim.cloud"
-print(MONGOURL,base_domain)
+IP=os.getenv("IP")
+# MONGOURL = "***REDACTED***"
+# base_domain="passim.cloud"
+# IP="172.105.102.156"
+print(MONGOURL,base_domain,IP)
 dbclient=MongoClient(MONGOURL)
 ns_settings=Settings()
 ns_settings.server_address="0.0.0.0"
@@ -20,15 +23,23 @@ ns = NameServer("passim",ns_settings)
 ipv4 = re.compile("(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)")
 
 
-@ns.rule("**.ip"+base_domain, ["A"])
+
+
+@ns.rule("nx."+base_domain, ["A"])
+def local_loopback_nx(query):
+  return A(query.name, IP)
+
+
+
+@ns.rule("**.ip."+base_domain, ["A"])
 def ip_reflex(query):
-  if(ipv4.fullmatch(query.name.replace(".ip"+base_domain,""))!=None):
-    return A(query.name, query.name.replace(".ip"+base_domain,""))
+  if(ipv4.fullmatch(query.name.lower().replace(".ip."+base_domain,""))!=None):
+    return A(query.name, query.name.lower().replace(".ip."+base_domain,""))
   return Response()
 
-@ns.rule("**"+base_domain, ["A"])
+@ns.rule("**."+base_domain, ["A"])
 def DDNS(query):
-  name=query.name.replace(base_domain,"")
+  name=query.name.lower().replace("."+base_domain,"")
   db=dbclient["resource"]
   data=db["vps"].find_one({"name":name},projection={"name":True,"ip":True})
   if(data==None):
@@ -38,6 +49,20 @@ def DDNS(query):
   return Response()
 
 
+@ns.rule("**."+base_domain, ["SOA","AAAA","MX"])
+def local_loopback_SOA(query):
+  return SOA(query.name,
+  "ns."+base_domain+".",
+  "root."+base_domain+".",
+  1,600,85400,2419200,604800)
+
+@ns.rule("**."+base_domain, ["A"])
+def local_loopback_A(query):
+  return A(query.name, IP)
+
+@ns.rule("**."+base_domain, ["NS"])
+def local_loopback_NS(query):
+  return NS(query.name, "nx."+base_domain+".")
 
 
 
