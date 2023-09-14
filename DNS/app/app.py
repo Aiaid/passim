@@ -1,6 +1,7 @@
 from pymongo import MongoClient
 import os,re
 import urllib.request
+import IP2Location
 from datetime import datetime
 from datetime import timezone
 from nserver import NameServer, Response, A, NS, TXT,Settings,SOA
@@ -35,6 +36,13 @@ def local_loopback_nx(query):
 def ip_reflex(query):
   if(ipv4.fullmatch(query.name.lower().replace(".ip."+base_domain,""))!=None):
     return A(query.name, query.name.lower().replace(".ip."+base_domain,""))
+  return Response()
+
+@ns.rule("**.ip."+base_domain, ["TXT"])
+def ip2loc(query):
+  IPdb=IP2Location.IP2Location("/code/app/ip2loc/IP2LOCATION-LITE-DB1.BIN")
+  if(ipv4.fullmatch(query.name.lower().replace(".ip."+base_domain,""))!=None):
+    return TXT(query.name, IPdb.get_country_short(query.name.lower().replace(".ip."+base_domain,"")))
   return Response()
 
 @ns.rule("**."+base_domain, ["A"])
