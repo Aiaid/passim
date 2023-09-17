@@ -8,11 +8,9 @@ from nserver import NameServer, Response, A, NS, TXT,Settings,SOA
 
 MONGOURL = os.getenv("MONGOURL")
 base_domain=os.getenv("BASE_DOMAIN")
+IP_domain=os.getenv("IP_DOMAIN")
 IP=os.getenv("IP")
-# MONGOURL = "***REDACTED***"
-# base_domain="passim.cloud"
-# IP="172.105.102.156"
-print(MONGOURL,base_domain,IP)
+print(MONGOURL,base_domain,IP_domain,IP)
 dbclient=MongoClient(MONGOURL)
 ns_settings=Settings()
 ns_settings.server_address="0.0.0.0"
@@ -26,23 +24,21 @@ ipv4 = re.compile("(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|
 
 
 
-@ns.rule("nx."+base_domain, ["A"])
-def local_loopback_nx(query):
-  return A(query.name, IP)
 
 
 
-@ns.rule("**.ip."+base_domain, ["A"])
+
+@ns.rule("**."+IP_domain, ["A"])
 def ip_reflex(query):
-  if(ipv4.fullmatch(query.name.lower().replace(".ip."+base_domain,""))!=None):
-    return A(query.name, query.name.lower().replace(".ip."+base_domain,""))
+  if(ipv4.fullmatch(query.name.lower().replace("."+IP_domain,""))!=None):
+    return A(query.name, query.name.lower().replace("."+IP_domain,""))
   return Response()
 
-@ns.rule("**.ip."+base_domain, ["TXT"])
+@ns.rule("**."+IP_domain, ["TXT"])
 def ip2loc(query):
   IPdb=IP2Location.IP2Location("/code/app/ip2loc/IP2LOCATION-LITE-DB1.BIN")
-  if(ipv4.fullmatch(query.name.lower().replace(".ip."+base_domain,""))!=None):
-    return TXT(query.name, IPdb.get_country_short(query.name.lower().replace(".ip."+base_domain,"")))
+  if(ipv4.fullmatch(query.name.lower().replace("."+IP_domain,""))!=None):
+    return TXT(query.name, IPdb.get_country_short(query.name.lower().replace("."+IP_domain,"")))
   return Response()
 
 @ns.rule("**."+base_domain, ["A"])
@@ -56,6 +52,10 @@ def DDNS(query):
     return A(query.name, data["ip"])
   return Response()
 
+
+@ns.rule("nx."+base_domain, ["A"])
+def local_loopback_nx(query):
+  return A(query.name, IP)
 
 @ns.rule("**."+base_domain, ["SOA","AAAA","MX"])
 def local_loopback_SOA(query):
@@ -72,7 +72,24 @@ def local_loopback_A(query):
 def local_loopback_NS(query):
   return NS(query.name, "nx."+base_domain+".")
 
+@ns.rule("nx."+IP_domain, ["A"])
+def IP_local_loopback_nx(query):
+  return A(query.name, IP)
 
+@ns.rule("**."+IP_domain, ["SOA","AAAA","MX"])
+def IP_local_loopback_SOA(query):
+  return SOA(query.name,
+  "ns."+IP_domain+".",
+  "root."+IP_domain+".",
+  1,600,85400,2419200,604800)
+
+@ns.rule("**."+IP_domain, ["A"])
+def IP_local_loopback_A(query):
+  return A(query.name, IP)
+
+@ns.rule("**."+IP_domain, ["NS"])
+def IP_local_loopback_NS(query):
+  return NS(query.name, "nx."+IP_domain+".")
 
 if __name__ == "__main__":
 
