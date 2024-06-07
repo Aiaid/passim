@@ -53,8 +53,16 @@ def DDNS(query):
   return Response()
 
 
-@ns.rule("nx."+base_domain, ["A"])
+@ns.rule("ns."+base_domain, ["A"])
 def local_loopback_nx(query):
+  return A(query.name, IP)
+
+@ns.rule(IP_domain, ["A"])
+def local_loopback_IP(query):
+  return A(query.name, IP)
+
+@ns.rule("ns."+IP_domain, ["A"])
+def IP_local_loopback_nx(query):
   return A(query.name, IP)
 
 @ns.rule("**."+base_domain, ["SOA","AAAA","MX"])
@@ -70,11 +78,7 @@ def local_loopback_A(query):
 
 @ns.rule("**."+base_domain, ["NS"])
 def local_loopback_NS(query):
-  return NS(query.name, "nx."+base_domain+".")
-
-@ns.rule("nx."+IP_domain, ["A"])
-def IP_local_loopback_nx(query):
-  return A(query.name, IP)
+  return NS(query.name, "ns."+base_domain+".")
 
 @ns.rule("**."+IP_domain, ["SOA","AAAA","MX"])
 def IP_local_loopback_SOA(query):
@@ -89,7 +93,7 @@ def IP_local_loopback_A(query):
 
 @ns.rule("**."+IP_domain, ["NS"])
 def IP_local_loopback_NS(query):
-  return NS(query.name, "nx."+IP_domain+".")
+  return NS(query.name, "ns."+IP_domain+".")
 
 if __name__ == "__main__":
 
