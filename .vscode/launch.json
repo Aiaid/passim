@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/anend/Library/Containers/com.bandisoft.mac.bandizip/Data/tmp/9DB456CC-E89E-4582-907A-B62C96F01618",
+      "program": "/Users/anend/Library/Containers/com.bandisoft.mac.bandizip/Data/tmp/9DB456CC-E89E-4582-907A-B62C96F01618/build/Debug/outDebug"
+    }
+  ]
+}
