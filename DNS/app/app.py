@@ -6,8 +6,6 @@ from nserver import NameServer, Response, A, AAAA, NS, TXT,Settings,SOA
 
 base_domain=os.getenv("BASE_DOMAIN")
 IP=os.getenv("IP")
-base_domain="test.com"
-IP="127.0.0.1"
 print(base_domain,IP)
 ns_settings=Settings()
 ns_settings.server_address="0.0.0.0"
@@ -26,22 +24,23 @@ def base32_to_ipv4(b32_str):
     :raises ValueError: 解码失败或长度不是 4 字节
     """
     # 1) 将末尾 '8' 替换回 '='
-    s_stripped = b32_str.rstrip('8')  # 去掉尾部所有 '8'
+    s_stripped = b32_str.upper().rstrip('8')  # 去掉尾部所有 '8'
     trailing_8_count = len(b32_str) - len(s_stripped)
     # 用同样数量的 '=' 填充
     b32_converted = s_stripped + ('=' * trailing_8_count)
-
+    print(b32_converted)
     # 2) 解码 Base32
     try:
         raw_bytes = base64.b32decode(b32_converted)
     except base64.binascii.Error as e:
         raise ValueError(f"Base32 解码失败: {e}")
-
+    print(raw_bytes)
     # 3) IPv4 地址应精确 4 字节
     if len(raw_bytes) != 4:
         raise ValueError(f"解码后长度为 {len(raw_bytes)} 字节，不是 4 字节，无法还原为 IPv4。")
 
     # 4) 使用 ipaddress 解析
+    print(str(ipaddress.IPv4Address(raw_bytes)))
     return str(ipaddress.IPv4Address(raw_bytes))
 
 
@@ -54,7 +53,7 @@ def base32_to_ipv6(b32_str):
     :raises ValueError: 解码失败或长度不是 16 字节
     """
     # 1) 将末尾 '8' 替换回 '='
-    s_stripped = b32_str.rstrip('8')
+    s_stripped = b32_str.upper().rstrip('8')
     trailing_8_count = len(b32_str) - len(s_stripped)
     b32_converted = s_stripped + ('=' * trailing_8_count)
 
@@ -77,10 +76,12 @@ def base32_to_ipv6(b32_str):
 @ns.rule("*."+base_domain, ["A"])
 def base32_ipv4_reflex(query):
   perfix=query.name.lower().replace("."+base_domain,"")
+  print(perfix)
   if(len(perfix)==8):
-     return AAAA(query.name, base32_to_ipv4(perfix))
+    print(perfix)
+    return A(query.name, base32_to_ipv4(perfix))
   if(len(perfix)==40):
-     return AAAA(query.name, base32_to_ipv4(perfix[:8]))
+    return A(query.name, base32_to_ipv4(perfix[:8]))
   return Response()
 
 
@@ -88,9 +89,9 @@ def base32_ipv4_reflex(query):
 def base32_ipv6_reflex(query):
   perfix=query.name.lower().replace("."+base_domain,"")
   if(len(perfix)==32):
-     return AAAA(query.name, base32_to_ipv6(perfix))
+    return AAAA(query.name, base32_to_ipv6(perfix))
   if(len(perfix)==40):
-     return AAAA(query.name, base32_to_ipv6(perfix[8:]))
+    return AAAA(query.name, base32_to_ipv6(perfix[8:]))
   return Response()
      
 
