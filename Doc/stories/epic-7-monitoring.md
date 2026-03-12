@@ -30,15 +30,27 @@
 **以便** 了解网络质量
 
 **验收标准:**
+
+**浏览器 → VPS 测速 (内置 HTTP 端点):**
 - [ ] 节点详情页 "Speedtest" 区域
 - [ ] 显示最近一次测速结果:
-  - 下载速度 (Mbps)
-  - 上传速度 (Mbps)
-  - 延迟 Ping (ms)
-  - 抖动 Jitter (ms)
+  - 下载速度 (Mbps) — `GET /api/speedtest/download`
+  - 上传速度 (Mbps) — `POST /api/speedtest/upload`
+  - 延迟 Ping (ms) / 抖动 Jitter (ms) — `GET /api/speedtest/ping`
 - [ ] [Run Speedtest] 按钮触发新测速
-- [ ] 测速进行中显示 loading 动画
+- [ ] 测速进行中显示实时进度 (下载 → 上传 → Ping)
 - [ ] 测速历史记录 (简单表格，最近 10 次)
+
+**节点 ↔ 节点测速 (iperf3):**
+- [ ] 远程节点详情页显示 [Test Throughput] 按钮
+- [ ] 使用 iperf3 测试本机与远程节点之间的吞吐量
+- [ ] 测速结果: 下载 / 上传 (Mbps)
+- [ ] 测速过程通过 SSE 推送实时进度
+
+**技术实现:**
+- 浏览器测速: Go 内置 HTTP 端点 (download 返回随机数据流，upload 接收数据计算速度，ping 返回时间戳)
+- 节点间测速: iperf3 (每个 Passim 内置 iperf3 server，监听 :5201)
+- 不再使用独立 Speedtest 容器
 
 **前端交互:**
 ```
@@ -50,6 +62,12 @@ Speedtest                          [Run Speedtest]
 └────────────┘ └────────────┘ └──────────┘ └──────────┘
 
 Last tested: 2026-03-12 10:30
+
+Node-to-Node Throughput            [Test Throughput]
+┌────────────────────────────────────────────────────┐
+│  tokyo-1 ↔ us-west:  ↓ 892 Mbps  ↑ 445 Mbps      │
+│  Tested: 2026-03-12 09:15                          │
+└────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -62,14 +80,23 @@ Last tested: 2026-03-12 10:30
 
 **验收标准:**
 - [ ] 节点详情 Services 区域显示 SSL 状态:
-  - ✅ Valid (expires 2026-06-15)
+  - ✅ Valid (expires 2026-06-15) — auto/custom 模式
   - ⚠️ Expiring Soon (< 7 days)
   - ❌ Expired
+  - 🔒 Self-Signed — self-signed 模式
   - ⬜ Not Configured
-- [ ] 显示证书到期日期
+- [ ] 显示当前 SSL 模式 (auto / self-signed / custom)
+- [ ] auto 模式显示: 域名、证书颁发者 (Let's Encrypt)、到期日期、自动续期状态
 - [ ] 即将过期 (< 7 天) 时: 黄色 Badge 警告
-- [ ] [Renew Certificate] 按钮: 手动触发续期 (调用 SWAG)
+- [ ] [Renew Certificate] 按钮: 手动触发 certmagic 续期 (auto 模式)
+- [ ] [Upload Certificate] 按钮: 上传自定义证书 (切换到 custom 模式)
 - [ ] 续期过程显示进度
+
+**技术实现:**
+- 使用 certmagic 内置 ACME 客户端 (替代 SWAG 容器)
+- auto 模式: certmagic 自动管理 Let's Encrypt 证书，到期前 30 天自动续期
+- self-signed 模式: Go 内置生成自签证书 (用于 LAN/dev 环境)
+- custom 模式: 用户上传自己的证书
 
 ---
 

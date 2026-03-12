@@ -31,7 +31,7 @@ AC (Passim) 是一个分布式 VPS 管理与应用部署平台，用户通过 We
 
 **应用服务**: L2TP/IPSec VPN, Wireguard VPN, V2ray 代理, Hysteria 代理, WebDAV 存储, Samba 文件共享, RDesktop 远程桌面, S3 兼容存储
 
-**基础设施**: Let's Encrypt 自动 SSL (SWAG), Speedtest 测速, Glances 监控, DNS 健康检查, TOTP 认证, 多语言 (en-US/zh-CN)
+**基础设施**: Let's Encrypt 自动 SSL (SWAG 容器), Speedtest 测速 (独立容器), Glances 监控, DNS 健康检查, TOTP 认证, 多语言 (en-US/zh-CN)
 
 ---
 
@@ -54,7 +54,7 @@ AC (Passim) 是一个分布式 VPS 管理与应用部署平台，用户通过 We
 ### 运维层面
 
 9. **更新机制粗糙** — Updater 直接 stop/rm/pull/run，无健康检查
-10. **SSL 管理耦合** — SWAG 容器与 Passim 紧密耦合
+10. **SSL 管理耦合** — SWAG 容器与 Passim 紧密耦合，Speedtest 也需独立容器
 
 ---
 
@@ -100,8 +100,8 @@ VPS A                    VPS B                    VPS C
 
 ```bash
 docker run -d -v /var/run/docker.sock:/var/run/docker.sock \
-  -v passim-data:/data -p 8443:8443 passim/passim
-# 访问 https://<ip>:8443 → 管理本机
+  -v passim-data:/data -p 8443:8443 -p 80:80 passim/passim
+# 访问 https://<ip>:8443 → 管理本机 (端口 80 用于 ACME 证书验证)
 ```
 
 **场景 2**: 多机管理
@@ -137,7 +137,9 @@ VPS B 也连接了 C
 | Updater (Python) 独立容器 | 内置自我更新 |
 | MongoDB (集中) | SQLite (本地，每台独立) |
 | Glances 容器 (监控) | 内置 gopsutil 指标采集 |
-| 4 个进程 + 数据库 | 1 个 Docker 容器 |
+| SWAG 容器 (SSL) | 内置 certmagic ACME 客户端 |
+| Speedtest 容器 (测速) | 内置 HTTP 测速端点 + iperf3 |
+| 4+ 个进程 + 数据库 | 1 个 Docker 容器 |
 
 ### Docker 容器结构
 
@@ -148,11 +150,12 @@ COPY . .
 RUN go build -o /passim ./cmd/passim/
 
 FROM alpine:3.20
+RUN apk add --no-cache ca-certificates iperf3
 COPY --from=builder /passim /usr/local/bin/passim
 COPY templates/ /etc/passim/templates/
 
-VOLUME /data           # SQLite + 配置 + 应用数据
-EXPOSE 8443
+VOLUME /data           # SQLite + 配置 + 应用数据 + 证书
+EXPOSE 8443 80
 
 ENTRYPOINT ["passim"]
 ```
@@ -164,7 +167,9 @@ docker run -d \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v passim-data:/data \
   -p 8443:8443 \
+  -p 80:80 \
   passim/passim:latest
+# 端口 80 用于 ACME HTTP-01 证书验证，验证完成后自动重定向到 HTTPS
 ```
 
 **Volume 挂载:**
@@ -174,7 +179,7 @@ docker run -d \
 | `/var/run/docker.sock` | Docker Engine 通信 (必须) |
 | `/data/passim.db` | SQLite 数据库 |
 | `/data/configs/` | 应用配置文件 (Wireguard conf 等) |
-| `/data/ssl/` | SSL 证书 |
+| `/data/ssl/` | SSL 证书 (certmagic 自动管理) |
 
 ---
 
@@ -189,6 +194,8 @@ docker run -d \
 | 数据库 | **SQLite** (go-sqlite3, WAL) | 零配置嵌入式，每台 VPS 独立 |
 | 容器 | **Docker SDK (Go)** | 直接调用 Docker Engine API |
 | 指标 | **gopsutil** | 系统指标采集，替代 Glances 容器 |
+| SSL | **certmagic** | 内置 ACME 客户端，自动 Let's Encrypt，替代 SWAG 容器 |
+| 测速 | **内置 HTTP 端点** + **iperf3** | 浏览器测速 + 节点间吞吐量测试，替代 Speedtest 容器 |
 | 多节点通信 | **WebSocket** (gorilla/websocket) | Passim 实例间双向通信 |
 | 任务 | **内存队列** + SQLite 持久化 | 单机场景不需要 Redis |
 | 前端嵌入 | **Go embed** | 静态文件打包进二进制 |
@@ -276,10 +283,14 @@ passim/
 │   │   ├── queue.go                 # 内存队列 + SQLite 持久化
 │   │   ├── worker.go               # 任务消费
 │   │   └── types.go                # 任务类型定义
+│   ├── ssl/                         # SSL/TLS 证书管理
+│   │   ├── manager.go               # certmagic ACME + 自签回退
+│   │   └── selfsigned.go            # 自签证书生成
+│   ├── speedtest/                   # 内置测速
+│   │   ├── http.go                  # 浏览器测速端点 (download/upload/ping)
+│   │   └── iperf.go                 # iperf3 server 管理 (节点间测速)
 │   ├── setup/                       # 初始化
-│   │   ├── setup.go                 # 首次启动流程
-│   │   ├── ssl.go                   # SWAG 部署
-│   │   └── speedtest.go            # Speedtest 部署
+│   │   └── setup.go                 # 首次启动流程
 │   └── auth/                        # 认证
 │       ├── apikey.go                # API Key 管理
 │       ├── jwt.go                   # JWT 签发/验证
@@ -586,7 +597,8 @@ GET    /ws/node?key=<api_key>       # 远程 Passim 连接端点
 - [ ] API Key 认证 + Passkey (WebAuthn) + JWT
 - [ ] SQLite 数据持久化
 - [ ] 异步任务队列 (内存 + SQLite)
-- [ ] 初始化 setup (SSL/Speedtest 自动部署)
+- [ ] SSL 证书管理 (certmagic ACME + 自签回退 + 自定义证书)
+- [ ] 内置测速 (HTTP download/upload/ping 端点 + iperf3 server)
 - [ ] SSE 实时推送 (指标 + 部署进度)
 - [ ] Dockerfile
 - [ ] 单元测试

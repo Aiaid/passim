@@ -15,11 +15,13 @@
   ```bash
   docker run -d --name passim --restart always \
     -v /var/run/docker.sock:/var/run/docker.sock \
-    -v passim-data:/data -p 8443:8443 \
+    -v passim-data:/data \
+    -p 8443:8443 -p 80:80 \
     passim/passim:latest
   ```
+  端口 80 用于 ACME HTTP-01 证书验证 (auto 模式)
 - [ ] 首次启动自动生成 API Key，通过 `docker logs passim` 查看
-- [ ] 首次启动自动运行 setup: 部署 Speedtest + SWAG (SSL) 容器
+- [ ] 首次启动自动运行 setup: 初始化 SSL 证书 (certmagic) + 内置测速服务
 - [ ] 启动完成后可通过 `https://<vps-ip>:8443` 访问 Web UI
 - [ ] 启动时间 < 5s (不含 setup)
 - [ ] 支持通过环境变量自定义节点名和 API Key

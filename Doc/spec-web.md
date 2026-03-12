@@ -209,12 +209,12 @@ web/
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
 │                                                             │
 │  ┌─────────────────────────┐ ┌────────────────────────────┐ │
-│  │ Containers        5/6  │ │ Apps                    3  │ │
+│  │ Containers        3/4  │ │ Apps                    3  │ │
 │  │ wireguard     🟢  2%   │ │ 🛡️ Wireguard     🟢 Run   │ │
 │  │ l2tp          🟢  1%   │ │ 🔒 L2TP          🟢 Run   │ │
 │  │ webdav        🔴  -    │ │ 📁 WebDAV        🔴 Stop  │ │
-│  │ speedtest     🟢  1%   │ │                            │ │
-│  │ swag          🟢  0%   │ │ [Deploy New App]           │ │
+│  │                         │ │                            │ │
+│  │                         │ │ [Deploy New App]           │ │
 │  │ [View All]              │ │                            │ │
 │  └─────────────────────────┘ └────────────────────────────┘ │
 │                                                             │
@@ -469,12 +469,12 @@ RUN CGO_ENABLED=1 go build -o /passim ./cmd/passim/
 
 # Stage 3: 最终镜像
 FROM alpine:3.20
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates iperf3
 COPY --from=backend /passim /usr/local/bin/passim
 COPY templates/ /etc/passim/templates/
 
 VOLUME /data
-EXPOSE 8443
+EXPOSE 8443 80
 
 ENTRYPOINT ["passim"]
 ```

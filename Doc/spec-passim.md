@@ -34,6 +34,10 @@ Docker Container: passim/passim
 │  │  │  Task   │ │  Node    │ │   Setup     │  │ │
 │  │  │  Queue  │ │  Hub     │ │  Manager    │  │ │
 │  │  └─────────┘ └──────────┘ └─────────────┘  │ │
+│  │  ┌─────────┐ ┌──────────┐ ┌─────────────┐  │ │
+│  │  │   SSL   │ │Speedtest │ │    Auth     │  │ │
+│  │  │certmagic│ │HTTP+iperf│ │ Key+Passkey │  │ │
+│  │  └─────────┘ └──────────┘ └─────────────┘  │ │
 │  └─────────────────────┬──────────────────────┘ │
 │                        │                         │
 │              ┌─────────▼─────────┐               │
@@ -118,12 +122,20 @@ Authorization: Bearer <jwt-token>
 JWT 有效期 7 天，API Key 永久有效 (可重置)。
 auth_version (config 表) 用于 JWT 吊销: 每次重置 API Key 或调用 reset-all 时 +1，旧 JWT 验证失败。
 
-#### Go 依赖
+#### Go 依赖 (认证)
 
 ```
 github.com/go-webauthn/webauthn   -- WebAuthn/FIDO2
 golang.org/x/crypto/bcrypt        -- API Key hash
 ```
+
+#### Go 依赖 (SSL/测速)
+
+```
+github.com/caddyserver/certmagic  -- ACME 客户端 (Let's Encrypt)
+```
+
+> iperf3: 使用 Alpine 系统包 `iperf3`，Go 通过 `os/exec` 调用命令行
 
 ### 系统状态
 
@@ -148,8 +160,14 @@ golang.org/x/crypto/bcrypt        -- API Key hash
   },
   "containers": { "running": 5, "stopped": 1, "total": 6 },
   "services": {
-    "ssl": { "status": "valid", "expires_at": "2026-06-15T00:00:00Z" },
-    "speedtest": { "status": "running" },
+    "ssl": {
+      "mode": "auto",
+      "status": "valid",
+      "domain": "vps.example.com",
+      "expires_at": "2026-06-15T00:00:00Z",
+      "issuer": "Let's Encrypt"
+    },
+    "speedtest": { "http": "ready", "iperf3": "ready" },
     "dns": { "status": "ok", "resolved_ip": "203.0.113.10" }
   },
   "remote_nodes": { "connected": 2, "total": 3 }
@@ -262,6 +280,83 @@ data: {"status":"running","container_id":"def456"}
 #### `GET /api/apps/:id/configs/:filename`
 
 返回文件内容 (`Content-Type: application/octet-stream`)。
+
+### 测速
+
+#### `GET /api/speedtest/download` (浏览器下载测速)
+
+返回随机数据流，前端计算下载速度。
+```
+Content-Type: application/octet-stream
+Content-Length: 104857600  (100MB, 可通过 ?size=50mb 调整)
+```
+
+#### `POST /api/speedtest/upload` (浏览器上传测速)
+
+接收前端上传的数据，返回测速结果。
+```json
+{ "bytes": 52428800, "duration_ms": 1250, "speed_mbps": 335.5 }
+```
+
+#### `GET /api/speedtest/ping` (延迟测试)
+
+```json
+{ "timestamp": "2026-03-12T10:00:00.000Z" }
+```
+
+前端连续请求多次，计算 RTT 和 jitter。
+
+#### `POST /api/speedtest/iperf` (节点间测速，需已登录)
+
+启动 iperf3 客户端连接指定节点:
+```json
+// Request
+{ "target": "node-uuid" }  // 或 { "target_address": "vps-b:5201" }
+
+// Response (SSE stream)
+event: progress
+data: {"direction":"download","speed_mbps":892.3,"percent":50}
+
+event: complete
+data: {"download_mbps":892.3,"upload_mbps":445.1,"duration_s":10}
+```
+
+#### `GET /api/speedtest/iperf/status` (iperf3 server 状态)
+
+```json
+{ "status": "ready", "port": 5201 }
+```
+
+### SSL 证书管理
+
+#### `GET /api/ssl/status`
+
+```json
+{
+  "mode": "auto",
+  "status": "valid",
+  "domain": "vps.example.com",
+  "issuer": "Let's Encrypt",
+  "expires_at": "2026-06-15T00:00:00Z",
+  "auto_renew": true
+}
+```
+
+#### `POST /api/ssl/renew` (手动触发续期，auto 模式)
+
+```json
+{ "ok": true, "message": "Renewal initiated" }
+```
+
+#### `POST /api/ssl/upload` (上传自定义证书，切换到 custom 模式)
+
+```
+Content-Type: multipart/form-data
+  cert: (PEM file)
+  key: (PEM file)
+```
+
+---
 
 ### 远程节点管理
 
@@ -448,9 +543,14 @@ auth:
   api_key: "auto-generated"    # 明文仅首次启动输出到日志，数据库存 hash
 
 ssl:
-  enabled: true
-  cert_path: "/data/ssl/cert.pem"
-  key_path: "/data/ssl/key.pem"
+  mode: "auto"               # auto (certmagic Let's Encrypt) / self-signed / custom
+  domain: ""                 # auto 模式需要，如 "vps.example.com"
+  email: ""                  # auto 模式 ACME 联系邮箱 (可选)
+  cert_path: ""              # custom 模式: 自定义证书路径
+  key_path: ""               # custom 模式: 自定义私钥路径
+  # auto 模式: certmagic 自动管理，证书存储在 /data/ssl/certmagic/
+  # self-signed 模式: 首次启动自动生成自签证书到 /data/ssl/
+  # custom 模式: 使用用户提供的证书
 
 docker:
   socket: "unix:///var/run/docker.sock"
@@ -509,9 +609,11 @@ docker run passim/passim
     │  ✗ → 打印错误，容器管理功能不可用
     ▼
 [5] 如果 setup_required:
-    ├─ 部署 Speedtest 容器
-    ├─ 部署 SWAG 容器 (SSL)
-    ├─ 等待 SSL 证书 (最多 120s，失败则用自签)
+    ├─ 初始化 SSL (根据 ssl.mode):
+    │   ├─ auto → certmagic 启动 ACME，监听 :80 进行 HTTP-01 验证
+    │   ├─ self-signed → 生成自签证书到 /data/ssl/
+    │   └─ custom → 验证用户提供的证书路径有效
+    ├─ 初始化内置测速 (HTTP 端点 + iperf3 server)
     └─ 标记 setup_complete
     │
     ▼
