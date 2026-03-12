@@ -1,10 +1,10 @@
 # Epic 9: 设置与个性化
 
-> Phase: 3 (P1) + Phase 5 (P3)
+> Phase: 2 (P1) + Phase 5 (P3)
 
 ---
 
-## US-9.1 暗色模式 `P1` `Phase 3`
+## US-9.1 暗色模式 `P1` `Phase 2`
 
 **作为** 用户
 **我想** 切换亮色/暗色主题
@@ -12,9 +12,9 @@
 
 **验收标准:**
 - [ ] Header 右上角主题切换按钮 (3 种模式):
-  - ☀️ Light
-  - 🌙 Dark
-  - 💻 System (跟随操作系统)
+  - Light
+  - Dark
+  - System (跟随操作系统)
 - [ ] 切换动画平滑 (CSS transition)
 - [ ] 偏好保存到 localStorage，下次访问自动应用
 - [ ] 所有页面和组件适配暗色模式 (shadcn/ui 原生支持)
@@ -28,43 +28,55 @@
 **前端交互:**
 ```
 Header 右上角:
-  [🌙 ▼]
-    ├── ☀️ Light
-    ├── 🌙 Dark
-    └── 💻 System
+  [Dark ▼]
+    ├── Light
+    ├── Dark
+    └── System
 ```
 
 ---
 
-## US-9.2 修改密码 `P3` `Phase 5`
+## US-9.2 安全设置 `P1` `Phase 2`
 
 **作为** 用户
-**我想** 修改我的登录密码
-**以便** 保障账号安全
+**我想** 在设置页管理 Passkey 和 API Key
+**以便** 控制认证方式和节点访问
 
 **验收标准:**
-- [ ] 设置页面 Security Tab
-- [ ] 表单: 当前密码 + 新密码 + 确认新密码
-- [ ] 密码强度指示器 (Weak / Medium / Strong)
-- [ ] 最小长度 8 位
-- [ ] 新密码与确认密码不匹配时显示错误
-- [ ] 当前密码错误时显示错误
-- [ ] 修改成功后:
-  - Toast: "密码已更新"
-  - 清除所有其他会话 (撤销 refresh token)
-  - 当前会话保持
+
+**Passkey 管理:**
+- [ ] 显示已注册 Passkey 列表 (名称、创建时间、上次使用)
+- [ ] 注册新 Passkey (触发 WebAuthn 流程)
+- [ ] 删除 Passkey (确认弹窗)
+- [ ] 详见 US-5.3
+
+**API Key 管理:**
+- [ ] 显示当前 API Key 前缀 (如 `ak_7f3d...e2a1`)
+- [ ] 复制完整 Key / 切换显示
+- [ ] 重新生成 API Key:
+  - 确认弹窗，警告 "所有远程连接将断开"
+  - 生成后显示新 Key (仅一次)
+  - 旧 Key 立即失效
+  - 所有入站 WebSocket 断开
 
 **前端交互:**
 ```
 Settings → Security
 
-Change Password
-┌──────────────────────────────────────────┐
-│ Current Password: [●●●●●●●●            ] │
-│ New Password:     [●●●●●●●●●●          ] │
-│                   Strength: ████░░ Good  │
-│ Confirm:          [●●●●●●●●●●          ] │
-│                                          │
-│                              [Update]    │
-└──────────────────────────────────────────┘
+Passkeys
+┌──────────────────────────────────────────────┐
+│ 🔑 MacBook Touch ID       Last used: 2h ago │
+│ 🔑 YubiKey 5C             Last used: 3 days │
+│                                              │
+│         [ + Register New Passkey ]           │
+└──────────────────────────────────────────────┘
+
+API Key
+┌──────────────────────────────────────────────┐
+│ ak_7f3d...e2a1              [Copy] [Reveal]  │
+│ Created: 2026-03-01                          │
+│                                              │
+│ [ Regenerate ]                               │
+│ ⚠ Will disconnect all remote nodes          │
+└──────────────────────────────────────────────┘
 ```

@@ -52,6 +52,11 @@ Docker Container: passim/passim
 
 ### 认证
 
+用户登录支持两种方式: **API Key** (主要/首次) + **Passkey** (便捷/日常)。不使用密码登录。
+节点间 WebSocket 通信使用 API Key 直接认证 (不走 JWT)。
+
+#### API Key 登录
+
 ```
 POST /api/auth/login
   Request:  { "api_key": "xxx" }
@@ -62,12 +67,63 @@ POST /api/auth/refresh
   Response: { "token": "new-jwt", "expires_at": "..." }
 ```
 
+#### Passkey (WebAuthn/FIDO2) 登录
+
+```
+POST /api/auth/passkey/begin
+  Response: { WebAuthn PublicKeyCredentialRequestOptions }
+
+POST /api/auth/passkey/finish
+  Request:  { WebAuthn AuthenticatorAssertionResponse }
+  Response: { "token": "eyJ...", "expires_at": "..." }
+```
+
+Passkey 需要先通过 API Key 登录后在设置页注册，之后可直接使用指纹/面容/安全密钥登录。
+
+#### Passkey 管理 (需已登录)
+
+```
+GET    /api/auth/passkeys                → [{ id, name, created_at, last_used_at }]
+POST   /api/auth/passkey/register        → { WebAuthn PublicKeyCredentialCreationOptions }
+POST   /api/auth/passkey/register/finish  → { "ok": true }
+DELETE /api/auth/passkeys/:id
+```
+
+#### API Key 管理 (需已登录)
+
+```
+GET    /api/settings/api-key             → { "prefix": "ak_7f3d", "created_at": "..." }
+POST   /api/settings/api-key/regenerate  → { "api_key": "ak_..." }  ← 仅此一次返回明文
+```
+
+重新生成 API Key 会:
+1. 关闭所有入站 WebSocket 连接 (远程管理方需用新 key 重新添加)
+2. 吊销所有已签发 JWT (auth_version +1)
+
+#### CLI 应急重置
+
+```bash
+docker exec passim passim reset-api-key    # 重置 API Key
+docker exec passim passim reset-passkeys   # 清除所有 Passkey
+docker exec passim passim reset-all        # 全部重置
+```
+
+#### 通用规则
+
 所有其他 API 需携带:
 ```
 Authorization: Bearer <jwt-token>
 ```
 
 JWT 有效期 7 天，API Key 永久有效 (可重置)。
+auth_version (config 表) 用于 JWT 吊销: 每次重置 API Key 或调用 reset-all 时 +1，旧 JWT 验证失败。
+
+#### Go 依赖
+
+```
+github.com/go-webauthn/webauthn   -- WebAuthn/FIDO2
+golang.org/x/crypto/bcrypt        -- API Key hash
+```
 
 ### 系统状态
 
@@ -389,7 +445,7 @@ node:
   port: 8443
 
 auth:
-  api_key: "auto-generated"
+  api_key: "auto-generated"    # 明文仅首次启动输出到日志，数据库存 hash
 
 ssl:
   enabled: true
@@ -415,6 +471,16 @@ docker run -d \
   -e PASSIM_AUTH_API_KEY="my-custom-key" \
   -e PASSIM_LOG_LEVEL="debug" \
   ...
+```
+
+CLI 子命令:
+
+```
+passim                     # 正常启动
+passim reset-api-key       # 重置节点 API Key
+passim reset-passkeys      # 清除所有 Passkey
+passim reset-all           # 全部重置 (API Key + Passkey + JWT)
+passim version             # 版本信息
 ```
 
 ---
@@ -461,6 +527,7 @@ docker run passim/passim
 [9] 日志输出:
     "Passim started on https://0.0.0.0:8443"
     "API Key: xxxxx"
+    "Register a Passkey in Settings for convenient login"
 ```
 
 ---
@@ -503,7 +570,9 @@ docker run -d ... passim/passim:latest  # 相同参数
 | Code | HTTP | 说明 |
 |------|------|------|
 | `AUTH_REQUIRED` | 401 | 未认证 |
-| `AUTH_INVALID` | 401 | API Key / JWT 无效 |
+| `AUTH_INVALID` | 401 | API Key / JWT / Passkey 无效 |
+| `PASSKEY_NOT_FOUND` | 404 | Passkey 不存在 |
+| `WEBAUTHN_FAILED` | 400 | WebAuthn 验证失败 |
 | `NOT_FOUND` | 404 | 资源不存在 |
 | `CONTAINER_NOT_FOUND` | 404 | 容器不存在 |
 | `APP_NOT_FOUND` | 404 | 应用不存在 |

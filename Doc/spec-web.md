@@ -43,7 +43,7 @@ web/
 │   ├── main.tsx                     # 入口
 │   ├── App.tsx                      # 根组件 (路由 + Providers)
 │   ├── routes/                      # 页面
-│   │   ├── login.tsx                # API Key 登录
+│   │   ├── login.tsx                # 登录 (API Key + Passkey)
 │   │   ├── dashboard.tsx            # 总览面板
 │   │   ├── containers.tsx           # 本地容器管理
 │   │   ├── apps/
@@ -54,7 +54,7 @@ web/
 │   │   │   ├── index.tsx            # 远程节点列表
 │   │   │   └── [id].tsx             # 远程节点详情 (指标/容器/应用)
 │   │   ├── storage.tsx              # S3 凭证管理
-│   │   └── settings.tsx             # 设置 (节点名/连接管理/主题/语言)
+│   │   └── settings.tsx             # 设置 (节点名/连接管理/Passkey/API Key/主题/语言)
 │   ├── components/
 │   │   ├── ui/                      # shadcn/ui 组件 (自动生成)
 │   │   │   ├── button.tsx
@@ -100,7 +100,8 @@ web/
 │   ├── hooks/
 │   │   ├── use-api.ts               # TanStack Query wrappers
 │   │   ├── use-sse.ts               # SSE 实时数据
-│   │   ├── use-auth.ts              # 认证状态
+│   │   ├── use-auth.ts              # 认证状态 (API Key + Passkey)
+│   │   ├── use-passkey.ts           # WebAuthn 注册/认证流程
 │   │   └── use-theme.ts             # 主题切换
 │   ├── stores/
 │   │   └── app-store.ts             # Zustand (sidebar/viewMode)
@@ -170,6 +171,8 @@ web/
 
 ### 登录页 `/login`
 
+支持两种登录方式: API Key (主要/首次) + Passkey (便捷/日常)。
+
 ```
 ┌──────────────────────────────────────┐
 │                                      │
@@ -179,13 +182,21 @@ web/
 │   │  API Key                     │   │
 │   └──────────────────────────────┘   │
 │                                      │
-│   [ Enter                        ]   │
+│   [ Sign In                      ]   │
+│                                      │
+│   ── or ──                           │
+│                                      │
+│   [ 🔑 Sign in with Passkey     ]   │
 │                                      │
 │   Run `docker logs passim` to see   │
 │   your API key                      │
 │                                      │
 └──────────────────────────────────────┘
 ```
+
+- Passkey 按钮仅在已注册过 Passkey 时显示 (通过 `GET /api/auth/passkeys/exists` 检查)
+- 首次使用必须用 API Key 登录，然后在设置页注册 Passkey
+- Passkey 登录触发浏览器原生 WebAuthn 弹窗 (指纹/面容/安全密钥)
 
 ### Dashboard `/`
 
@@ -264,8 +275,20 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  // Auth
+  // Auth - API Key
   login: (apiKey: string) => request<{token: string}>('/auth/login', { method: 'POST', body: JSON.stringify({ api_key: apiKey }) }),
+
+  // Auth - Passkey (WebAuthn)
+  passkeyBegin: () => request<PublicKeyCredentialRequestOptions>('/auth/passkey/begin', { method: 'POST' }),
+  passkeyFinish: (credential: any) => request<{token: string}>('/auth/passkey/finish', { method: 'POST', body: JSON.stringify(credential) }),
+  getPasskeys: () => request<{passkeys: Passkey[]}>('/auth/passkeys'),
+  passkeyRegister: () => request<PublicKeyCredentialCreationOptions>('/auth/passkey/register', { method: 'POST' }),
+  passkeyRegisterFinish: (credential: any) => request('/auth/passkey/register/finish', { method: 'POST', body: JSON.stringify(credential) }),
+  deletePasskey: (id: string) => request('/auth/passkeys/' + id, { method: 'DELETE' }),
+
+  // API Key management
+  getApiKey: () => request<{prefix: string, created_at: string}>('/settings/api-key'),
+  regenerateApiKey: () => request<{api_key: string}>('/settings/api-key/regenerate', { method: 'POST' }),
 
   // Status
   getStatus: () => request<NodeStatus>('/status'),
@@ -505,6 +528,25 @@ ENTRYPOINT ["passim"]
     "connected": "已连接",
     "disconnected": "未连接",
     "offline": "离线"
+  },
+  "auth": {
+    "sign_in": "登录",
+    "sign_in_with_passkey": "使用 Passkey 登录",
+    "api_key_placeholder": "输入 API Key",
+    "invalid_api_key": "API Key 无效",
+    "passkey_failed": "Passkey 验证失败"
+  },
+  "settings": {
+    "security": "安全",
+    "passkeys": "Passkeys",
+    "passkey_register": "注册新 Passkey",
+    "passkey_name": "名称",
+    "passkey_last_used": "上次使用",
+    "passkey_delete": "删除",
+    "passkey_empty": "未注册 Passkey，使用指纹/面容快速登录",
+    "api_key": "API Key",
+    "api_key_regenerate": "重新生成",
+    "api_key_warning": "重新生成会断开所有远程连接"
   }
 }
 ```

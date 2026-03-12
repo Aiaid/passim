@@ -192,7 +192,7 @@ docker run -d \
 | 多节点通信 | **WebSocket** (gorilla/websocket) | Passim 实例间双向通信 |
 | 任务 | **内存队列** + SQLite 持久化 | 单机场景不需要 Redis |
 | 前端嵌入 | **Go embed** | 静态文件打包进二进制 |
-| 认证 | **JWT** + **API Key** | API Key 登录，签发 JWT |
+| 认证 | **JWT** + **API Key** + **WebAuthn** | API Key 登录 + Passkey 便捷登录，签发 JWT |
 | 配置 | **Viper** | YAML 配置文件 |
 
 ### 前端 (Vite + React)
@@ -282,7 +282,8 @@ passim/
 │   │   └── speedtest.go            # Speedtest 部署
 │   └── auth/                        # 认证
 │       ├── apikey.go                # API Key 管理
-│       └── jwt.go                   # JWT 签发/验证
+│       ├── jwt.go                   # JWT 签发/验证
+│       └── webauthn.go              # Passkey (WebAuthn/FIDO2)
 ├── web/                             # 前端源码 (Vite + React)
 │   ├── src/
 │   │   ├── main.tsx
@@ -353,7 +354,18 @@ CREATE TABLE config (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
--- node_id, node_name, api_key, setup_complete
+-- node_id, node_name, api_key_hash, auth_version, setup_complete
+
+-- Passkey (WebAuthn) 凭证
+CREATE TABLE passkeys (
+    id              TEXT PRIMARY KEY,
+    credential_id   BLOB NOT NULL UNIQUE, -- WebAuthn credential ID
+    public_key      BLOB NOT NULL,        -- COSE public key
+    name            TEXT,                  -- "MacBook Touch ID", "YubiKey" 等
+    sign_count      INTEGER DEFAULT 0,
+    created_at      TEXT DEFAULT (datetime('now')),
+    last_used_at    TEXT
+);
 
 -- 远程节点
 CREATE TABLE remote_nodes (
@@ -455,9 +467,27 @@ VPS A (管理者)                    VPS B (被管理)
 
 ### 认证
 
+用户登录支持两种方式: API Key (主要/首次) + Passkey (便捷/日常)。
+节点间 WebSocket 通信使用 API Key 直接认证。
+
 ```
-POST /api/auth/login     { "api_key": "xxx" } → { "token": "jwt..." }
-POST /api/auth/refresh   { "token": "xxx" }   → { "token": "new-jwt..." }
+# API Key 登录
+POST /api/auth/login                    { "api_key": "xxx" } → { "token": "jwt..." }
+POST /api/auth/refresh                  { "token": "xxx" }   → { "token": "new-jwt..." }
+
+# Passkey (WebAuthn) 登录
+POST /api/auth/passkey/begin            → { challenge options }
+POST /api/auth/passkey/finish           { credential }       → { "token": "jwt..." }
+
+# Passkey 管理 (需已登录)
+GET    /api/auth/passkeys               → [{ id, name, created_at, last_used_at }]
+POST   /api/auth/passkey/register       → { challenge options }
+POST   /api/auth/passkey/register/finish → { ok }
+DELETE /api/auth/passkeys/:id
+
+# API Key 管理 (需已登录)
+GET    /api/settings/api-key            → { prefix, created_at }
+POST   /api/settings/api-key/regenerate → { api_key }  ← 仅此一次明文返回
 ```
 
 ### 本地状态
@@ -553,7 +583,7 @@ GET    /ws/node?key=<api_key>       # 远程 Passim 连接端点
 - [ ] 应用模板引擎 (YAML 解析 + 参数渲染 + Docker 部署)
 - [ ] 迁移所有现有应用为 YAML 模板 (7 个)
 - [ ] 配置导出 (conf/mobileconfig/yaml)
-- [ ] API Key 认证 + JWT
+- [ ] API Key 认证 + Passkey (WebAuthn) + JWT
 - [ ] SQLite 数据持久化
 - [ ] 异步任务队列 (内存 + SQLite)
 - [ ] 初始化 setup (SSL/Speedtest 自动部署)
@@ -569,7 +599,7 @@ GET    /ws/node?key=<api_key>       # 远程 Passim 连接端点
 
 - [ ] 项目初始化 (Vite + React 19 + Tailwind v4 + shadcn/ui)
 - [ ] 设计系统 (OKLCH 色彩 / 暗色模式)
-- [ ] API Key 登录页
+- [ ] 登录页 (API Key + Passkey)
 - [ ] Dashboard 总览 (节点状态 + 快速操作)
 - [ ] 容器管理 (列表 + 操作 + 日志)
 - [ ] 应用管理
@@ -621,7 +651,7 @@ GET    /ws/node?key=<api_key>       # 远程 Passim 连接端点
 
 ### Phase 5: 增强功能 (持续)
 
-- [ ] 多用户 + RBAC
+- [ ] 多用户 + 密码登录 + RBAC
 - [ ] Web Terminal (xterm.js)
 - [ ] 灰度发布
 - [ ] 审计日志
