@@ -1,6 +1,6 @@
 # Epic 9: 设置与个性化
 
-> Phase: 2 (P1) + Phase 5 (P3)
+> Phase: 2 (P1) + Phase 4 (P2) + Phase 5 (P3)
 
 ---
 
@@ -80,3 +80,4 @@ API Key
 │ ⚠ Will disconnect all remote nodes          │
 └──────────────────────────────────────────────┘
 ```
+

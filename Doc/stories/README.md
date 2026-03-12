@@ -4,11 +4,14 @@
 
 ## 角色定义
 
+Passim 的核心用户是有 VPS 但不想折腾命令行的普通人——可能是为了翻墙、远程办公、搭私有网盘，也可能只是想有一个属于自己的云。他们不是开发者，不懂 Docker，不想碰终端。
+
 | 角色 | 描述 |
 |------|------|
-| **User** | 单机或多机用户，通过 Passim Web UI 管理 VPS |
+| **User** | 普通用户，通过 Passim Web UI 管理自己的 VPS，不需要技术背景 |
+| **Power User** | 管理多台 VPS 的用户，使用远程节点管理和批量部署 |
 | **Admin** | 平台管理员 (多用户场景，Phase 5) |
-| **New User** | 首次接触平台的用户 |
+| **New User** | 首次接触平台的用户，需要清晰的引导从安装到第一次使用 |
 
 ## Epic 目录
 
@@ -23,6 +26,7 @@
 | 7 | [epic-7-monitoring.md](./epic-7-monitoring.md) | US-7.1 ~ US-7.4 | 监控与可观测性 |
 | 8 | [epic-8-admin.md](./epic-8-admin.md) | US-8.1 ~ US-8.2 | 系统管理 (Admin) |
 | 9 | [epic-9-settings.md](./epic-9-settings.md) | US-9.1 ~ US-9.2 | 设置与个性化 (主题/安全) |
+| 10 | [epic-10-mobile-app.md](./epic-10-mobile-app.md) | US-10.1 ~ US-10.6 | 手机 App (Expo，连接/管理/VPN 配置/通知) |
 
 ## 优先级矩阵
 
@@ -55,5 +59,11 @@
 | **P2** | US-7.2 测速 | Phase 4 |
 | **P2** | US-7.3 SSL 状态 | Phase 4 |
 | **P2** | US-7.4 DNS 检查 | Phase 4 |
+| **P1** | US-10.1 连接 Passim 节点 (App) | Phase 5 |
+| **P1** | US-10.2 Dashboard 概览 (App) | Phase 5 |
+| **P1** | US-10.3 应用管理与快捷操作 (App) | Phase 5 |
+| **P0** | US-10.4 VPN 配置与扫码 (App) | Phase 5 |
+| **P1** | US-10.6 Passkey 生物认证 (App) | Phase 5 |
+| **P2** | US-10.5 推送通知 (App) | Phase 5 |
 | **P3 - 后续** | US-8.1 用户管理 | Phase 5 |
 | **P3** | US-8.2 全局概览 | Phase 5 |

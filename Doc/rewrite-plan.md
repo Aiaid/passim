@@ -2,6 +2,22 @@
 
 > 版本: 3.0 | 日期: 2026-03-12
 
+## 产品定位
+
+**Passim 是面向普通人的个人云管理助手。**
+
+大多数人租了 VPS 之后，面对的是黑漆漆的终端和一堆命令行。Portainer 解决了 Docker 管理的问题，但它是给开发者用的——界面复杂、概念多、没有引导。Passim 不一样：一行命令启动，打开浏览器就能部署 VPN、网盘、远程桌面，不需要懂 Docker、不需要写配置文件、不需要碰终端。
+
+Passim 是你的 VPS 管家。它藏起了所有技术细节，只呈现你关心的事情：装一个 VPN、看看服务器状态、下载配置扫码连接。多台 VPS 也不怕，任何一台都能管其他的，没有中心、没有额外部署。
+
+**核心受众**: 有 VPS 但不想（或不会）折腾命令行的普通用户——可能是为了翻墙、远程办公、私有网盘，也可能只是想有一个属于自己的云。
+
+**设计原则**:
+- **即装即用** — `docker run` 一行命令，不需要第二步
+- **隐藏复杂度** — 用户看到的是"部署 VPN"，不是"创建容器"
+- **有品位** — 界面干净克制，不堆功能、不用默认蓝
+- **自给自足** — 一个容器 = 全部功能，不依赖外部服务
+
 ### 相关文档
 
 | 文档 | 说明 |
@@ -9,12 +25,13 @@
 | [stories/](./stories/) | User Stories 与验收标准 (按 Epic 分文件) |
 | [spec-passim.md](./spec-passim.md) | Passim 服务详细设计 (API/配置/多节点/CLI) |
 | [spec-web.md](./spec-web.md) | Web 前端详细设计 (页面/组件/状态管理) |
+| [stories/epic-10-mobile-app.md](./stories/epic-10-mobile-app.md) | 手机 App 设计 (Expo, User Stories) |
 
 ---
 
 ## 一、现有系统概述
 
-AC (Passim) 是一个分布式 VPS 管理与应用部署平台，用户通过 Web 控制台管理 VPS 实例、部署 VPN/存储/远程桌面等服务，后端通过 Docker 编排完成自动化运维。
+AC (Passim) 目前是一个分布式 VPS 管理与应用部署平台，用户通过 Web 控制台管理 VPS 实例、部署 VPN/存储/远程桌面等服务，后端通过 Docker 编排完成自动化运维。但现有系统更像是给开发者写的工具——组件分散、概念外露、缺少面向普通用户的引导和体验打磨。
 
 ### 当前组件
 
@@ -60,15 +77,17 @@ AC (Passim) 是一个分布式 VPS 管理与应用部署平台，用户通过 We
 
 ## 三、重写目标
 
+重写的核心不是技术升级，而是**把一个开发者工具变成普通人的产品**。
+
 | 优先级 | 目标 | 说明 |
 |--------|------|------|
 | P0 | 单一服务 | 一个 Docker 容器 = 全部功能 (API + Web UI + 本地管理 + 远程节点管理) |
-| P0 | 即装即用 | `docker run` 一行命令启动，开箱管理本机 |
-| P0 | 对等多节点 | 任意 Passim 实例可连接其他实例，形成管理网络 |
-| P0 | 可靠部署 | 异步任务 + 重试 + 进度推送 |
-| P1 | 插件化应用 | YAML 模板定义应用，新增应用无需改代码 |
-| P1 | 现代化前端 | Vite + React 19 + shadcn/ui + Tailwind CSS v4 |
-| P1 | 可观测性 | 内置指标采集 (替代 Glances)，结构化日志 |
+| P0 | 即装即用 | `docker run` 一行命令启动，不需要配置文件、不需要数据库、不需要第二步 |
+| P0 | 对等多节点 | 任意 Passim 实例可连接其他实例，没有中心、没有额外部署 |
+| P0 | 可靠部署 | 异步任务 + 重试 + 进度推送，用户不需要盯着终端 |
+| P1 | 插件化应用 | YAML 模板定义应用，用户看到的是"一键部署 VPN"，开发者看到的是可扩展的模板 |
+| P1 | 有品位的界面 | Vite + React 19 + shadcn/ui + Tailwind CSS v4，干净克制，不堆功能 |
+| P1 | 可观测性 | 内置指标采集 (替代 Glances)，用户只看到简洁的仪表盘 |
 | P2 | 多用户 | 用户隔离、配额、RBAC |
 
 ---
@@ -78,6 +97,8 @@ AC (Passim) 是一个分布式 VPS 管理与应用部署平台，用户通过 We
 ### 核心理念：一个 Passim，对等互联
 
 不再区分 "Node Service" 和 "Gateway"。每台 VPS 运行**同一个 Passim Docker 容器**，它既管理本机，也可以连接管理其他 VPS。
+
+对用户来说，这意味着：买一台 VPS，装一行命令，打开浏览器就能用。买了第二台？在第一台的界面里加一下就行，不需要装新东西。
 
 ```
 VPS A                    VPS B                    VPS C
@@ -140,6 +161,7 @@ VPS B 也连接了 C
 | SWAG 容器 (SSL) | 内置 certmagic ACME 客户端 |
 | Speedtest 容器 (测速) | 内置 HTTP 测速端点 + iperf3 |
 | 4+ 个进程 + 数据库 | 1 个 Docker 容器 |
+| 无手机 App | Expo 手机 App (iOS + Android) |
 
 ### Docker 容器结构
 
@@ -229,6 +251,28 @@ docker run -d \
 | 复杂度 | middleware/server actions 等概念 | 简单直接 |
 
 管理后台不需要 SEO，不需要 SSR。Vite 产出纯静态文件，完美嵌入 Go 二进制。
+
+### 手机 App (Expo)
+
+| 类别 | 选择 | 理由 |
+|------|------|------|
+| 框架 | **Expo SDK 52+** | 统一 iOS/Android，OTA 更新 |
+| 导航 | **Expo Router** | 文件系统路由，与 Expo 深度集成 |
+| UI | **React Native** + 自定义组件 | 与 Web 保持视觉一致性 |
+| 状态 | **Zustand** + **TanStack Query** | 与 Web 端方案一致，复用逻辑 |
+| 认证 | **WebAuthn (Passkey)** | 指纹/面容登录，与 Passim Passkey 后端共用 |
+| 通知 | **Expo Notifications** | 推送节点离线/部署完成等事件 |
+| 二维码 | **expo-camera** | 扫码添加节点、扫码导入配置 |
+| 存储 | **expo-secure-store** | 安全存储 JWT / API Key |
+
+#### 为什么用手机 App 而不只是响应式 Web
+
+Passim 的核心用户是普通人，大部分场景发生在手机上：扫码连 VPN、出门前看一眼服务状态、收到节点离线通知。Web 响应式做不到的事：
+
+- **VPN 配置直接导入** — deep link / URL scheme 打开 WireGuard/Stash 等 App
+- **推送通知** — 节点离线、容器停止、SSL 过期，不用一直开着页面
+- **生物认证** — Face ID / 指纹解锁，比在手机浏览器输密码自然得多
+- **扫码连接** — 手机扫 Web UI 的二维码一步添加节点
 
 ### DNS
 
@@ -661,13 +705,34 @@ GET    /ws/node?key=<api_key>       # 远程 Passim 连接端点
 
 **交付物**: 可从旧系统迁移的生产版本
 
-### Phase 5: 增强功能 (持续)
+### Phase 5: 手机 App + 增强功能 (4 周 + 持续)
 
+**目标**: 手机 App 让 Passim 从"打开电脑才能管"变成"随手就能管"
+
+**手机 App (Expo):**
+- [ ] Expo 项目初始化 (Expo Router + Zustand + TanStack Query)
+- [ ] 连接节点 (手动输入 + 扫码添加)
+- [ ] Dashboard 概览 (节点状态 + 应用列表)
+- [ ] 应用管理 (启停/部署/详情)
+- [ ] VPN 配置导出 (deep link 导入 WireGuard/Stash + 二维码全屏 + 系统分享)
+- [ ] Passkey 生物认证 (Face ID / 指纹)
+- [ ] 推送通知 (节点离线/容器停止/SSL 过期/部署完成)
+- [ ] 多节点切换
+- [ ] 国际化 (en-US / zh-CN)
+- [ ] App Store / Google Play 上架
+
+**交付物**: iOS + Android App，与 Passim API 完全对接
+
+**后端支持 (Passim 侧):**
+- [ ] `POST /api/push/register` — 注册推送 token
+- [ ] `GET/PUT /api/push/settings` — 通知偏好
+- [ ] Web UI 设置页生成"连接二维码" (地址 + API Key 编码)
+
+**其他增强:**
 - [ ] 多用户 + 密码登录 + RBAC
 - [ ] Web Terminal (xterm.js)
 - [ ] 灰度发布
 - [ ] 审计日志
-- [ ] 移动端适配
 - [ ] DNS 服务器 Go 重写 (可选)
 
 ---
@@ -696,3 +761,6 @@ GET    /ws/node?key=<api_key>       # 远程 Passim 连接端点
 - [ ] 任意节点可连接管理其他节点
 - [ ] 前端 Lighthouse 性能 > 90
 - [ ] 核心 API 测试覆盖率 > 80%
+- [ ] 手机 App: 扫码添加节点 < 30 秒完成
+- [ ] 手机 App: VPN 配置一键导入到客户端 App
+- [ ] 手机 App: iOS + Android 双平台上架

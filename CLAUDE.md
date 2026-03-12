@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AC (Passim) is a distributed VPS management and deployment platform. Users provision VPS instances, deploy applications (VPN, remote desktop, storage services), and manage them through a web dashboard backed by a FastAPI control plane.
+AC (Passim) is a personal cloud management assistant for ordinary people — like Portainer, but designed with taste and simplicity for non-technical users. One `docker run` command, open a browser, deploy VPN/storage/remote desktop without touching a terminal. Currently undergoing a full rewrite from the legacy multi-component architecture (Next.js + Python FastAPI + MongoDB) to a single Go binary with embedded Web UI (see `Doc/rewrite-plan.md`).
 
 ## Components
 
