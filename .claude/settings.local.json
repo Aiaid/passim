@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(curl:*)",
+      "Bash(head -30 /Users/anend/Desktop/AC/Web/app/api/vps/[ip]/update/route.ts)",
+      "Bash(ls -la /Users/anend/Desktop/AC/Web/components/ | grep -E \"\\\\.tsx$\")",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(find /Users/anend/Desktop/AC/Doc -type f -name \"*.md\" | sort && echo \"---\" && wc -l /Users/anend/Desktop/AC/Doc/*.md /Users/anend/Desktop/AC/Doc/stories/*.md 2>/dev/null)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
