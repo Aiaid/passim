@@ -8,6 +8,16 @@ import (
 	"github.com/docker/docker/client"
 )
 
+// DockerClient defines the interface for Docker operations.
+type DockerClient interface {
+	Close() error
+	ListContainers(ctx context.Context) ([]container.Summary, error)
+	StartContainer(ctx context.Context, id string) error
+	StopContainer(ctx context.Context, id string) error
+	RemoveContainer(ctx context.Context, id string) error
+	Ping(ctx context.Context) error
+}
+
 type Client struct {
 	cli *client.Client
 }

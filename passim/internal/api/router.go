@@ -7,11 +7,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/auth"
+	"github.com/passim/passim/internal/docker"
+	"github.com/passim/passim/internal/template"
 )
 
 type Deps struct {
-	DB  *sql.DB
-	JWT *auth.JWTManager
+	DB        *sql.DB
+	JWT       *auth.JWTManager
+	Docker    docker.DockerClient
+	Templates *template.Registry
 }
 
 func NewRouter(deps Deps) http.Handler {
@@ -43,6 +47,10 @@ func NewRouter(deps Deps) http.Handler {
 					"go":      runtime.Version(),
 				})
 			})
+
+			if deps.Templates != nil {
+				protected.GET("/templates", listTemplates(deps.Templates))
+			}
 		}
 	}
 
