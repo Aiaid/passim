@@ -1,0 +1,78 @@
+name: rdesktop
+category: tools
+version: 1.0.0
+icon: monitor
+description:
+  en-US: "Remote desktop environment accessible via RDP"
+  zh-CN: "通过 RDP 访问的远程桌面环境"
+source:
+  url: https://github.com/linuxserver/docker-rdesktop
+  license: GPL-3.0
+guide:
+  setup:
+    en-US: "Choose a screen resolution and start the container. Connect using any RDP client."
+    zh-CN: "选择屏幕分辨率并启动容器。使用任意 RDP 客户端连接。"
+  usage:
+    en-US: "Open an RDP client (Windows: Remote Desktop Connection, macOS: Microsoft Remote Desktop, Linux: Remmina) and connect to the server IP on port 3389."
+    zh-CN: "打开 RDP 客户端（Windows：远程桌面连接，macOS：Microsoft Remote Desktop，Linux：Remmina）并连接到服务器 IP 的 3389 端口。"
+limitations:
+  - "Performance depends on network bandwidth and server resources"
+  - "No GPU acceleration by default"
+settings:
+  - key: resolution
+    type: select
+    default: "1920x1080"
+    label:
+      en-US: "Screen Resolution"
+      zh-CN: "屏幕分辨率"
+    description:
+      en-US: "Desktop resolution for the remote session"
+      zh-CN: "远程会话的桌面分辨率"
+    options:
+      - value: "1920x1080"
+        label:
+          en-US: "1920x1080 (Full HD)"
+          zh-CN: "1920x1080（全高清）"
+      - value: "1280x720"
+        label:
+          en-US: "1280x720 (HD)"
+          zh-CN: "1280x720（高清）"
+      - value: "2560x1440"
+        label:
+          en-US: "2560x1440 (2K)"
+          zh-CN: "2560x1440（2K）"
+      - value: "1366x768"
+        label:
+          en-US: "1366x768"
+          zh-CN: "1366x768"
+      - value: "1024x768"
+        label:
+          en-US: "1024x768"
+          zh-CN: "1024x768"
+container:
+  image: linuxserver/rdesktop
+  ports:
+    - "3389:3389"
+  volumes:
+    - "/data/configs/rdesktop:/config"
+  environment:
+    PUID: "1000"
+    PGID: "1000"
+  labels:
+    io.passim: tools
+    io.passim.app: rdesktop
+clients:
+  desktop:
+    label:
+      en-US: "RDP Client"
+      zh-CN: "RDP 客户端"
+    description:
+      en-US: "Use any RDP client to connect to the server IP on port 3389."
+      zh-CN: "使用任意 RDP 客户端连接到服务器 IP 的 3389 端口。"
+  mobile:
+    label:
+      en-US: "Microsoft Remote Desktop"
+      zh-CN: "Microsoft 远程桌面"
+    description:
+      en-US: "Install Microsoft Remote Desktop from your app store and connect to the server IP."
+      zh-CN: "从应用商店安装 Microsoft 远程桌面并连接到服务器 IP。"

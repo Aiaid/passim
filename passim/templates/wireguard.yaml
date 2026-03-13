@@ -5,6 +5,20 @@ icon: shield
 description:
   en-US: "Peer-to-peer VPN using WireGuard protocol"
   zh-CN: "基于 WireGuard 协议的点对点 VPN"
+source:
+  url: https://github.com/linuxserver/docker-wireguard
+  license: GPL-2.0
+guide:
+  setup:
+    en-US: "Set the number of peers and start the server. Config files are generated automatically for each peer."
+    zh-CN: "设置对等节点数并启动服务器。每个节点的配置文件会自动生成。"
+  usage:
+    en-US: "Download the generated .conf file or scan the QR code, then import it into your WireGuard client app."
+    zh-CN: "下载生成的 .conf 文件或扫描二维码，然后导入 WireGuard 客户端应用。"
+limitations:
+  - "Requires NET_ADMIN and SYS_MODULE capabilities"
+  - "Host must have WireGuard kernel module support or wireguard-tools installed"
+  - "UDP port 51820 must not be blocked by firewall"
 settings:
   - key: peers
     type: number
@@ -14,6 +28,9 @@ settings:
     label:
       en-US: "Number of Peers"
       zh-CN: "对等节点数"
+    description:
+      en-US: "How many peer config files to generate"
+      zh-CN: "要生成多少个对等节点配置文件"
 container:
   image: linuxserver/wireguard
   ports:
@@ -30,6 +47,21 @@ container:
     - SYS_MODULE
   sysctls:
     net.ipv4.conf.all.src_valid_mark: "1"
+clients:
+  mobile:
+    label:
+      en-US: "WireGuard App"
+      zh-CN: "WireGuard 应用"
+    description:
+      en-US: "Install WireGuard from your app store and scan the QR code or import the .conf file."
+      zh-CN: "从应用商店安装 WireGuard，扫描二维码或导入 .conf 文件。"
+  desktop:
+    label:
+      en-US: "WireGuard Client"
+      zh-CN: "WireGuard 客户端"
+    description:
+      en-US: "Download WireGuard from wireguard.com and import the generated peer .conf file."
+      zh-CN: "从 wireguard.com 下载 WireGuard 并导入生成的节点 .conf 文件。"
 config_export:
   format: conf
   path: /data/configs/wireguard/wg_confs/

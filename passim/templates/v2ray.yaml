@@ -1,0 +1,99 @@
+name: v2ray
+category: vpn
+version: 1.0.0
+icon: globe
+description:
+  en-US: "V2Ray proxy with VMess protocol"
+  zh-CN: "V2Ray 代理 — 使用 VMess 协议"
+source:
+  url: https://github.com/v2fly/v2ray-core
+  license: MIT
+guide:
+  setup:
+    en-US: "A UUID is generated automatically. Set the listen port and start the server. Use the UUID in your V2Ray client config."
+    zh-CN: "UUID 会自动生成。设置监听端口并启动服务器。在 V2Ray 客户端配置中使用该 UUID。"
+  usage:
+    en-US: "Configure your V2Ray client with the server address, port, and UUID. Protocol: VMess, alterId: 0."
+    zh-CN: "使用服务器地址、端口和 UUID 配置 V2Ray 客户端。协议：VMess，alterId：0。"
+limitations:
+  - "VMess traffic may be detected by deep packet inspection without additional obfuscation"
+  - "Requires a V2Ray-compatible client (v2rayN, v2rayNG, Qv2ray, etc.)"
+settings:
+  - key: port
+    type: number
+    min: 1
+    max: 65535
+    default: 10086
+    label:
+      en-US: "Listen Port"
+      zh-CN: "监听端口"
+    description:
+      en-US: "TCP port for VMess inbound connections"
+      zh-CN: "VMess 入站连接的 TCP 端口"
+  - key: uuid
+    type: string
+    default: "{{generated.uuid}}"
+    label:
+      en-US: "Client UUID"
+      zh-CN: "客户端 UUID"
+    description:
+      en-US: "UUID for VMess authentication (auto-generated)"
+      zh-CN: "VMess 认证 UUID（自动生成）"
+generated:
+  - key: uuid
+    type: uuid_v4
+container:
+  image: v2fly/v2fly-core
+  ports:
+    - "{{settings.port}}:10086"
+  volumes:
+    - "/data/configs/v2ray:/etc/v2ray"
+  environment: {}
+  labels:
+    io.passim: vpn
+    io.passim.app: v2ray
+  args:
+    - "run"
+    - "-c"
+    - "/etc/v2ray/config.json"
+config:
+  files:
+    - path: /data/configs/v2ray/config.json
+      template: |
+        {
+          "inbounds": [
+            {
+              "port": 10086,
+              "protocol": "vmess",
+              "settings": {
+                "clients": [
+                  {
+                    "id": "{{settings.uuid}}",
+                    "alterId": 0
+                  }
+                ]
+              }
+            }
+          ],
+          "outbounds": [
+            {
+              "protocol": "freedom",
+              "settings": {}
+            }
+          ]
+        }
+clients:
+  mobile:
+    label:
+      en-US: "v2rayNG (Android) / Shadowrocket (iOS)"
+      zh-CN: "v2rayNG (Android) / Shadowrocket (iOS)"
+    description:
+      en-US: "Import VMess config or manually add server with address, port, UUID, and alterId 0."
+      zh-CN: "导入 VMess 配置或手动添加服务器，填入地址、端口、UUID 和 alterId 0。"
+  desktop:
+    label:
+      en-US: "v2rayN / Qv2ray"
+      zh-CN: "v2rayN / Qv2ray"
+    description:
+      en-US: "Add a VMess server with the server address, port, UUID, and alterId 0."
+      zh-CN: "添加 VMess 服务器，填入服务器地址、端口、UUID 和 alterId 0。"

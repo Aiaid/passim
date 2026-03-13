@@ -1,0 +1,88 @@
+name: l2tp
+category: vpn
+version: 1.0.0
+icon: lock
+description:
+  en-US: "L2TP/IPSec VPN server for broad device compatibility"
+  zh-CN: "L2TP/IPSec VPN 服务器，兼容各种设备"
+source:
+  url: https://github.com/hwdsl2/docker-ipsec-vpn-server
+  license: MIT
+guide:
+  setup:
+    en-US: "Set your VPN credentials and start the server. The pre-shared key (PSK), username, and password are required to connect."
+    zh-CN: "设置 VPN 凭据并启动服务器。连接时需要预共享密钥 (PSK)、用户名和密码。"
+  usage:
+    en-US: "Configure your device's built-in L2TP/IPSec VPN client with the server IP, PSK, username, and password."
+    zh-CN: "使用服务器 IP、PSK、用户名和密码配置设备自带的 L2TP/IPSec VPN 客户端。"
+limitations:
+  - "Requires NET_ADMIN capability"
+  - "Requires access to /lib/modules on the host for kernel modules"
+  - "UDP ports 500 and 4500 must not be in use by other services"
+settings:
+  - key: vpn_user
+    type: string
+    default: "vpnuser"
+    label:
+      en-US: "VPN Username"
+      zh-CN: "VPN 用户名"
+    description:
+      en-US: "Username for VPN authentication"
+      zh-CN: "VPN 认证用户名"
+  - key: vpn_password
+    type: string
+    default: "{{generated.vpn_password}}"
+    label:
+      en-US: "VPN Password"
+      zh-CN: "VPN 密码"
+    description:
+      en-US: "Password for VPN authentication"
+      zh-CN: "VPN 认证密码"
+  - key: vpn_psk
+    type: string
+    default: "{{generated.vpn_psk}}"
+    label:
+      en-US: "Pre-Shared Key"
+      zh-CN: "预共享密钥"
+    description:
+      en-US: "IPSec pre-shared key for connection setup"
+      zh-CN: "IPSec 连接预共享密钥"
+generated:
+  - key: vpn_password
+    type: random_string
+    length: 16
+  - key: vpn_psk
+    type: random_string
+    length: 24
+container:
+  image: hwdsl2/ipsec-vpn-server
+  ports:
+    - "500:500/udp"
+    - "4500:4500/udp"
+  volumes:
+    - "/data/configs/l2tp:/etc/ipsec.d"
+    - "/lib/modules:/lib/modules:ro"
+  environment:
+    VPN_IPSEC_PSK: "{{settings.vpn_psk}}"
+    VPN_USER: "{{settings.vpn_user}}"
+    VPN_PASSWORD: "{{settings.vpn_password}}"
+  labels:
+    io.passim: vpn
+    io.passim.app: l2tp
+  cap_add:
+    - NET_ADMIN
+clients:
+  mobile:
+    label:
+      en-US: "Built-in VPN Client"
+      zh-CN: "系统自带 VPN 客户端"
+    description:
+      en-US: "Use your device's built-in L2TP/IPSec VPN settings with the server IP, username, password, and PSK."
+      zh-CN: "使用设备自带的 L2TP/IPSec VPN 设置，填入服务器 IP、用户名、密码和 PSK。"
+  desktop:
+    label:
+      en-US: "Built-in VPN Client"
+      zh-CN: "系统自带 VPN 客户端"
+    description:
+      en-US: "Open network settings and add an L2TP/IPSec VPN connection with the server credentials."
+      zh-CN: "打开网络设置，添加 L2TP/IPSec VPN 连接并填入服务器凭据。"

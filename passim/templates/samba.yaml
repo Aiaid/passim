@@ -1,0 +1,76 @@
+name: samba
+category: storage
+version: 1.0.0
+icon: hard-drive
+description:
+  en-US: "Samba file sharing server for local network access"
+  zh-CN: "Samba 文件共享服务器，用于局域网文件访问"
+source:
+  url: https://github.com/dperson/samba
+  license: ISC
+guide:
+  setup:
+    en-US: "Set a username, password, and share name. The share will be accessible on your local network."
+    zh-CN: "设置用户名、密码和共享名称。共享将在局域网内可访问。"
+  usage:
+    en-US: "Connect from Windows (\\\\server-ip\\share), macOS (Finder > Connect to Server > smb://server-ip/share), or Linux (mount -t cifs)."
+    zh-CN: "从 Windows (\\\\服务器IP\\共享名)、macOS (Finder > 连接服务器 > smb://服务器IP/共享名) 或 Linux (mount -t cifs) 连接。"
+limitations:
+  - "Best suited for local network use; not recommended over the internet without a VPN"
+  - "SMB ports (139, 445) may be blocked by ISPs or firewalls"
+settings:
+  - key: username
+    type: string
+    default: "user"
+    label:
+      en-US: "Username"
+      zh-CN: "用户名"
+    description:
+      en-US: "Samba authentication username"
+      zh-CN: "Samba 认证用户名"
+  - key: password
+    type: string
+    default: "{{generated.password}}"
+    label:
+      en-US: "Password"
+      zh-CN: "密码"
+    description:
+      en-US: "Samba authentication password"
+      zh-CN: "Samba 认证密码"
+  - key: share_name
+    type: string
+    default: "share"
+    label:
+      en-US: "Share Name"
+      zh-CN: "共享名称"
+    description:
+      en-US: "Name of the Samba share visible on the network"
+      zh-CN: "网络上可见的 Samba 共享名称"
+generated:
+  - key: password
+    type: random_string
+    length: 16
+container:
+  image: dperson/samba
+  ports:
+    - "139:139"
+    - "445:445"
+  volumes:
+    - "/data/files/samba:/mount"
+  environment: {}
+  labels:
+    io.passim: storage
+    io.passim.app: samba
+  args:
+    - "-u"
+    - "{{settings.username}};{{settings.password}}"
+    - "-s"
+    - "{{settings.share_name}};/mount;yes;no;no;{{settings.username}}"
+clients:
+  desktop:
+    label:
+      en-US: "File Manager"
+      zh-CN: "文件管理器"
+    description:
+      en-US: "Open your file manager and connect to smb://server-ip/share with the configured credentials."
+      zh-CN: "打开文件管理器，使用配置的凭据连接到 smb://服务器IP/共享名。"
