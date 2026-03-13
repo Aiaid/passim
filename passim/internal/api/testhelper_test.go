@@ -15,6 +15,8 @@ import (
 	"github.com/passim/passim/internal/auth"
 	"github.com/passim/passim/internal/db"
 	"github.com/passim/passim/internal/docker"
+	"github.com/passim/passim/internal/sse"
+	"github.com/passim/passim/internal/template"
 )
 
 // testServer creates a full test server with mock Docker.
@@ -66,6 +68,71 @@ func testServerWithDeps(t *testing.T, dockerClient docker.DockerClient) (http.Ha
 		mock, _ = dockerClient.(*docker.MockClient)
 	}
 	return router, database, plain, mock
+}
+
+// testServerFull creates a test server with mock Docker and a template registry.
+func testServerFull(t *testing.T, mock *docker.MockClient, reg *template.Registry) (http.Handler, *sql.DB, string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "test.db")
+	database, err := db.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrate(database); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		database.Close()
+		os.Remove(path)
+	})
+
+	plain, hash, err := auth.GenerateAPIKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetConfig(database, "api_key_hash", hash)
+	db.SetConfig(database, "auth_version", "1")
+
+	secret, _ := auth.GenerateSecret()
+	db.SetConfig(database, "jwt_secret", secret)
+
+	jwtMgr := auth.NewJWTManager(secret, 1*time.Hour)
+
+	router := NewRouter(Deps{DB: database, JWT: jwtMgr, Docker: mock, Templates: reg})
+	return router, database, plain
+}
+
+// testServerWithSSEBroker creates a test server with an SSE broker.
+func testServerWithSSEBroker(t *testing.T, broker *sse.Broker) (http.Handler, *sql.DB, string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "test.db")
+	database, err := db.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrate(database); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		database.Close()
+		os.Remove(path)
+	})
+
+	plain, hash, err := auth.GenerateAPIKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetConfig(database, "api_key_hash", hash)
+	db.SetConfig(database, "auth_version", "1")
+
+	secret, _ := auth.GenerateSecret()
+	db.SetConfig(database, "jwt_secret", secret)
+
+	jwtMgr := auth.NewJWTManager(secret, 1*time.Hour)
+
+	mock := &docker.MockClient{}
+	router := NewRouter(Deps{DB: database, JWT: jwtMgr, Docker: mock, SSE: broker})
+	return router, database, plain
 }
 
 // getToken logs in with an API key and returns the JWT token.

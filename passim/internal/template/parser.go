@@ -22,6 +22,7 @@ type Template struct {
 	Hooks        *Hooks            `yaml:"hooks,omitempty"`
 	Clients      *ClientConfig     `yaml:"clients,omitempty"`
 	ConfigExport *ConfigExport     `yaml:"config_export,omitempty"`
+	Generated    []GeneratedSpec   `yaml:"generated,omitempty"`
 }
 
 type Source struct {

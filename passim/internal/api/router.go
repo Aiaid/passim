@@ -8,7 +8,9 @@ import (
 	"github.com/passim/passim/internal/auth"
 	"github.com/passim/passim/internal/docker"
 	"github.com/passim/passim/internal/speedtest"
+	"github.com/passim/passim/internal/sse"
 	"github.com/passim/passim/internal/ssl"
+	"github.com/passim/passim/internal/task"
 	"github.com/passim/passim/internal/template"
 )
 
@@ -19,6 +21,8 @@ type Deps struct {
 	Templates *template.Registry
 	SSL       *ssl.SSLManager
 	Iperf     *speedtest.IperfServer
+	Tasks     *task.Queue
+	SSE       *sse.Broker
 }
 
 func NewRouter(deps Deps) http.Handler {
@@ -59,6 +63,26 @@ func NewRouter(deps Deps) http.Handler {
 			protected.POST("/containers/:id/restart", restartContainerHandler(deps))
 			protected.DELETE("/containers/:id", removeContainerHandler(deps))
 			protected.GET("/containers/:id/logs", containerLogsHandler(deps))
+
+			// App routes
+			protected.POST("/apps", deployAppHandler(deps))
+			protected.GET("/apps", listAppsHandler(deps))
+			protected.GET("/apps/:id", getAppHandler(deps))
+			protected.PATCH("/apps/:id", updateAppHandler(deps))
+			protected.DELETE("/apps/:id", deleteAppHandler(deps))
+			protected.GET("/apps/:id/configs", appConfigsHandler(deps))
+			protected.GET("/apps/:id/configs/:file", appConfigFileHandler(deps))
+
+			// Task routes
+			protected.GET("/tasks", listTasksHandler(deps))
+			protected.GET("/tasks/:id", getTaskHandler(deps))
+			protected.GET("/tasks/:id/events", taskEventsHandler(deps))
+
+			// App events
+			protected.GET("/apps/:id/events", appEventsHandler(deps))
+
+			// Metrics stream
+			protected.GET("/metrics/stream", metricsStreamHandler(deps))
 
 			// SSL routes
 			if deps.SSL != nil {
