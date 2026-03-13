@@ -1,6 +1,6 @@
 # 手机 App 详细设计
 
-> 配合 [rewrite-plan.md](./rewrite-plan.md) 和 [stories/epic-10-mobile-app.md](./stories/epic-10-mobile-app.md) 使用
+> 配合 [rewrite-plan.md](./rewrite-plan.md)、[stories/epic-10-mobile-app.md](./stories/epic-10-mobile-app.md) 和 [stories/epic-11-cloud-provisioning.md](./stories/epic-11-cloud-provisioning.md) 使用
 
 ---
 
@@ -9,6 +9,8 @@
 Passim 手机 App 不是 Web UI 的缩小版，而是围绕"随手管理"场景重新设计的移动端。
 
 核心场景只有几个：扫码连接节点、看一眼状态、启停应用、获取 VPN 配置导入客户端、给朋友分享。大部分时候用户不会主动打开 App，而是收到推送通知后进来看一眼。
+
+新增场景: **云服务商直连**——没有 VPS 的用户可以在 App 里直接购买 VPS 并自动部署 Passim。App 直连云厂商 REST API (Vultr / DigitalOcean / Hetzner / AWS Lightsail / Linode)，用户的 API Key 只存储在手机本地，不经过任何中间服务。Cloudflare R2 作为纯存储选项 (免出站费)。详见 [stories/epic-11-cloud-provisioning.md](./stories/epic-11-cloud-provisioning.md)。
 
 技术上使用 Expo (React Native) 构建，iOS 和 Android 共用一套代码。所有数据来自 Passim 节点的 HTTP API，App 本身不存储业务数据，只缓存连接信息和偏好设置。
 
@@ -73,22 +75,42 @@ app-mobile/
 │   ├── nodes/
 │   │   ├── add.tsx                # 添加新节点
 │   │   └── [id].tsx               # 节点详情
-│   └── share/
-│       └── [appId].tsx            # 分享给朋友
+│   ├── share/
+│   │   └── [appId].tsx            # 分享给朋友
+│   └── cloud/                     # 云服务商直连 (Epic 11)
+│       ├── accounts.tsx           # 云账号管理
+│       ├── add-account.tsx        # 添加云账号
+│       ├── provision.tsx          # 购买 VPS 向导 (选区域→选配置→确认)
+│       ├── progress.tsx           # 创建进度 (全屏)
+│       └── storage.tsx            # 开通云存储
 ├── components/
 │   ├── NodeCard.tsx               # 节点状态卡片
 │   ├── AppCard.tsx                # 应用卡片
 │   ├── MetricRing.tsx             # 环形指标图 (CPU/MEM/DISK)
 │   ├── StatusDot.tsx              # 状态指示灯
 │   ├── QRFullScreen.tsx           # 全屏二维码 (自动调亮度)
-│   └── EmptyState.tsx             # 空状态组件
+│   ├── EmptyState.tsx             # 空状态组件
+│   ├── PlanCard.tsx               # VPS 套餐卡片 (价格/配置)
+│   ├── RegionPicker.tsx           # 区域选择器 (按大洲分组+延迟)
+│   └── ProvisionProgress.tsx      # 创建进度动画
 ├── lib/
 │   ├── api.ts                     # API 客户端 (复用 Web 的 API 结构)
 │   ├── storage.ts                 # SecureStore 封装 (节点列表/token/偏好)
 │   ├── notifications.ts           # 推送注册与处理
-│   └── auth.ts                    # 认证逻辑 (API Key + Passkey + 生物认证)
+│   ├── auth.ts                    # 认证逻辑 (API Key + Passkey + 生物认证)
+│   └── cloud/                     # 云厂商适配层
+│       ├── types.ts               # CloudProvider 接口定义
+│       ├── vultr.ts               # Vultr API 适配
+│       ├── digitalocean.ts        # DigitalOcean API 适配
+│       ├── hetzner.ts             # Hetzner Cloud API 适配
+│       ├── lightsail.ts           # AWS Lightsail API 适配 (SigV4 签名)
+│       ├── linode.ts              # Linode (Akamai) API 适配
+│       ├── cloudflare.ts          # Cloudflare R2 存储适配 (无 VPS)
+│       ├── cloud-init.ts          # cloud-init 脚本生成
+│       └── provisioner.ts         # 统一创建+轮询+连接流程
 ├── stores/
 │   ├── node-store.ts              # 当前节点/节点列表状态
+│   ├── cloud-store.ts             # 云账号状态
 │   └── preferences-store.ts       # 主题/语言/通知偏好
 ├── hooks/
 │   ├── use-node.ts                # 节点数据 Query
@@ -111,13 +133,15 @@ App 启动
   │
   ├─ 无保存的节点 → (auth) 引导流程
   │   ├── welcome.tsx     # 1-2 屏介绍
+  │   │     ├── "已有服务器" → scan.tsx / add-node.tsx
+  │   │     └── "没有服务器，帮我买一个" → cloud/provision.tsx (Epic 11)
   │   ├── scan.tsx        # 扫码添加
   │   └── add-node.tsx    # 手动添加
   │
   └─ 有节点 → (tabs) 主界面
       ├── Dashboard       # 节点状态 + 应用列表
       ├── 应用             # 所有应用 + 部署入口
-      └── 设置             # 节点管理/主题/通知/关于
+      └── 设置             # 节点管理/主题/通知/云账号/关于
 ```
 
 ### Tab 导航
@@ -258,11 +282,41 @@ const getClient = (nodeId: string) => {
       "host": "vps.example.com:8443",
       "token": "eyJ...",
       "name": "tokyo-1",
-      "apiKeyPrefix": "ak_7f3d"
+      "apiKeyPrefix": "ak_7f3d",
+      // 云端创建的节点才有此字段
+      "cloud": {
+        "provider": "vultr",
+        "accountId": "my-vultr",
+        "instanceId": "cb676a46-...",
+        "region": "nrt",
+        "plan": "vc2-1c-1gb",
+        "monthlyPrice": 6.00,
+        "createdAt": "2026-03-13T..."
+      }
     }
   ],
   "activeNodeId": "uuid",
-  "biometricEnabled": true
+  "biometricEnabled": true,
+
+  // 云厂商账号 (Epic 11)
+  "cloudAccounts": [
+    {
+      "id": "my-vultr",
+      "provider": "vultr",
+      "name": "my-vultr",
+      "apiKey": "encrypted...",      // Vultr API Key
+      "email": "me@email.com",
+      "addedAt": "2026-03-13T..."
+    },
+    {
+      "id": "do-main",
+      "provider": "digitalocean",
+      "name": "do-main",
+      "apiKey": "encrypted...",      // DO Bearer Token
+      "email": "me@email.com",
+      "addedAt": "2026-03-13T..."
+    }
+  ]
 }
 
 // AsyncStorage (非敏感偏好)
@@ -361,3 +415,293 @@ App 收到推送 → 点击 → 根据 data.type 跳转对应页面
 | App 包大小 (Android) | < 25 MB |
 | 内存占用 | < 100 MB |
 | 后台唤醒 (推送) | < 200ms |
+| 云端创建 VPS 全流程 | < 3 分钟 (含 cloud-init) |
+
+---
+
+## 云服务商直连 (Epic 11)
+
+> 详细 User Stories 见 [stories/epic-11-cloud-provisioning.md](./stories/epic-11-cloud-provisioning.md)
+
+### 架构: App 直连
+
+```
+┌─────────────────────────┐
+│       Passim App        │
+│                         │
+│  lib/cloud/             │
+│  ┌───────────────────┐  │
+│  │  CloudProvider     │  │     HTTPS (直连)
+│  │  (统一接口)        │──────────────────┐
+│  └───────────────────┘  │                │
+│    ▲  ▲  ▲  ▲           │                │
+│    │  │  │  │           │                ▼
+│  ┌─┴──┴──┴──┴─────────┐│   ┌────────────────────┐
+│  │vultr│do│hzn│lightsail││   │  Cloud Provider API │
+│  └────────────────────┘│   │  (Vultr/DO/Hetzner/ │
+│                         │   │   Lightsail)         │
+│  SecureStore            │   └────────────────────┘
+│  ┌───────────────────┐  │
+│  │ API Keys (加密)    │  │    不经过任何中间服务器
+│  └───────────────────┘  │    API Key 只在设备本地
+└─────────────────────────┘
+```
+
+### Provider Adapter 接口
+
+```typescript
+// lib/cloud/types.ts
+
+// VPS 厂商 (可创建服务器)
+type VpsProviderId = 'vultr' | 'digitalocean' | 'hetzner' | 'lightsail' | 'linode';
+// 存储厂商 (仅 S3 兼容存储)
+type StorageOnlyProviderId = 'cloudflare';
+type ProviderId = VpsProviderId | StorageOnlyProviderId;
+
+interface CloudProvider {
+  id: ProviderId;
+  name: string;
+  icon: string;
+  website: string;                    // API Key 获取页面 URL
+  supportsVps: boolean;
+
+  // 账号验证
+  validateCredentials(creds: ProviderCredentials): Promise<AccountInfo>;
+
+  // VPS 管理 (仅 supportsVps == true)
+  listRegions?(): Promise<Region[]>;
+  listPlans?(regionId: string): Promise<Plan[]>;
+  createInstance?(opts: CreateInstanceOpts): Promise<{ instanceId: string }>;
+  getInstance?(id: string): Promise<Instance>;
+  deleteInstance?(id: string): Promise<void>;
+  powerAction?(id: string, action: 'on' | 'off' | 'reboot'): Promise<void>;
+
+  // 对象存储 (可选)
+  supportsObjectStorage: boolean;
+  createObjectStorage?(opts: CreateStorageOpts): Promise<StorageCredentials>;
+
+  // 辅助
+  getFirewallSetup?(): Promise<void>;  // 确保 8443+80 端口开放
+}
+
+interface ProviderCredentials {
+  // Vultr / DO / Hetzner / Linode: 单个 token
+  apiKey?: string;
+  // Lightsail: AWS Access Key + Secret
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  region?: string;
+  // Cloudflare: API Token + Account ID
+  accountId?: string;
+}
+
+interface AccountInfo {
+  email?: string;
+  name?: string;
+  balance?: number;          // 可用余额 (USD)
+  valid: boolean;
+  error?: string;
+}
+
+interface Region {
+  id: string;
+  name: string;              // "Tokyo", "Frankfurt"
+  country: string;           // "JP", "DE"
+  continent: 'asia' | 'americas' | 'europe' | 'oceania';
+  available: boolean;
+}
+
+interface Plan {
+  id: string;
+  cpu: number;
+  memoryMb: number;
+  diskGb: number;
+  bandwidthTb: number;
+  monthlyPrice: number;      // USD
+  hourlyPrice?: number;
+  recommended: boolean;      // 1C/1G 或 1C/2G，最便宜够用的
+}
+
+interface Instance {
+  id: string;
+  ip?: string;
+  ipv6?: string;
+  status: 'provisioning' | 'running' | 'stopped' | 'error';
+  region: string;
+  plan: string;
+  createdAt: string;
+  tags?: Record<string, string>;
+}
+
+interface CreateInstanceOpts {
+  region: string;
+  plan: string;
+  hostname?: string;         // 默认 "passim-{random}"
+  userData: string;          // cloud-init YAML
+  tags?: Record<string, string>;
+}
+
+interface StorageCredentials {
+  endpoint: string;          // s3.amazonaws.com / sgp1.vultrobjects.com
+  bucket: string;
+  accessKey: string;
+  secretKey: string;
+  region: string;
+}
+```
+
+### 各厂商 API 映射
+
+> 完整对照表见 [epic-11-cloud-provisioning.md](./stories/epic-11-cloud-provisioning.md)
+
+| 维度 | Vultr | DigitalOcean | Hetzner | Lightsail | Linode |
+|------|-------|-------------|---------|-----------|--------|
+| **Base URL** | `api.vultr.com/v2` | `api.digitalocean.com/v2` | `api.hetzner.cloud/v1` | `lightsail.{region}.amazonaws.com` | `api.linode.com/v4` |
+| **认证** | `Bearer {key}` | `Bearer {token}` | `Bearer {token}` | AWS Signature V4 | `Bearer {PAT}` |
+| **HTTP 风格** | RESTful | RESTful | RESTful | 全部 POST | RESTful |
+| **创建实例** | `POST /instances` | `POST /droplets` | `POST /servers` | `→ CreateInstances` | `POST /linode/instances` |
+| **user_data** | Base64 | 明文 | 明文 | 明文 | Base64 (`metadata.user_data`) |
+| **实例 ID** | UUID | Int | Int | Name | Int |
+| **标签** | string[] | string[] | kv map | kv[] | string[] |
+
+**仅存储: Cloudflare R2** — `{account_id}.r2.cloudflarestorage.com`，Bearer Token 认证，免出站费
+
+### 创建流程状态机
+
+```typescript
+// lib/cloud/provisioner.ts
+
+type ProvisionState =
+  | { step: 'creating';     message: '正在创建服务器...' }
+  | { step: 'booting';      message: '等待服务器启动...' }
+  | { step: 'installing';   message: '正在安装 Passim...' }
+  | { step: 'connecting';   message: '正在验证连接...' }
+  | { step: 'done';         message: '搞定了！';          nodeId: string }
+  | { step: 'error';        message: string;              retryable: boolean };
+
+async function provisionNode(
+  provider: CloudProvider,
+  opts: { region: string; plan: string },
+  onProgress: (state: ProvisionState) => void,
+): Promise<string> {
+  // 1. 创建实例
+  onProgress({ step: 'creating', message: '正在创建服务器...' });
+  const cloudInit = generateCloudInit();  // 包含随机 API Key
+  const { instanceId } = await provider.createInstance({
+    region: opts.region,
+    plan: opts.plan,
+    userData: cloudInit.script,
+    tags: { 'passim': 'pending' },
+  });
+
+  // 2. 等待实例运行
+  onProgress({ step: 'booting', message: '等待服务器启动...' });
+  const instance = await pollUntil(
+    () => provider.getInstance(instanceId),
+    (i) => i.status === 'running' && !!i.ip,
+    { interval: 5000, timeout: 120_000 },
+  );
+
+  // 3. 等待 Passim 就绪
+  onProgress({ step: 'installing', message: '正在安装 Passim...' });
+  await pollUntil(
+    () => fetch(`https://${instance.ip}:8443/api/status`, {
+      // 自签证书，忽略 TLS 错误
+    }).then(r => r.ok).catch(() => false),
+    (ok) => ok === true,
+    { interval: 10_000, timeout: 300_000 },
+  );
+
+  // 4. 读取 API Key 并连接
+  onProgress({ step: 'connecting', message: '正在验证连接...' });
+  const updatedInstance = await provider.getInstance(instanceId);
+  const apiKey = updatedInstance.tags?.['passim-api-key'];
+  // 或使用 cloud-init 写入的 tag
+
+  const { token } = await fetch(`https://${instance.ip}:8443/api/auth/login`, {
+    method: 'POST',
+    body: JSON.stringify({ api_key: apiKey }),
+  }).then(r => r.json());
+
+  // 5. 保存节点
+  const nodeId = await saveNode({
+    host: `${instance.ip}:8443`,
+    token,
+    name: `${provider.name}-${instance.region}`,
+    cloud: {
+      provider: provider.id,
+      instanceId,
+      region: opts.region,
+      plan: opts.plan,
+      ip: instance.ip!,
+      monthlyPrice: /* from plan */,
+    },
+  });
+
+  onProgress({ step: 'done', message: '搞定了！', nodeId });
+  return nodeId;
+}
+```
+
+### cloud-init 与 API Key 回传
+
+不依赖各厂商 tag/label 差异，使用 Passim 自身的 `setup_token` 机制:
+
+```yaml
+# lib/cloud/cloud-init.ts → generateCloudInit()
+
+#cloud-config
+package_update: true
+packages:
+  - docker.io
+  - curl
+runcmd:
+  - systemctl enable docker
+  - systemctl start docker
+  - |
+    PASSIM_API_KEY=$(openssl rand -hex 24)
+    docker run -d \
+      --name passim \
+      --restart always \
+      -e PASSIM_API_KEY="$PASSIM_API_KEY" \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -v passim-data:/data \
+      -p 8443:8443 \
+      -p 80:80 \
+      passim/passim:latest
+```
+
+**回传流程:**
+1. Passim 首次启动检测到 `PASSIM_API_KEY` 环境变量 → 生成一次性 `setup_token`
+2. `GET /api/status` (无需认证) 返回 `{ "setup": true, "setup_token": "xxx" }`
+3. App 轮询此端点 → 收到 token → `POST /api/auth/setup { setup_token }` → JWT
+4. setup_token 使用一次后失效，60 分钟过期
+
+### AWS Lightsail 签名
+
+Lightsail 使用 AWS Signature V4，不能像其他三家一样只传 Bearer Token:
+
+```typescript
+// lib/cloud/lightsail.ts
+// 使用 @smithy/signature-v4 (~15KB gzipped) + @aws-crypto/sha256-js
+import { SignatureV4 } from '@smithy/signature-v4';
+import { Sha256 } from '@aws-crypto/sha256-js';
+
+const signer = new SignatureV4({
+  service: 'lightsail',
+  region,
+  credentials: { accessKeyId, secretAccessKey },
+  sha256: Sha256,
+});
+```
+
+### 安全设计
+
+| 威胁 | 对策 |
+|------|------|
+| API Key 泄露 | SecureStore 加密存储 + App 锁 (生物认证) |
+| 中间人攻击 | HTTPS 直连云 API (TLS pinning 可选) |
+| API Key 权限过大 | 引导用户创建最小权限 API Key (只需 compute/storage) |
+| 意外扣费 | 创建前显示价格确认，套餐选择器显示月费 |
+| 孤儿实例 (创建后 App 崩溃) | 本地持久化 instanceId，重启后可恢复/清理 |
+| cloud-init 中的 API Key | 随机生成，一次性使用，连接后建议注册 Passkey |
