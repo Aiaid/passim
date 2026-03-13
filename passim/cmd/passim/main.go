@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/passim/passim/internal/api"
+	"github.com/passim/passim/internal/auth"
 	"github.com/passim/passim/internal/db"
+	"github.com/passim/passim/internal/setup"
 )
 
 func main() {
@@ -24,7 +26,22 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	router := api.NewRouter(database)
+	// First-time setup: generate node_id, API Key, JWT secret
+	if err := setup.Init(database); err != nil {
+		log.Fatalf("failed to initialise: %v", err)
+	}
+
+	// Load JWT secret from DB
+	jwtSecret, err := db.GetConfig(database, "jwt_secret")
+	if err != nil || jwtSecret == "" {
+		log.Fatal("jwt_secret not found in config")
+	}
+	jwtMgr := auth.NewJWTManager(jwtSecret, 7*24*time.Hour)
+
+	router := api.NewRouter(api.Deps{
+		DB:  database,
+		JWT: jwtMgr,
+	})
 
 	addr := ":8443"
 	if port := os.Getenv("PORT"); port != "" {

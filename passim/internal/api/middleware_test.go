@@ -1,0 +1,86 @@
+package api
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/passim/passim/internal/db"
+)
+
+func TestMiddlewareNoToken(t *testing.T) {
+	router, _, _ := setupTestServer(t)
+
+	req := httptest.NewRequest("GET", "/api/status", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestMiddlewareInvalidToken(t *testing.T) {
+	router, _, _ := setupTestServer(t)
+
+	req := httptest.NewRequest("GET", "/api/status", nil)
+	req.Header.Set("Authorization", "Bearer invalid.token")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestMiddlewareValidToken(t *testing.T) {
+	router, _, apiKey := setupTestServer(t)
+
+	token := loginForToken(t, router, apiKey)
+
+	req := httptest.NewRequest("GET", "/api/status", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMiddlewareRevokedToken(t *testing.T) {
+	router, database, apiKey := setupTestServer(t)
+
+	token := loginForToken(t, router, apiKey)
+
+	// Bump auth_version to revoke existing tokens
+	if err := db.SetConfig(database, "auth_version", "2"); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/api/status", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for revoked token, got %d", w.Code)
+	}
+}
+
+func loginForToken(t *testing.T, router http.Handler, apiKey string) string {
+	t.Helper()
+	body, _ := json.Marshal(map[string]string{"api_key": apiKey})
+	req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("login failed: %d %s", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	return resp["token"].(string)
+}

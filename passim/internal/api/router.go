@@ -6,24 +6,44 @@ import (
 	"runtime"
 
 	"github.com/gin-gonic/gin"
+	"github.com/passim/passim/internal/auth"
 )
 
-func NewRouter(database *sql.DB) http.Handler {
+type Deps struct {
+	DB  *sql.DB
+	JWT *auth.JWTManager
+}
+
+func NewRouter(deps Deps) http.Handler {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(corsMiddleware())
 	r.Use(gin.Logger())
 
+	ah := &authHandler{database: deps.DB, jwt: deps.JWT}
+
 	api := r.Group("/api")
 	{
-		api.GET("/status", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"status":  "ok",
-				"version": "0.1.0",
-				"go":      runtime.Version(),
+		// Public — no auth required
+		authGroup := api.Group("/auth")
+		{
+			authGroup.POST("/login", ah.login)
+			authGroup.POST("/refresh", ah.refresh)
+		}
+
+		// Protected — JWT required
+		protected := api.Group("")
+		protected.Use(authMiddleware(deps.JWT, deps.DB))
+		{
+			protected.GET("/status", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{
+					"status":  "ok",
+					"version": "0.1.0",
+					"go":      runtime.Version(),
+				})
 			})
-		})
+		}
 	}
 
 	return r

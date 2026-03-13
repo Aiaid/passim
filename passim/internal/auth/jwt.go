@@ -9,6 +9,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+type Claims struct {
+	jwt.RegisteredClaims
+	AuthVersion int `json:"auth_version"`
+}
+
 type JWTManager struct {
 	secret []byte
 	ttl    time.Duration
@@ -26,22 +31,37 @@ func GenerateSecret() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func (m *JWTManager) Issue() (string, error) {
-	claims := jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.ttl)),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		Issuer:    "passim",
+func (m *JWTManager) Issue(authVersion int) (string, time.Time, error) {
+	exp := time.Now().Add(m.ttl)
+	claims := Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(exp),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "passim",
+		},
+		AuthVersion: authVersion,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(m.secret)
+	signed, err := token.SignedString(m.secret)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return signed, exp, nil
 }
 
-func (m *JWTManager) Verify(tokenStr string) error {
-	_, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+func (m *JWTManager) Verify(tokenStr string) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
 		return m.secret, nil
 	})
-	return err
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := token.Claims.(*Claims)
+	if !ok {
+		return nil, fmt.Errorf("invalid claims type")
+	}
+	return claims, nil
 }
