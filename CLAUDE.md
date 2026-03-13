@@ -4,91 +4,80 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AC (Passim) is a personal cloud management assistant for ordinary people — like Portainer, but designed with taste and simplicity for non-technical users. One `docker run` command, open a browser, deploy VPN/storage/remote desktop without touching a terminal. Currently undergoing a full rewrite from the legacy multi-component architecture (Next.js + Python FastAPI + MongoDB) to a single Go binary with embedded Web UI (see `Doc/rewrite-plan.md`).
+AC (Passim) is a personal cloud management assistant for ordinary people — like Portainer, but designed with taste and simplicity for non-technical users. One `docker run` command, open a browser, deploy VPN/storage/remote desktop without touching a terminal.
 
-## Components
+Full rewrite in progress: legacy multi-component architecture → single Go binary with embedded Web UI. See `Doc/rewrite-plan.md` for details.
 
-1. **Web** — Next.js 15 frontend (App Router, React 19) for managing VPS instances, applications, and deployments
-2. **Passim** — Python FastAPI backend that controls Docker containers and VPS provisioning
-3. **DNS** — Custom DNS server for dynamic IP-to-domain resolution using Base32 encoding
-4. **Updater** — Auto-update service for VPS deployments (Python + Docker)
-5. **IoC** — Deployment orchestration (docker-compose)
-6. **FIlestash** — File management service container
+## Monorepo Structure
+
+| Directory | Description | Status |
+|-----------|-------------|--------|
+| `passim/` | Go backend (Gin + SQLite + Docker SDK) | Active — Phase 1 |
+| `web/` | Vite + React 19 + shadcn/ui frontend | Planned — Phase 2 |
+| `app/` | Expo mobile app (iOS + Android) | Planned — Phase 5 |
+| `DNS/` | Python nserver DNS server (kept as-is) | Maintained |
+| `Doc/` | Design docs, specs, user stories | Active |
+| `_legacy/` | Old code (Web/Passim/Updater/IoC/FIlestash) | Archived |
+
+## Development Workflow
+
+**All changes MUST follow this order:**
+
+1. **Doc first** — Update or create the relevant spec/story in `Doc/` before writing any code. If the change touches API, schema, or architecture, the doc update is mandatory.
+2. **Code** — Implement the change.
+3. **Test** — Write and run tests. Code without tests is not considered complete.
+
+## Testing Requirements
+
+Every code change must include appropriate tests. No exceptions.
+
+### Go Backend (`passim/`)
+
+```bash
+cd passim
+go test ./...                    # Run all tests
+go test ./internal/auth/...      # Run specific package tests
+go test -race ./...              # Race condition detection
+go test -cover ./...             # Coverage report
+```
+
+**Unit tests** — Test individual functions and methods in isolation. Use table-driven tests. Mock external dependencies (Docker SDK, filesystem). Place test files alongside source: `foo.go` → `foo_test.go`.
+
+**Integration tests** — Test interactions between packages (API → DB, API → Docker). Use a real SQLite database (in-memory or temp file). Use build tag `//go:build integration`. Place in `_test.go` files or `testdata/` directories.
+
+**E2E tests** — Test full HTTP request/response cycles against a running server. Start a real Gin server on a random port, hit actual endpoints, verify responses. Use build tag `//go:build e2e`.
+
+```bash
+go test -tags=integration ./...  # Run integration tests
+go test -tags=e2e ./...          # Run E2E tests
+```
+
+### Web Frontend (`web/`) — Phase 2
+
+Unit tests: Vitest + React Testing Library
+E2E tests: Playwright
+
+### Mobile App (`app/`) — Phase 5
+
+Unit tests: Jest + React Native Testing Library
 
 ## Common Commands
 
-### Web (Next.js Frontend)
+### Passim (Go Backend)
 ```bash
-cd Web
-npm run dev      # Development server at http://localhost:3000
-npm run build    # Production build
-npm run lint     # ESLint
-```
-
-### Passim (FastAPI Backend)
-```bash
-cd Passim
-pip install -r requirements.txt
-uvicorn app.main:app --reload   # Development server
-./run.sh                        # Production startup (runs setup then uvicorn)
+cd passim
+go run ./cmd/passim/             # Dev server on :8443
+go build ./cmd/passim/           # Build binary
+go test ./...                    # All tests
+go test -cover ./...             # Coverage
 ```
 
 ### DNS Server
 ```bash
 cd DNS
 pip install -r requirements.txt
-python app/app.py               # Runs nserver DNS on port 153
+python app/app.py                # Runs nserver DNS on port 153
 ```
-
-### Docker
-All components have Dockerfiles. Web uses Node 20 Alpine multi-stage build (standalone output, port 3000). Passim uses Python 3.10 slim.
-
-## Web Architecture (App Router)
-
-The Web frontend has been migrated from Pages Router to App Router (Next.js 15).
-
-### Routing & Layout
-- `app/layout.tsx` — Root layout (async server component, sets up metadata)
-- `app/providers.tsx` — Client-side providers (`SessionProvider`, `NextIntlClientProvider`, `AntdRegistry`)
-- `app/page.tsx` — Home page with auth-based redirect to dashboard
-- `app/dashboard/` — Main dashboard (server page + client component)
-- `app/app/` — Application management pages (hysteria, l2tp, rdesktop, webdav, wireguard)
-- `app/vps/[ip]/` — Dynamic VPS detail pages
-- `app/api/` — API routes using `route.ts` convention (`NextRequest`/`NextResponse`)
-
-### Page Pattern: Server/Client Split
-Pages follow a consistent pattern — server component (`page.tsx`) handles auth checks and redirects, client component (`client.tsx`) contains the interactive UI with `'use client'` directive. Most existing components in `components/` have been updated with `'use client'`.
-
-### Authentication (NextAuth v5)
-- Config in `lib/auth.ts` — exports `handlers`, `auth`, `signIn`, `signOut`
-- JWT strategy, MongoDB adapter (`@auth/mongodb-adapter`)
-- Providers: Email (Nodemailer), Credentials (Demo)
-- Route handler at `app/api/auth/[...nextauth]/route.ts`
-
-### Internationalization (next-intl)
-- Uses `next-intl` (not next-i18next) with `createNextIntlPlugin` in `next.config.ts`
-- Locales: `en-US`, `zh-CN`
-- Message files in `messages/en-US.json`, `messages/zh-CN.json`
-- Config in `lib/i18n.ts` using `getRequestConfig`
-- `middleware.ts` detects locale from `NEXT_LOCALE` cookie → `Accept-Language` header → defaults to `en-US`
-- Client components use `useTranslations()` hook
-
-### Key Dependencies
-- `next@^15.0.0`, `react@19.0.0`, `typescript@5.0.0`
-- `next-auth@^5.0.0-beta.25` with `@auth/mongodb-adapter@^3.0.0`
-- `next-intl@^3.0.0`
-- `antd` for UI components
-- `mongodb` for database access (`lib/mongodb.ts`)
-
-## Passim Architecture
-
-- `app/main.py` — FastAPI entry with CORS (all origins), rate limiting (`slowapi`), in-memory caching (`fastapi-cache2`)
-- `app/vps/docker.py` — Docker container management
-- `app/vps/vps.py` — VPS provisioning
-- `app/application/application.py` — Application deployment routes
-- `app/setup.py` — Initial VPS setup: deploys speedtest, glances, swag (Let's Encrypt) containers, configures SSL
-- `app/dependencies.py` — Shared dependencies
-- Uses `pyotp` for TOTP, `dnspython` for DNS operations
 
 ## DNS Architecture
 
@@ -99,17 +88,9 @@ Pages follow a consistent pattern — server component (`page.tsx`) handles auth
 
 ## Environment Variables
 
-### Web
-- `MONGODB_URI` — MongoDB connection string
-- NextAuth secrets and provider config (see `.env.development.local`)
-
-### Passim
-- `API_SERVER` — API hostname (default: `app.passim.io`)
-- `DNS_SERVER` — DNS domain (default: `dns.passim.io`)
-- `IP` — Server IP address
-- `USER`, `SECRET` — Authentication credentials
-- `UPDATER` — Docker image for auto-updater
-- `version` — Current version
+### Passim (Go)
+- `PORT` — HTTP listen port (default: `8443`)
+- Data stored in `/data/` volume (SQLite, configs, certs)
 
 ### DNS
 - `BASE_DOMAIN` — Base domain for DNS queries
