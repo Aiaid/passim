@@ -7,6 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/auth"
 	"github.com/passim/passim/internal/docker"
+	"github.com/passim/passim/internal/speedtest"
+	"github.com/passim/passim/internal/ssl"
 	"github.com/passim/passim/internal/template"
 )
 
@@ -15,6 +17,8 @@ type Deps struct {
 	JWT       *auth.JWTManager
 	Docker    docker.DockerClient
 	Templates *template.Registry
+	SSL       *ssl.SSLManager
+	Iperf     *speedtest.IperfServer
 }
 
 func NewRouter(deps Deps) http.Handler {
@@ -35,6 +39,9 @@ func NewRouter(deps Deps) http.Handler {
 			authGroup.POST("/refresh", ah.refresh)
 		}
 
+		// Public speedtest routes (no auth)
+		registerSpeedtestPublicRoutes(api)
+
 		// Protected — JWT required
 		protected := api.Group("")
 		protected.Use(authMiddleware(deps.JWT, deps.DB))
@@ -52,6 +59,16 @@ func NewRouter(deps Deps) http.Handler {
 			protected.POST("/containers/:id/restart", restartContainerHandler(deps))
 			protected.DELETE("/containers/:id", removeContainerHandler(deps))
 			protected.GET("/containers/:id/logs", containerLogsHandler(deps))
+
+			// SSL routes
+			if deps.SSL != nil {
+				registerSSLRoutes(protected, deps.SSL)
+			}
+
+			// Protected speedtest routes
+			if deps.Iperf != nil {
+				registerSpeedtestProtectedRoutes(protected, deps.Iperf)
+			}
 		}
 	}
 
