@@ -11,7 +11,9 @@
       "mcp__plugin_context7_context7__query-docs",
       "Bash(find /Users/anend/Desktop/AC/Doc -type f -name \"*.md\" | sort && echo \"---\" && wc -l /Users/anend/Desktop/AC/Doc/*.md /Users/anend/Desktop/AC/Doc/stories/*.md 2>/dev/null)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(ls /Users/anend/Desktop/AC/Doc/spec-*.md)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
