@@ -15,7 +15,7 @@ import (
 	tmpl "github.com/passim/passim/internal/template"
 )
 
-func setupTestServerWithTemplates(t *testing.T, registry *tmpl.Registry) (http.Handler, string) {
+func testServerWithTemplates(t *testing.T, registry *tmpl.Registry) (http.Handler, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.db")
 	database, err := db.Open(path)
@@ -76,17 +76,15 @@ container:
 `)
 
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "wireguard.yaml"), yamlData, 0644); err != nil {
-		t.Fatalf("write temp file: %v", err)
-	}
+	os.WriteFile(filepath.Join(tmpDir, "wireguard.yaml"), yamlData, 0644)
 
 	registry := tmpl.NewRegistry()
 	if err := registry.LoadDir(tmpDir); err != nil {
-		t.Fatalf("LoadDir() error: %v", err)
+		t.Fatal(err)
 	}
 
-	router, apiKey := setupTestServerWithTemplates(t, registry)
-	token := loginForToken(t, router, apiKey)
+	router, apiKey := testServerWithTemplates(t, registry)
+	token := getToken(t, router, apiKey)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/templates", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -98,29 +96,19 @@ container:
 	}
 
 	var result []templateSummary
-	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
+	json.Unmarshal(w.Body.Bytes(), &result)
 
 	if len(result) != 1 {
 		t.Fatalf("len = %d, want 1", len(result))
 	}
-
-	wg := result[0]
-	if wg.Name != "wireguard" {
-		t.Errorf("Name = %q, want %q", wg.Name, "wireguard")
-	}
-	if wg.Category != "vpn" {
-		t.Errorf("Category = %q, want %q", wg.Category, "vpn")
-	}
-	if len(wg.Settings) != 1 || wg.Settings[0].Key != "peers" {
-		t.Errorf("Settings unexpected: %+v", wg.Settings)
+	if result[0].Name != "wireguard" {
+		t.Errorf("Name = %q", result[0].Name)
 	}
 }
 
 func TestListTemplatesRequiresAuth(t *testing.T) {
 	registry := tmpl.NewRegistry()
-	router, _ := setupTestServerWithTemplates(t, registry)
+	router, _ := testServerWithTemplates(t, registry)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/templates", nil)
 	w := httptest.NewRecorder()

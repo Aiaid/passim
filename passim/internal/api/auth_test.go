@@ -2,60 +2,19 @@ package api
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
-
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/passim/passim/internal/auth"
-	"github.com/passim/passim/internal/db"
 )
 
-func setupTestServer(t *testing.T) (http.Handler, *sql.DB, string) {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "test.db")
-	database, err := db.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Migrate(database); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		database.Close()
-		os.Remove(path)
-	})
-
-	// Generate known API key for testing
-	plain, hash, err := auth.GenerateAPIKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	db.SetConfig(database, "api_key_hash", hash)
-	db.SetConfig(database, "auth_version", "1")
-
-	secret, _ := auth.GenerateSecret()
-	db.SetConfig(database, "jwt_secret", secret)
-
-	jwtMgr := auth.NewJWTManager(secret, 1*time.Hour)
-
-	router := NewRouter(Deps{DB: database, JWT: jwtMgr})
-	return router, database, plain
-}
-
 func TestLoginSuccess(t *testing.T) {
-	router, _, apiKey := setupTestServer(t)
+	router, _, apiKey, _ := testServer(t)
 
 	body, _ := json.Marshal(map[string]string{"api_key": apiKey})
 	req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -73,13 +32,12 @@ func TestLoginSuccess(t *testing.T) {
 }
 
 func TestLoginWrongKey(t *testing.T) {
-	router, _, _ := setupTestServer(t)
+	router, _, _, _ := testServer(t)
 
 	body, _ := json.Marshal(map[string]string{"api_key": "psk_wrong"})
 	req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusUnauthorized {
@@ -88,13 +46,12 @@ func TestLoginWrongKey(t *testing.T) {
 }
 
 func TestLoginMissingKey(t *testing.T) {
-	router, _, _ := setupTestServer(t)
+	router, _, _, _ := testServer(t)
 
 	body, _ := json.Marshal(map[string]string{})
 	req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -103,9 +60,8 @@ func TestLoginMissingKey(t *testing.T) {
 }
 
 func TestRefreshSuccess(t *testing.T) {
-	router, _, apiKey := setupTestServer(t)
+	router, _, apiKey, _ := testServer(t)
 
-	// Login first
 	body, _ := json.Marshal(map[string]string{"api_key": apiKey})
 	req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -116,7 +72,6 @@ func TestRefreshSuccess(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &loginResp)
 	token := loginResp["token"].(string)
 
-	// Refresh
 	body, _ = json.Marshal(map[string]string{"token": token})
 	req = httptest.NewRequest("POST", "/api/auth/refresh", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -135,7 +90,7 @@ func TestRefreshSuccess(t *testing.T) {
 }
 
 func TestRefreshInvalidToken(t *testing.T) {
-	router, _, _ := setupTestServer(t)
+	router, _, _, _ := testServer(t)
 
 	body, _ := json.Marshal(map[string]string{"token": "invalid.token.here"})
 	req := httptest.NewRequest("POST", "/api/auth/refresh", bytes.NewReader(body))

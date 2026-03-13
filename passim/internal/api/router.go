@@ -3,7 +3,6 @@ package api
 import (
 	"database/sql"
 	"net/http"
-	"runtime"
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/auth"
@@ -40,17 +39,19 @@ func NewRouter(deps Deps) http.Handler {
 		protected := api.Group("")
 		protected.Use(authMiddleware(deps.JWT, deps.DB))
 		{
-			protected.GET("/status", func(c *gin.Context) {
-				c.JSON(http.StatusOK, gin.H{
-					"status":  "ok",
-					"version": "0.1.0",
-					"go":      runtime.Version(),
-				})
-			})
+			protected.GET("/status", statusHandler(deps))
 
 			if deps.Templates != nil {
 				protected.GET("/templates", listTemplates(deps.Templates))
 			}
+
+			// Container routes
+			protected.GET("/containers", listContainersHandler(deps))
+			protected.POST("/containers/:id/start", startContainerHandler(deps))
+			protected.POST("/containers/:id/stop", stopContainerHandler(deps))
+			protected.POST("/containers/:id/restart", restartContainerHandler(deps))
+			protected.DELETE("/containers/:id", removeContainerHandler(deps))
+			protected.GET("/containers/:id/logs", containerLogsHandler(deps))
 		}
 	}
 
