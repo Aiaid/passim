@@ -732,18 +732,19 @@ GET    /ws/node?key=<api_key>       # 远程 Passim 连接端点
 - [ ] Web UI 设置页生成"连接二维码" (地址 + API Key 编码)
 
 **云服务商直连 (App 端):**
-- [ ] CloudProvider 适配层 (统一接口 + 5 VPS 厂商 + 1 存储厂商)
-- [ ] Vultr API 适配 (regions/plans/instances/object-storage)
-- [ ] DigitalOcean API 适配 (regions/sizes/droplets/spaces)
-- [ ] Hetzner Cloud API 适配 (locations/server_types/servers)
-- [ ] AWS Lightsail API 适配 (Signature V4 + regions/bundles/instances)
-- [ ] Linode (Akamai) API 适配 (regions/types/instances/object-storage)
-- [ ] Cloudflare R2 存储适配 (仅存储，无 VPS，免出站费)
+- [ ] CloudProvider 能力模型 (Capability: compute/storage/tunnel/dns)
+- [ ] Vultr 适配 (compute + storage)
+- [ ] DigitalOcean 适配 (compute + storage)
+- [ ] Hetzner Cloud 适配 (compute + storage)
+- [ ] AWS Lightsail 适配 (compute + storage, SigV4 签名)
+- [ ] Linode (Akamai) 适配 (compute + storage)
+- [ ] Cloudflare 适配 (storage R2 + tunnel + dns)
 - [ ] 云账号管理 (绑定/验证/删除 API Key，SecureStore 加密)
 - [ ] 一键购买 VPS + cloud-init 自动部署 Passim
 - [ ] 创建进度状态机 (创建→启动→安装→连接→完成)
 - [ ] 云端 VPS 管理 (开关机/重启/销毁)
-- [ ] 一键开通 S3 兼容存储 (Vultr Object Storage / DO Spaces / AWS S3)
+- [ ] 一键开通 S3 兼容存储 (Vultr / DO / Hetzner / Linode / Lightsail / Cloudflare R2)
+- [ ] Cloudflare Tunnel 接入 (免开端口暴露 Passim 到公网)
 - [ ] 新手全引导向导 (从零到 VPN 可用)
 
 **其他增强:**

@@ -98,14 +98,16 @@ app-mobile/
 │   ├── storage.ts                 # SecureStore 封装 (节点列表/token/偏好)
 │   ├── notifications.ts           # 推送注册与处理
 │   ├── auth.ts                    # 认证逻辑 (API Key + Passkey + 生物认证)
-│   └── cloud/                     # 云厂商适配层
-│       ├── types.ts               # CloudProvider 接口定义
-│       ├── vultr.ts               # Vultr API 适配
-│       ├── digitalocean.ts        # DigitalOcean API 适配
-│       ├── hetzner.ts             # Hetzner Cloud API 适配
-│       ├── lightsail.ts           # AWS Lightsail API 适配 (SigV4 签名)
-│       ├── linode.ts              # Linode (Akamai) API 适配
-│       ├── cloudflare.ts          # Cloudflare R2 存储适配 (无 VPS)
+│   └── cloud/                     # 云厂商适配层 (能力模型)
+│       ├── types.ts               # Capability 接口定义
+│       ├── registry.ts            # Provider 注册表 + 能力发现
+│       ├── providers/
+│       │   ├── vultr.ts           # compute + storage
+│       │   ├── digitalocean.ts    # compute + storage
+│       │   ├── hetzner.ts         # compute + storage
+│       │   ├── lightsail.ts       # compute + storage (SigV4)
+│       │   ├── linode.ts          # compute + storage
+│       │   └── cloudflare.ts      # storage + tunnel + dns
 │       ├── cloud-init.ts          # cloud-init 脚本生成
 │       └── provisioner.ts         # 统一创建+轮询+连接流程
 ├── stores/
@@ -450,49 +452,34 @@ App 收到推送 → 点击 → 根据 data.type 跳转对应页面
 ### Provider Adapter 接口
 
 ```typescript
-// lib/cloud/types.ts
+// lib/cloud/types.ts — 能力 (Capability) 模型
+// 详细类型定义见 epic-11-cloud-provisioning.md
 
-// VPS 厂商 (可创建服务器)
-type VpsProviderId = 'vultr' | 'digitalocean' | 'hetzner' | 'lightsail' | 'linode';
-// 存储厂商 (仅 S3 兼容存储)
-type StorageOnlyProviderId = 'cloudflare';
-type ProviderId = VpsProviderId | StorageOnlyProviderId;
+type ProviderId = 'vultr' | 'digitalocean' | 'hetzner' | 'lightsail' | 'linode' | 'cloudflare';
+type Capability = 'compute' | 'storage' | 'tunnel' | 'dns';
 
 interface CloudProvider {
   id: ProviderId;
   name: string;
   icon: string;
-  website: string;                    // API Key 获取页面 URL
-  supportsVps: boolean;
+  website: string;
+  capabilities: Capability[];         // 声明支持的能力
 
-  // 账号验证
   validateCredentials(creds: ProviderCredentials): Promise<AccountInfo>;
 
-  // VPS 管理 (仅 supportsVps == true)
-  listRegions?(): Promise<Region[]>;
-  listPlans?(regionId: string): Promise<Plan[]>;
-  createInstance?(opts: CreateInstanceOpts): Promise<{ instanceId: string }>;
-  getInstance?(id: string): Promise<Instance>;
-  deleteInstance?(id: string): Promise<void>;
-  powerAction?(id: string, action: 'on' | 'off' | 'reboot'): Promise<void>;
-
-  // 对象存储 (可选)
-  supportsObjectStorage: boolean;
-  createObjectStorage?(opts: CreateStorageOpts): Promise<StorageCredentials>;
-
-  // 辅助
-  getFirewallSetup?(): Promise<void>;  // 确保 8443+80 端口开放
+  // 按能力挂载具体实现
+  compute?:  ComputeCapability;       // VPS 管理
+  storage?:  StorageCapability;       // S3 兼容存储
+  tunnel?:   TunnelCapability;        // Cloudflare Tunnel
+  dns?:      DnsCapability;           // DNS 管理
 }
 
 interface ProviderCredentials {
-  // Vultr / DO / Hetzner / Linode: 单个 token
-  apiKey?: string;
-  // Lightsail: AWS Access Key + Secret
-  accessKeyId?: string;
-  secretAccessKey?: string;
-  region?: string;
-  // Cloudflare: API Token + Account ID
-  accountId?: string;
+  apiKey?: string;                   // Vultr / DO / Hetzner / Linode / Cloudflare
+  accessKeyId?: string;              // AWS
+  secretAccessKey?: string;          // AWS
+  region?: string;                   // Lightsail
+  accountId?: string;                // Cloudflare
 }
 
 interface AccountInfo {
@@ -705,3 +692,4 @@ const signer = new SignatureV4({
 | 意外扣费 | 创建前显示价格确认，套餐选择器显示月费 |
 | 孤儿实例 (创建后 App 崩溃) | 本地持久化 instanceId，重启后可恢复/清理 |
 | cloud-init 中的 API Key | 随机生成，一次性使用，连接后建议注册 Passkey |
+| Tunnel token 泄露 | 与 API Key 同等保护，存 SecureStore；cloudflared 容器内不暴露 |
