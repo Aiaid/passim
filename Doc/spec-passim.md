@@ -63,45 +63,41 @@ Docker Container: passim/passim
 用户登录支持两种方式: **API Key** (主要/首次) + **Passkey** (便捷/日常)。不使用密码登录。
 节点间 WebSocket 通信使用 API Key 直接认证 (不走 JWT)。
 
-#### API Key 登录
+#### API Key 登录 ✅ Phase 1
 
 ```
 POST /api/auth/login
-  Request:  { "api_key": "xxx" }
+  Request:  { "api_key": "psk_xxx" }
   Response: { "token": "eyJ...", "expires_at": "2026-03-19T..." }
 
 POST /api/auth/refresh
-  Request:  { "token": "current-jwt" }
+  Request:  (Authorization: Bearer <current-jwt>)
   Response: { "token": "new-jwt", "expires_at": "..." }
 ```
 
-#### Passkey (WebAuthn/FIDO2) 登录
+#### Passkey (WebAuthn/FIDO2) 登录 — Phase 2
+
+> Passkey 登录计划在 Phase 2 (Web UI) 中实现。
 
 ```
 POST /api/auth/passkey/begin
-  Response: { WebAuthn PublicKeyCredentialRequestOptions }
-
 POST /api/auth/passkey/finish
-  Request:  { WebAuthn AuthenticatorAssertionResponse }
-  Response: { "token": "eyJ...", "expires_at": "..." }
 ```
 
-Passkey 需要先通过 API Key 登录后在设置页注册，之后可直接使用指纹/面容/安全密钥登录。
-
-#### Passkey 管理 (需已登录)
+#### Passkey 管理 — Phase 2
 
 ```
-GET    /api/auth/passkeys                → [{ id, name, created_at, last_used_at }]
-POST   /api/auth/passkey/register        → { WebAuthn PublicKeyCredentialCreationOptions }
-POST   /api/auth/passkey/register/finish  → { "ok": true }
+GET    /api/auth/passkeys
+POST   /api/auth/passkey/register
+POST   /api/auth/passkey/register/finish
 DELETE /api/auth/passkeys/:id
 ```
 
-#### API Key 管理 (需已登录)
+#### API Key 管理 (需已登录) — Phase 2
 
 ```
-GET    /api/settings/api-key             → { "prefix": "ak_7f3d", "created_at": "..." }
-POST   /api/settings/api-key/regenerate  → { "api_key": "ak_..." }  ← 仅此一次返回明文
+GET    /api/settings/api-key             → { "prefix": "psk_7f3d", "created_at": "..." }
+POST   /api/settings/api-key/regenerate  → { "api_key": "psk_..." }  ← 仅此一次返回明文
 ```
 
 重新生成 API Key 会:
@@ -126,22 +122,28 @@ Authorization: Bearer <jwt-token>
 JWT 有效期 7 天，API Key 永久有效 (可重置)。
 auth_version (config 表) 用于 JWT 吊销: 每次重置 API Key 或调用 reset-all 时 +1，旧 JWT 验证失败。
 
-#### Go 依赖 (认证)
+#### Go 依赖 (Phase 1 已使用)
 
 ```
-github.com/go-webauthn/webauthn   -- WebAuthn/FIDO2
-golang.org/x/crypto/bcrypt        -- API Key hash
+github.com/gin-gonic/gin          -- HTTP 框架
+github.com/mattn/go-sqlite3       -- SQLite 驱动
+github.com/docker/docker           -- Docker SDK
+github.com/shirou/gopsutil/v4     -- 系统指标
+github.com/google/uuid             -- UUID 生成
+golang.org/x/crypto/bcrypt        -- API Key hash (SHA256)
+crypto/rsa + crypto/x509          -- 自签 SSL 证书
 ```
 
-#### Go 依赖 (SSL/测速)
+#### Go 依赖 (Phase 2 计划)
 
 ```
+github.com/go-webauthn/webauthn   -- WebAuthn/FIDO2 (Passkey)
 github.com/caddyserver/certmagic  -- ACME 客户端 (Let's Encrypt)
 ```
 
 > iperf3: 使用 Alpine 系统包 `iperf3`，Go 通过 `os/exec` 调用命令行
 
-### 系统状态
+### 系统状态 ✅ Phase 1
 
 #### `GET /api/status`
 
@@ -150,101 +152,89 @@ github.com/caddyserver/certmagic  -- ACME 客户端 (Let's Encrypt)
   "node": {
     "id": "uuid",
     "name": "my-vps-tokyo",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "uptime": 864000
   },
   "system": {
     "cpu": { "usage_percent": 23.5, "cores": 4, "model": "Intel Xeon E5-2680" },
     "memory": { "total_bytes": 8589934592, "used_bytes": 3221225472, "usage_percent": 37.5 },
     "disk": { "total_bytes": 107374182400, "used_bytes": 42949672960, "usage_percent": 40.0 },
-    "network": { "rx_bytes": 104857600, "tx_bytes": 52428800, "rx_rate": 1048576, "tx_rate": 524288 },
+    "network": { "rx_bytes": 104857600, "tx_bytes": 52428800 },
     "load": { "load1": 0.5, "load5": 0.8, "load15": 0.6 },
     "os": "Ubuntu 22.04.3 LTS",
     "kernel": "5.15.0-91-generic"
   },
-  "containers": { "running": 5, "stopped": 1, "total": 6 },
-  "services": {
-    "ssl": {
-      "mode": "auto",
-      "status": "valid",
-      "domain": "vps.example.com",
-      "expires_at": "2026-06-15T00:00:00Z",
-      "issuer": "Let's Encrypt"
-    },
-    "speedtest": { "http": "ready", "iperf3": "ready" },
-    "dns": { "status": "ok", "resolved_ip": "203.0.113.10" }
-  },
-  "remote_nodes": { "connected": 2, "total": 3 }
+  "containers": { "running": 5, "stopped": 1, "total": 6 }
 }
 ```
 
-#### `GET /api/metrics/stream` (SSE)
+> Phase 1 实现不含 `services` 和 `remote_nodes` 字段。`network` 不含 rate 字段。这些将在 Phase 2/3 补充。
+
+#### `GET /api/metrics/stream` (SSE) ✅ Phase 1
 
 ```
 event: metrics
-data: {"cpu":23.5,"memory":37.5,"network":{"rx_rate":1048576,"tx_rate":524288},"load1":0.5,"timestamp":"2026-03-12T10:00:05Z"}
+data: {"hostname":"...","cpu_percent":23.5,"mem_percent":37.5,...,"timestamp":"2026-03-12T10:00:05Z"}
 ```
 
-每 5 秒推送一次。
+立即发送一次初始指标，之后每 5 秒推送一次。SSE 格式 (`text/event-stream`)。
 
-### 容器管理
+### 容器管理 ✅ Phase 1
 
 #### `GET /api/containers`
 
-```json
-{
-  "containers": [
-    {
-      "id": "abc123",
-      "name": "wireguard",
-      "image": "linuxserver/wireguard:latest",
-      "status": "running",
-      "created_at": "2026-03-10T08:00:00Z",
-      "uptime": 172800,
-      "ports": [{"host": 51820, "container": 51820, "protocol": "udp"}],
-      "labels": { "io.passim": "vpn", "io.passim.app": "wireguard" },
-      "stats": { "cpu_percent": 2.1, "memory_bytes": 52428800 }
-    }
-  ]
-}
-```
-
-#### `POST /api/containers/:name/stop|start|restart`
+返回 Docker 容器列表（数组，非包装对象）。
 
 ```json
-{ "ok": true, "message": "Container wireguard stopped" }
+[
+  {
+    "id": "abc123",
+    "name": "wireguard",
+    "image": "linuxserver/wireguard:latest",
+    "state": "running",
+    "status": "Up 2 days",
+    "labels": { "io.passim.app": "wireguard" }
+  }
+]
 ```
 
-#### `DELETE /api/containers/:name?volumes=true`
+#### `POST /api/containers/:id/start|stop|restart`
 
 ```json
-{ "ok": true, "message": "Container wireguard removed" }
+{ "status": "started" }
+{ "status": "stopped" }
+{ "status": "restarted" }
 ```
 
-#### `GET /api/containers/:name/logs?lines=200&follow=false`
+#### `DELETE /api/containers/:id`
 
-非 follow: 返回纯文本。
-follow=true: 返回 SSE 流。
+```json
+{ "status": "removed" }
+```
 
-### 应用管理
+#### `GET /api/containers/:id/logs?lines=200`
+
+返回纯文本日志（Content-Type: text/plain）。默认 200 行。
+
+### 应用管理 ✅ Phase 1
 
 #### `GET /api/templates`
 
+返回模板数组。
+
 ```json
-{
-  "templates": [
-    {
-      "name": "wireguard",
-      "category": "vpn",
-      "version": "1.0.0",
-      "icon": "shield",
-      "description": "基于 WireGuard 协议的点对点 VPN",
-      "settings": [
-        { "key": "peers", "type": "number", "min": 1, "max": 25, "default": 1, "label": "对等节点数" }
-      ]
-    }
-  ]
-}
+[
+  {
+    "name": "wireguard",
+    "category": "vpn",
+    "version": "1.0.0",
+    "icon": "shield",
+    "description": { "zh-CN": "...", "en-US": "..." },
+    "settings": [
+      { "key": "peers", "type": "number", "min": 1, "max": 25, "default": 3 }
+    ]
+  }
+]
 ```
 
 #### `POST /api/apps`
@@ -253,56 +243,103 @@ follow=true: 返回 SSE 流。
 // Request
 { "template": "wireguard", "settings": { "peers": 5 } }
 
-// Response
-{ "id": "app-uuid", "status": "deploying" }
+// 异步响应 (task queue 启用时) — 202
+{ "id": "app-uuid", "template": "wireguard", "settings": {...}, "status": "deploying", "task_id": "task-uuid" }
+
+// 同步响应 (无 task queue) — 201
+{ "id": "app-uuid", "template": "wireguard", "settings": {...}, "status": "running", "container_id": "abc123" }
 ```
 
-#### `GET /api/apps/:id/events` (SSE)
+#### `GET /api/apps`
+
+返回应用数组。
+
+```json
+[{ "id": "...", "template": "wireguard", "settings": {...}, "status": "running", "container_id": "...", "deployed_at": "...", "updated_at": "..." }]
+```
+
+#### `GET /api/apps/:id`
+
+返回单个应用详情，结构同数组元素。
+
+#### `PATCH /api/apps/:id`
+
+```json
+// Request
+{ "settings": { "peers": 8 } }
+// Response: 更新后的应用详情
+```
+
+#### `DELETE /api/apps/:id`
+
+```json
+// 异步 — 202
+{ "status": "undeploying", "task_id": "task-uuid" }
+
+// 同步 — 200
+{ "status": "deleted" }
+```
+
+#### `GET /api/apps/:id/events` (SSE) ✅ Phase 1
 
 ```
 event: progress
-data: {"stage":"pulling","message":"Pulling linuxserver/wireguard:latest","percent":45}
+data: {"status":"running","progress":50}
 
-event: progress
-data: {"stage":"starting","message":"Starting container...","percent":90}
-
-event: complete
-data: {"status":"running","container_id":"def456"}
+event: deploy
+data: {"status":"running"}
 ```
+
+当 SSE broker 未启用时返回 503。
 
 #### `GET /api/apps/:id/configs`
 
+返回配置文件名数组。
+
 ```json
-{
-  "configs": [
-    { "name": "peer1.conf", "format": "conf", "download_url": "/api/apps/xxx/configs/peer1.conf" },
-    { "name": "peer2.conf", "format": "conf", "download_url": "/api/apps/xxx/configs/peer2.conf" }
-  ]
-}
+["config.yaml", "peer1.conf"]
 ```
 
 #### `GET /api/apps/:id/configs/:filename`
 
-返回文件内容 (`Content-Type: application/octet-stream`)。
+返回文件内容 (`Content-Type: text/plain; charset=utf-8`)。包含路径穿越保护。
 
-### 测速
+### 任务管理 ✅ Phase 1
 
-#### `GET /api/speedtest/download` (浏览器下载测速)
+#### `GET /api/tasks`
+
+返回任务数组。
+
+```json
+[{ "id": "...", "type": "deploy", "ref_id": "app-uuid", "status": "completed", "payload": "...", "result": "...", "created_at": "...", "updated_at": "..." }]
+```
+
+#### `GET /api/tasks/:id`
+
+返回单个任务详情。404 if not found。
+
+#### `GET /api/tasks/:id/events` (SSE)
+
+订阅 `task:{id}` topic 的 SSE 事件流。当 SSE broker 未启用时返回 503。
+
+### 测速 ✅ Phase 1
+
+#### `GET /api/speedtest/download` (公开，无需认证)
 
 返回随机数据流，前端计算下载速度。
 ```
 Content-Type: application/octet-stream
-Content-Length: 104857600  (100MB, 可通过 ?size=50mb 调整)
+Content-Length: 104857600  (100MB, 可通过 ?size= 调整，支持 mb 后缀)
 ```
 
-#### `POST /api/speedtest/upload` (浏览器上传测速)
+#### `POST /api/speedtest/upload` (公开，无需认证)
 
-接收前端上传的数据，返回测速结果。
+接收上传数据，返回测速结果。
 ```json
 { "bytes": 52428800, "duration_ms": 1250, "speed_mbps": 335.5 }
 ```
 
-#### `GET /api/speedtest/ping` (延迟测试)
+#### `GET /api/speedtest/ping` (公开，无需认证)
 
 ```json
 { "timestamp": "2026-03-12T10:00:00.000Z" }
@@ -310,59 +347,40 @@ Content-Length: 104857600  (100MB, 可通过 ?size=50mb 调整)
 
 前端连续请求多次，计算 RTT 和 jitter。
 
-#### `POST /api/speedtest/iperf` (节点间测速，需已登录)
-
-启动 iperf3 客户端连接指定节点:
-```json
-// Request
-{ "target": "node-uuid" }  // 或 { "target_address": "vps-b:5201" }
-
-// Response (SSE stream)
-event: progress
-data: {"direction":"download","speed_mbps":892.3,"percent":50}
-
-event: complete
-data: {"download_mbps":892.3,"upload_mbps":445.1,"duration_s":10}
-```
-
-#### `GET /api/speedtest/iperf/status` (iperf3 server 状态)
+#### `GET /api/speedtest/iperf/status` (需认证)
 
 ```json
-{ "status": "ready", "port": 5201 }
+{ "status": "ready" }
 ```
 
-### SSL 证书管理
+#### `POST /api/speedtest/iperf` — Phase 3 (远程节点)
+
+> iperf3 客户端模式（节点间测速）计划在 Phase 3 实现。
+
+### SSL 证书管理 ✅ Phase 1
 
 #### `GET /api/ssl/status`
 
 ```json
 {
-  "mode": "auto",
+  "mode": "self-signed",
   "status": "valid",
-  "domain": "vps.example.com",
-  "issuer": "Let's Encrypt",
-  "expires_at": "2026-06-15T00:00:00Z",
-  "auto_renew": true
+  "not_before": "2026-03-13T00:00:00Z",
+  "not_after": "2027-03-13T00:00:00Z"
 }
 ```
 
-#### `POST /api/ssl/renew` (手动触发续期，auto 模式)
+#### `POST /api/ssl/renew`
 
-```json
-{ "ok": true, "message": "Renewal initiated" }
-```
+auto 模式返回 501 (not yet implemented)，其他模式返回提示信息。
 
-#### `POST /api/ssl/upload` (上传自定义证书，切换到 custom 模式)
+#### `POST /api/ssl/upload`
 
-```
-Content-Type: multipart/form-data
-  cert: (PEM file)
-  key: (PEM file)
-```
+返回 501 (not yet implemented)。Phase 2 实现 certmagic ACME 和自定义证书上传。
 
 ---
 
-### 远程节点管理
+### 远程节点管理 — Phase 3
 
 #### `POST /api/nodes` (添加远程节点)
 
@@ -435,7 +453,7 @@ POST /api/batch/deploy
 }
 ```
 
-### 被管理端 API
+### 被管理端 API — Phase 3
 
 #### `GET /ws/node?key=<api_key>` (WebSocket 连接端点)
 
@@ -459,7 +477,7 @@ POST /api/batch/deploy
 
 ---
 
-## WebSocket 协议
+## WebSocket 协议 — Phase 3
 
 ### 消息格式
 
@@ -638,7 +656,7 @@ docker run passim/passim
 
 ---
 
-## 自我更新
+## 自我更新 — Phase 4
 
 ```bash
 # 容器内检查更新
@@ -664,31 +682,20 @@ docker run -d ... passim/passim:latest  # 相同参数
 
 ## 错误处理
 
+所有错误响应使用统一的简单格式，靠 HTTP 状态码区分错误类型：
+
 ```json
-{
-  "error": {
-    "code": "CONTAINER_NOT_FOUND",
-    "message": "Container 'wireguard' not found"
-  }
-}
+{ "error": "描述性错误信息" }
 ```
 
-| Code | HTTP | 说明 |
-|------|------|------|
-| `AUTH_REQUIRED` | 401 | 未认证 |
-| `AUTH_INVALID` | 401 | API Key / JWT / Passkey 无效 |
-| `PASSKEY_NOT_FOUND` | 404 | Passkey 不存在 |
-| `WEBAUTHN_FAILED` | 400 | WebAuthn 验证失败 |
-| `NOT_FOUND` | 404 | 资源不存在 |
-| `CONTAINER_NOT_FOUND` | 404 | 容器不存在 |
-| `APP_NOT_FOUND` | 404 | 应用不存在 |
-| `TEMPLATE_NOT_FOUND` | 404 | 模板不存在 |
-| `NODE_NOT_FOUND` | 404 | 远程节点不存在 |
-| `NODE_DISCONNECTED` | 503 | 远程节点离线 |
-| `NODE_TIMEOUT` | 504 | 远程节点响应超时 |
-| `ALREADY_EXISTS` | 409 | 资源已存在 |
-| `DEPLOY_FAILED` | 500 | 部署失败 |
-| `DOCKER_ERROR` | 500 | Docker Engine 错误 |
+| HTTP 状态码 | 含义 | 示例 |
+|------------|------|------|
+| 400 | 请求无效 | `{"error": "invalid request body"}` |
+| 401 | 未认证 | `{"error": "missing or invalid token"}` |
+| 404 | 资源不存在 | `{"error": "app not found"}`, `{"error": "template not found: xxx"}` |
+| 500 | 服务器内部错误 | `{"error": "deploy failed: ..."}` |
+| 501 | 未实现 | `{"error": "auto renewal not yet implemented"}` |
+| 503 | 服务不可用 | `{"error": "docker is not available"}`, `{"error": "SSE not available"}` |
 
 ---
 

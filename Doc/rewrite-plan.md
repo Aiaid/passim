@@ -631,26 +631,59 @@ GET    /ws/node?key=<api_key>       # 远程 Passim 连接端点
 
 ## 八、实施阶段
 
-### Phase 1: Passim Core (5 周)
+### Phase 1: Passim Core ✅ (已完成 2026-03-13)
 
 **目标**: Go 重写 Passim，单机可用
 
-- [ ] Go 项目初始化 (Gin + SQLite + Docker SDK)
-- [ ] 系统指标采集 (gopsutil，替代 Glances)
-- [ ] Docker 容器管理 API (list/start/stop/rm/logs)
-- [ ] 应用模板引擎 (YAML 解析 + 参数渲染 + Docker 部署)
-- [ ] 迁移所有现有应用为 YAML 模板 (7 个)
-- [ ] 配置导出 (conf/mobileconfig/yaml)
-- [ ] API Key 认证 + Passkey (WebAuthn) + JWT
-- [ ] SQLite 数据持久化
-- [ ] 异步任务队列 (内存 + SQLite)
-- [ ] SSL 证书管理 (certmagic ACME + 自签回退 + 自定义证书)
-- [ ] 内置测速 (HTTP download/upload/ping 端点 + iperf3 server)
-- [ ] SSE 实时推送 (指标 + 部署进度)
-- [ ] Dockerfile
-- [ ] 单元测试
+- [x] Go 项目初始化 (Gin + SQLite + Docker SDK)
+- [x] 系统指标采集 (gopsutil，替代 Glances)
+- [x] Docker 容器管理 API (list/start/stop/rm/logs)
+- [x] 应用模板引擎 (YAML 解析 + 参数渲染 + Docker 部署)
+- [x] 迁移所有现有应用为 YAML 模板 (7 个: wireguard, l2tp, hysteria, v2ray, webdav, samba, rdesktop)
+- [ ] 配置导出 (conf/mobileconfig/yaml) — 基础文件下载已实现，格式转换待 Phase 2
+- [x] API Key 认证 + JWT (Passkey/WebAuthn 移至 Phase 2)
+- [x] SQLite 数据持久化
+- [x] 异步任务队列 (内存 channel + SQLite 持久化 + 自动重试)
+- [x] SSL 证书管理 (自签回退已实现，certmagic ACME 为 stub 待完善)
+- [x] 内置测速 (HTTP download/upload/ping 端点 + iperf3 server)
+- [x] SSE 实时推送 (指标流 + 任务进度 + 应用事件)
+- [ ] Dockerfile — 待编写
+- [x] 单元测试 (238 个测试，12 个包全部通过)
 
 **交付物**: `docker run` 一行启动，可管理本机容器和应用 (无 Web UI，API-only)
+
+**Phase 1 实际实现的 API 端点:**
+```
+# 公开 (无需认证)
+POST /api/auth/login              # API Key → JWT
+POST /api/auth/refresh            # 刷新 JWT
+GET  /api/speedtest/download      # 下载测速
+POST /api/speedtest/upload        # 上传测速
+GET  /api/speedtest/ping          # 延迟测试
+
+# 需认证 (Bearer JWT)
+GET  /api/status                  # 系统状态
+GET  /api/metrics/stream          # SSE 指标流 (每 5s)
+GET  /api/containers              # 容器列表
+POST /api/containers/:id/start|stop|restart
+DELETE /api/containers/:id
+GET  /api/containers/:id/logs
+GET  /api/templates               # 模板列表
+POST /api/apps                    # 部署应用 (同步或异步)
+GET  /api/apps                    # 应用列表
+GET  /api/apps/:id
+PATCH /api/apps/:id               # 更新设置
+DELETE /api/apps/:id              # 卸载
+GET  /api/apps/:id/configs        # 配置文件列表
+GET  /api/apps/:id/configs/:file  # 下载配置
+GET  /api/apps/:id/events         # SSE 应用事件
+GET  /api/tasks                   # 任务列表
+GET  /api/tasks/:id
+GET  /api/tasks/:id/events        # SSE 任务进度
+GET  /api/ssl/status
+POST /api/ssl/renew
+GET  /api/speedtest/iperf/status
+```
 
 ### Phase 2: Web UI (4 周)
 
