@@ -1,2 +1,15 @@
 IoC/bind/passim.cloud
 .vercel
+.DS_Store
+
+# Go
+passim/passim
+*.exe
+
+# Web (Phase 2)
+web/node_modules/
+web/dist/
+
+# App (Phase 5)
+app/node_modules/
+app/.expo/

@@ -1,0 +1,36 @@
+name: wireguard
+category: vpn
+version: 1.0.0
+icon: shield
+description:
+  en-US: "Peer-to-peer VPN using WireGuard protocol"
+  zh-CN: "基于 WireGuard 协议的点对点 VPN"
+settings:
+  - key: peers
+    type: number
+    min: 1
+    max: 25
+    default: 1
+    label:
+      en-US: "Number of Peers"
+      zh-CN: "对等节点数"
+container:
+  image: linuxserver/wireguard
+  ports:
+    - "51820:51820/udp"
+  volumes:
+    - "/data/configs/wireguard:/config"
+  environment:
+    PEERS: "{{settings.peers}}"
+  labels:
+    io.passim: vpn
+    io.passim.app: wireguard
+  cap_add:
+    - NET_ADMIN
+    - SYS_MODULE
+  sysctls:
+    net.ipv4.conf.all.src_valid_mark: "1"
+config_export:
+  format: conf
+  path: /data/configs/wireguard/wg_confs/
+  pattern: "peer*.conf"
