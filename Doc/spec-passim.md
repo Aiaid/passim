@@ -152,7 +152,10 @@ golang.org/x/crypto/acme/autocert -- ACME 客户端 (Let's Encrypt) ✅
     "id": "uuid",
     "name": "my-vps-tokyo",
     "version": "0.1.0",
-    "uptime": 864000
+    "uptime": 864000,
+    "public_ip": "203.0.113.10",
+    "public_ip6": "2001:db8::1",
+    "country": "JP"
   },
   "system": {
     "cpu": { "usage_percent": 23.5, "cores": 4, "model": "Intel Xeon E5-2680" },
@@ -168,6 +171,7 @@ golang.org/x/crypto/acme/autocert -- ACME 客户端 (Let's Encrypt) ✅
 ```
 
 > Phase 1 实现不含 `services` 和 `remote_nodes` 字段。`network` 不含 rate 字段。这些将在 Phase 2/3 补充。
+> `public_ip` / `public_ip6` / `country` 在首次请求时懒加载 (sync.Once)，通过外部服务发现 (api4.ipify.org / api6.ipify.org)，国家通过 ip-api.com 查询。
 
 #### `GET /api/metrics/stream` (SSE) ✅ Phase 1
 
@@ -363,9 +367,10 @@ Content-Length: 104857600  (100MB, 可通过 ?size= 调整，支持 mb 后缀)
 ```json
 {
   "mode": "self-signed",
-  "status": "valid",
-  "not_before": "2026-03-13T00:00:00Z",
-  "not_after": "2027-03-13T00:00:00Z"
+  "valid": true,
+  "domain": "example.com",
+  "expires_at": "2027-03-13T00:00:00Z",
+  "issuer": "Passim Self-Signed"
 }
 ```
 
@@ -376,6 +381,25 @@ auto 模式触发证书续期（删除缓存强制重签），其他模式返回
 #### `POST /api/ssl/upload`
 
 自定义证书上传，接受 multipart form（cert + key 文件）。✅ 已实现。
+
+### 节点设置 ✅ Phase 2
+
+#### `GET /api/settings`
+
+```json
+{ "node_name": "my-vps-tokyo" }
+```
+
+#### `PATCH /api/settings`
+
+```json
+// Request
+{ "node_name": "new-name" }
+// Response
+{ "ok": true }
+```
+
+`node_name` 最长 64 字符，空字符串表示使用系统 hostname。
 
 ---
 
@@ -610,6 +634,7 @@ services:
 | Key | 说明 |
 |-----|------|
 | `node_id` | 节点 UUID，首次启动自动生成 |
+| `node_name` | 节点显示名称，空则使用系统 hostname |
 | `api_key_hash` | API Key 的 SHA256 哈希 |
 | `jwt_secret` | JWT 签名密钥 |
 | `auth_version` | 认证版本号，重置 API Key 时 +1 用于吊销旧 JWT |
