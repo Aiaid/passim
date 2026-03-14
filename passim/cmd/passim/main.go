@@ -62,8 +62,19 @@ func main() {
 		log.Printf("warning: failed to load templates: %v", err)
 	}
 
-	// SSL manager
-	sslMgr := ssl.NewSSLManager("self-signed", "/data")
+	// SSL configuration
+	sslMode := getEnvDefault("SSL_MODE", "self-signed")
+	sslDomain := os.Getenv("SSL_DOMAIN")
+	sslBaseDomain := os.Getenv("DNS_BASE_DOMAIN") // DNS reflector (e.g., "dns.passim.io")
+	sslEmail := os.Getenv("SSL_EMAIL")
+
+	sslMgr := ssl.NewSSLManager(ssl.SSLManagerConfig{
+		Mode:       sslMode,
+		DataDir:    "/data",
+		Domain:     sslDomain,
+		BaseDomain: sslBaseDomain,
+		Email:      sslEmail,
+	})
 	if err := sslMgr.Init(); err != nil {
 		log.Printf("warning: SSL init failed: %v", err)
 	}
@@ -79,11 +90,16 @@ func main() {
 	iperfSrv := speedtest.NewIperfServer("5201")
 
 	// WebAuthn manager
+	rpID := "localhost"
 	rpOrigin := "https://localhost:8443"
-	if port := os.Getenv("PORT"); port != "" {
+	if sslDomain != "" {
+		rpID = sslDomain
+		rpOrigin = "https://" + sslDomain
+	}
+	if port := os.Getenv("PORT"); port != "" && sslDomain == "" {
 		rpOrigin = "https://localhost:" + port
 	}
-	webauthnMgr, err := auth.NewWebAuthnManager("localhost", rpOrigin)
+	webauthnMgr, err := auth.NewWebAuthnManager(rpID, rpOrigin)
 	if err != nil {
 		log.Printf("warning: WebAuthn init failed: %v", err)
 	}
@@ -125,10 +141,31 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
+	tlsConfig, tlsErr := sslMgr.GetTLSConfig()
+
 	go func() {
-		log.Printf("passim listening on %s", addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+		if tlsErr != nil {
+			log.Printf("warning: TLS not available (%v), serving HTTP only", tlsErr)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server error: %v", err)
+			}
+		} else {
+			srv.TLSConfig = tlsConfig
+			log.Printf("passim listening on %s (HTTPS)", addr)
+			if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server error: %v", err)
+			}
+		}
+	}()
+
+	// HTTP server on port 80: ACME challenges + redirect to HTTPS
+	go func() {
+		httpSrv := &http.Server{
+			Addr:    ":80",
+			Handler: sslMgr.HTTPChallengeHandler(),
+		}
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("HTTP server (:80) error: %v (ACME challenges may not work)", err)
 		}
 	}()
 
@@ -143,4 +180,11 @@ func main() {
 		log.Fatalf("forced shutdown: %v", err)
 	}
 	log.Println("bye")
+}
+
+func getEnvDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
