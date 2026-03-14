@@ -129,7 +129,7 @@ github.com/mattn/go-sqlite3       -- SQLite 驱动
 github.com/docker/docker           -- Docker SDK
 github.com/shirou/gopsutil/v4     -- 系统指标
 github.com/google/uuid             -- UUID 生成
-golang.org/x/crypto/bcrypt        -- API Key hash (SHA256)
+crypto/sha256                     -- API Key hash
 crypto/rsa + crypto/x509          -- 自签 SSL 证书
 ```
 
@@ -553,46 +553,66 @@ POST /api/batch/deploy
 
 ## 配置
 
-### `/data/config.yaml`
+Passim 不使用配置文件——所有配置通过**环境变量**传入，运行时状态存储在 SQLite 中。
+
+### 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PORT` | `8443` | 监听端口 |
+| `API_KEY` | (自动生成) | 预设 API Key；省略则首次启动自动生成并打印到日志 |
+| `SSL_MODE` | `self-signed` | SSL 模式：`self-signed` / `letsencrypt` / `off` |
+| `SSL_DOMAIN` | — | 域名，用于 Let's Encrypt 证书签发（最高优先级） |
+| `SSL_EMAIL` | — | Let's Encrypt 联系邮箱 |
+| `DNS_BASE_DOMAIN` | — | DNS 反射器基础域名；未设 `SSL_DOMAIN` 时自动发现公网 IP 拼域名 |
+| `DATA_DIR` | `/data` | 数据目录（SQLite、配置、证书） |
+
+### SSL 模式说明
+
+| 模式 | 行为 |
+|------|------|
+| `self-signed` | 自动生成自签证书到 `/data/certs/`（默认） |
+| `letsencrypt` | ACME 自动申请 Let's Encrypt 证书，需设置 `SSL_DOMAIN` 或 `DNS_BASE_DOMAIN` |
+| `off` | 纯 HTTP，不启用 TLS（开发模式） |
+
+**Let's Encrypt 域名优先级：**
+1. 设了 `SSL_DOMAIN` → 直接使用，DNS 反射不触发
+2. 未设 `SSL_DOMAIN`，设了 `DNS_BASE_DOMAIN` → 自动发现公网 IP，Base32 编码拼成域名（如 `ywahcia8.dns.passim.io`）
+3. 两个都未设 → 报错
+
+### Docker Compose
 
 ```yaml
-node:
-  name: ""             # 用户可修改
-  port: 8443
-
-auth:
-  api_key: "auto-generated"    # 明文仅首次启动输出到日志，数据库存 hash
-
-ssl:
-  mode: "auto"               # auto (autocert Let's Encrypt) / self-signed / custom
-  domain: ""                 # auto 模式需要，如 "vps.example.com"
-  email: ""                  # auto 模式 ACME 联系邮箱 (可选)
-  cert_path: ""              # custom 模式: 自定义证书路径
-  key_path: ""               # custom 模式: 自定义私钥路径
-  # auto 模式: autocert 自动管理，证书存储在 /data/ssl/autocert/
-  # self-signed 模式: 首次启动自动生成自签证书到 /data/certs/
-  # custom 模式: 使用用户提供的证书
-
-docker:
-  socket: "unix:///var/run/docker.sock"
-
-metrics:
-  interval: 5s
-
-log:
-  level: info          # debug / info / warn / error
-  format: json
+# passim/docker-compose.yml
+services:
+  passim:
+    build:
+      context: ..
+      dockerfile: passim/Dockerfile
+    ports:
+      - "8443:8443"        # Main HTTPS/HTTP port
+      - "80:80"            # ACME challenge + HTTP→HTTPS redirect
+      - "5201:5201"        # iperf3 speed test
+    volumes:
+      - passim-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - PORT=8443
+      - SSL_MODE=self-signed
+      # - API_KEY=your-secret-key
+      # - SSL_DOMAIN=example.com
+      # - SSL_EMAIL=you@example.com
+      # - DNS_BASE_DOMAIN=dns.passim.io
 ```
 
-首次启动自动生成，用户可通过环境变量覆盖:
+### 运行时存储 (SQLite `config` 表)
 
-```bash
-docker run -d \
-  -e PASSIM_NODE_NAME="tokyo-1" \
-  -e PASSIM_AUTH_API_KEY="my-custom-key" \
-  -e PASSIM_LOG_LEVEL="debug" \
-  ...
-```
+| Key | 说明 |
+|-----|------|
+| `node_id` | 节点 UUID，首次启动自动生成 |
+| `api_key_hash` | API Key 的 SHA256 哈希 |
+| `jwt_secret` | JWT 签名密钥 |
+| `auth_version` | 认证版本号，重置 API Key 时 +1 用于吊销旧 JWT |
 
 CLI 子命令:
 
@@ -612,45 +632,45 @@ passim version             # 版本信息
 docker run passim/passim
     │
     ▼
-[1] 检测 /data/config.yaml 是否存在
-    ├─ 不存在 → 首次安装
-    │   ├─ 生成节点 ID + API Key
-    │   ├─ 写入 config.yaml
-    │   └─ 标记 setup_required = true
-    └─ 存在 → 正常启动
+[1] 初始化 SQLite (WAL 模式，自动迁移)
     │
     ▼
-[2] 初始化 SQLite (WAL 模式，自动迁移)
+[2] 首次启动检测 (config 表无 node_id)
+    ├─ 生成节点 UUID
+    ├─ 生成 API Key (或使用 API_KEY 环境变量)
+    │   └─ 存储 SHA256 哈希，明文仅打印一次
+    ├─ 生成 JWT 签名密钥
+    └─ 设置 auth_version = 1
     │
     ▼
 [3] 加载应用模板 (/etc/passim/templates/*.yaml)
     │
     ▼
 [4] 检测 Docker socket 可用性
-    │  ✗ → 打印错误，容器管理功能不可用
+    │  ✗ → 打印警告，容器管理功能不可用
     ▼
-[5] 如果 setup_required:
-    ├─ 初始化 SSL (根据 ssl.mode):
-    │   ├─ auto → autocert 启动 ACME，监听 :80 进行 HTTP-01 验证
-    │   ├─ self-signed → 生成自签证书到 /data/ssl/
-    │   └─ custom → 验证用户提供的证书路径有效
-    ├─ 初始化内置测速 (HTTP 端点 + iperf3 server)
-    └─ 标记 setup_complete
+[5] 初始化 SSL (根据 SSL_MODE 环境变量):
+    ├─ self-signed → 生成自签证书到 /data/certs/
+    ├─ letsencrypt → autocert ACME，监听 :80 进行 HTTP-01 验证
+    │   ├─ 有 SSL_DOMAIN → 直接使用
+    │   └─ 有 DNS_BASE_DOMAIN → 自动发现公网 IP 拼域名
+    └─ off → 跳过 TLS，纯 HTTP
     │
     ▼
-[6] 启动 HTTP 服务 (API + 静态文件 + WebSocket)
+[6] 启动任务队列消费者 (2 workers)
     │
     ▼
-[7] 恢复远程节点连接 (重连 remote_nodes 表中的所有节点)
+[7] 启动 HTTP(S) 服务 (API + 嵌入式 Web UI)
     │
     ▼
-[8] 启动任务队列消费者
+[8] 如果 SSL_MODE ≠ off: 启动 HTTP :80 (ACME challenge + HTTPS 重定向)
     │
     ▼
 [9] 日志输出:
-    "Passim started on https://0.0.0.0:8443"
-    "API Key: xxxxx"
-    "Register a Passkey in Settings for convenient login"
+    "=== First-time setup complete ==="
+    "Node ID : <uuid>"
+    "API Key : <plaintext>"
+    "Save this API Key — it will not be shown again."
 ```
 
 ---

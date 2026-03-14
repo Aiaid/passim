@@ -180,7 +180,7 @@ COPY --from=builder /passim /usr/local/bin/passim
 COPY templates/ /etc/passim/templates/
 
 VOLUME /data           # SQLite + 配置 + 应用数据 + 证书
-EXPOSE 8443 80
+EXPOSE 8443 80 5201
 
 ENTRYPOINT ["passim"]
 ```
@@ -193,9 +193,24 @@ docker run -d \
   -v passim-data:/data \
   -p 8443:8443 \
   -p 80:80 \
+  -p 5201:5201 \
   passim/passim:latest
-# 端口 80 用于 ACME HTTP-01 证书验证，验证完成后自动重定向到 HTTPS
+# 8443: 主 HTTPS/HTTP 端口
+# 80:   ACME HTTP-01 证书验证 + HTTP→HTTPS 重定向
+# 5201: iperf3 测速
 ```
+
+**环境变量:**
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PORT` | `8443` | 监听端口 |
+| `API_KEY` | (自动生成) | 预设 API Key；省略则首次启动自动生成 |
+| `SSL_MODE` | `self-signed` | `self-signed` / `letsencrypt` / `off` |
+| `SSL_DOMAIN` | — | Let's Encrypt 域名（最高优先级） |
+| `SSL_EMAIL` | — | Let's Encrypt 联系邮箱 |
+| `DNS_BASE_DOMAIN` | — | DNS 反射器基础域名；未设 `SSL_DOMAIN` 时自动发现公网 IP 拼域名 |
+| `DATA_DIR` | `/data` | 数据目录 |
 
 **Volume 挂载:**
 

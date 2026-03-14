@@ -89,9 +89,19 @@ python app/app.py                # Runs nserver DNS on port 153
 ## Environment Variables
 
 ### Passim (Go)
-- `PORT` — HTTP listen port (default: `8443`)
-- Data stored in `/data/` volume (SQLite, configs, certs)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8443` | Listen port |
+| `API_KEY` | (auto-generated) | Pre-set API key; omit to auto-generate on first run |
+| `SSL_MODE` | `self-signed` | `self-signed` / `letsencrypt` / `off` |
+| `SSL_DOMAIN` | — | Domain for Let's Encrypt cert (highest priority) |
+| `SSL_EMAIL` | — | Contact email for Let's Encrypt |
+| `DNS_BASE_DOMAIN` | — | DNS reflector base domain; auto-discovers public IP when `SSL_DOMAIN` is not set |
+| `DATA_DIR` | `/data` | Data directory (SQLite, configs, certs) |
 
 ### DNS
-- `BASE_DOMAIN` — Base domain for DNS queries
-- `IP` — IP address for NS/A records
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BASE_DOMAIN` | — | Base domain for DNS queries |
+| `IP` | — | IP address for NS/A records |
