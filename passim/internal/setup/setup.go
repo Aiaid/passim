@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/google/uuid"
 	"github.com/passim/passim/internal/auth"
@@ -29,11 +30,18 @@ func Init(database *sql.DB) error {
 		return err
 	}
 
-	// Generate API Key — store hash, print plaintext
-	plain, hash, err := auth.GenerateAPIKey()
-	if err != nil {
-		return err
+	// Generate API Key — use API_KEY env var if set, otherwise generate random
+	var plain string
+	if envKey := os.Getenv("API_KEY"); envKey != "" {
+		plain = envKey
+	} else {
+		var err error
+		plain, _, err = auth.GenerateAPIKey()
+		if err != nil {
+			return err
+		}
 	}
+	hash := auth.HashAPIKey(plain)
 	if err := db.SetConfig(database, "api_key_hash", hash); err != nil {
 		return err
 	}

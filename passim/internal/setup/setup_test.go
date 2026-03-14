@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/passim/passim/internal/auth"
 	"github.com/passim/passim/internal/db"
 )
 
@@ -76,5 +77,25 @@ func TestInitIdempotent(t *testing.T) {
 	}
 	if hash != hash2 {
 		t.Fatal("api_key_hash changed on second init")
+	}
+}
+
+func TestInitWithAPIKeyEnv(t *testing.T) {
+	t.Setenv("API_KEY", "my-custom-key")
+
+	database := testDB(t)
+	if err := Init(database); err != nil {
+		t.Fatal(err)
+	}
+
+	hash, _ := db.GetConfig(database, "api_key_hash")
+	if hash == "" {
+		t.Fatal("api_key_hash should not be empty")
+	}
+
+	// Verify the stored hash matches the env var key
+	expected := auth.HashAPIKey("my-custom-key")
+	if hash != expected {
+		t.Fatalf("stored hash %s does not match expected %s", hash, expected)
 	}
 }
