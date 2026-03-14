@@ -34,7 +34,7 @@ const stoppedContainer: Container = {
 describe('ContainerActions', () => {
   it('shows Stop and Restart for a running container, not Start or Remove', async () => {
     const user = userEvent.setup();
-    render(<ContainerActions container={runningContainer} onViewLogs={vi.fn()} />);
+    render(<ContainerActions container={runningContainer} />);
     await user.click(screen.getByRole('button'));
 
     expect(await screen.findByText('container.stop')).toBeInTheDocument();
@@ -45,27 +45,12 @@ describe('ContainerActions', () => {
 
   it('shows Start and Remove for a stopped container, not Stop or Restart', async () => {
     const user = userEvent.setup();
-    render(<ContainerActions container={stoppedContainer} onViewLogs={vi.fn()} />);
+    render(<ContainerActions container={stoppedContainer} />);
     await user.click(screen.getByRole('button'));
 
     expect(await screen.findByText('container.start')).toBeInTheDocument();
     expect(screen.getByText('container.remove')).toBeInTheDocument();
     expect(screen.queryByText('container.stop')).not.toBeInTheDocument();
     expect(screen.queryByText('container.restart')).not.toBeInTheDocument();
-  });
-
-  it('always shows Logs regardless of container state', async () => {
-    const user = userEvent.setup();
-
-    const { unmount } = render(
-      <ContainerActions container={runningContainer} onViewLogs={vi.fn()} />,
-    );
-    await user.click(screen.getByRole('button'));
-    expect(await screen.findByText('container.logs')).toBeInTheDocument();
-    unmount();
-
-    render(<ContainerActions container={stoppedContainer} onViewLogs={vi.fn()} />);
-    await user.click(screen.getByRole('button'));
-    expect(await screen.findByText('container.logs')).toBeInTheDocument();
   });
 });

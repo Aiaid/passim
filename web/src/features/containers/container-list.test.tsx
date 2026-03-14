@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@/test/test-utils';
+import { render, screen } from '@/test/test-utils';
 import type { Container } from '@/lib/api-client';
 import { ContainerList } from './container-list';
 
@@ -11,8 +11,8 @@ vi.mock('./container-actions', () => ({
   ContainerActions: () => <div data-testid="container-actions" />,
 }));
 
-vi.mock('./container-logs', () => ({
-  ContainerLogs: () => null,
+vi.mock('./container-detail-panel', () => ({
+  ContainerDetailPanel: () => null,
 }));
 
 const containers: Container[] = [
@@ -38,7 +38,7 @@ describe('ContainerList', () => {
     expect(screen.queryByText('/nginx')).not.toBeInTheDocument();
   });
 
-  it('truncates image names longer than 40 chars', () => {
+  it('shows full image name (CSS handles truncation)', () => {
     const longImage = 'registry.example.com/org/very-long-image-name:latest-version-tag';
     const container: Container = {
       Id: 'long123',
@@ -49,25 +49,16 @@ describe('ContainerList', () => {
       Created: 0,
     };
     render(<ContainerList containers={[container]} />);
-    const truncated = longImage.slice(0, 40) + '...';
-    expect(screen.getByText(truncated)).toBeInTheDocument();
-    expect(screen.queryByText(longImage)).not.toBeInTheDocument();
+    expect(screen.getByText(longImage)).toBeInTheDocument();
   });
 
-  it('does not truncate image names 40 chars or shorter', () => {
-    render(<ContainerList containers={[containers[0]]} />);
-    expect(screen.getByText('nginx:latest')).toBeInTheDocument();
-  });
-
-  it('renders correct number of rows for given containers', () => {
+  it('renders a card for each container', () => {
     const threeContainers: Container[] = [
       ...containers,
       { Id: 'third111', Names: ['/postgres'], Image: 'postgres:16', State: 'running', Status: 'Up 5m', Created: 0 },
     ];
     render(<ContainerList containers={threeContainers} />);
-    const tbody = screen.getByRole('table').querySelector('tbody');
-    const rows = within(tbody!).getAllByRole('row');
-    expect(rows).toHaveLength(3);
+    expect(screen.getAllByTestId('container-actions')).toHaveLength(3);
   });
 
   it('falls back to first 12 chars of Id when Names is empty', () => {

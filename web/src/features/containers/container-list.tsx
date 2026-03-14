@@ -1,17 +1,10 @@
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { cn } from '@/lib/utils';
 import type { Container } from '@/lib/api-client';
 import { ContainerActions } from './container-actions';
-import { ContainerLogs } from './container-logs';
+import { ContainerDetailPanel } from './container-detail-panel';
 
 interface ContainerListProps {
   containers: Container[];
@@ -26,59 +19,72 @@ function displayName(container: Container): string {
   return container.Names[0]?.replace(/^\//, '') ?? container.Id.slice(0, 12);
 }
 
-function truncateImage(image: string, max = 40): string {
-  if (image.length <= max) return image;
-  return image.slice(0, max) + '...';
-}
+const borderColor: Record<string, string> = {
+  running: 'border-l-status-running',
+  stopped: 'border-l-status-stopped',
+  failed: 'border-l-status-failed',
+  deploying: 'border-l-status-deploying',
+};
 
 export function ContainerList({ containers }: ContainerListProps) {
-  const { t } = useTranslation();
-  const [logsContainer, setLogsContainer] = useState<Container | null>(null);
+  const [selected, setSelected] = useState<Container | null>(null);
 
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('container.name')}</TableHead>
-            <TableHead>{t('container.image')}</TableHead>
-            <TableHead>{t('container.state')}</TableHead>
-            <TableHead>{t('container.status')}</TableHead>
-            <TableHead className="w-12">{t('container.actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {containers.map((container) => (
-            <TableRow key={container.Id}>
-              <TableCell className="font-medium">
-                {displayName(container)}
-              </TableCell>
-              <TableCell className="text-muted-foreground" title={container.Image}>
-                {truncateImage(container.Image)}
-              </TableCell>
-              <TableCell>
-                <StatusBadge status={mapState(container.State)} />
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {container.Status}
-              </TableCell>
-              <TableCell>
-                <ContainerActions
-                  container={container}
-                  onViewLogs={() => setLogsContainer(container)}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {containers.map((container) => {
+          const name = displayName(container);
+          const state = mapState(container.State);
 
-      <ContainerLogs
-        containerId={logsContainer?.Id ?? null}
-        containerName={logsContainer ? displayName(logsContainer) : ''}
-        open={!!logsContainer}
+          return (
+            <Card
+              key={container.Id}
+              className={cn(
+                'overflow-hidden transition-all hover:shadow-md border-l-[3px] cursor-pointer',
+                borderColor[state] || 'border-l-status-stopped',
+              )}
+              onClick={() => setSelected(container)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      {state === 'running' && (
+                        <span className="relative flex size-2 shrink-0">
+                          <span className="absolute inline-flex size-full animate-ping rounded-full bg-status-running opacity-75" />
+                          <span className="inline-flex size-2 rounded-full bg-status-running" />
+                        </span>
+                      )}
+                      <h3 className="text-sm font-medium truncate">{name}</h3>
+                    </div>
+                    <p
+                      className="mt-1 text-xs text-muted-foreground truncate"
+                      title={container.Image}
+                    >
+                      {container.Image}
+                    </p>
+                  </div>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ContainerActions container={container} />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <StatusBadge status={state} />
+                  <span className="text-xs text-muted-foreground">
+                    {container.Status}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <ContainerDetailPanel
+        container={selected}
+        open={!!selected}
         onOpenChange={(open) => {
-          if (!open) setLogsContainer(null);
+          if (!open) setSelected(null);
         }}
       />
     </>

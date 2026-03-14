@@ -7,7 +7,6 @@ import {
   Square,
   RotateCcw,
   Trash2,
-  ScrollText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,10 +21,9 @@ import { useContainerAction, useRemoveContainer } from './queries';
 
 interface ContainerActionsProps {
   container: Container;
-  onViewLogs: () => void;
 }
 
-export function ContainerActions({ container, onViewLogs }: ContainerActionsProps) {
+export function ContainerActions({ container }: ContainerActionsProps) {
   const { t } = useTranslation();
   const [removeOpen, setRemoveOpen] = useState(false);
   const containerAction = useContainerAction();
@@ -96,10 +94,6 @@ export function ContainerActions({ container, onViewLogs }: ContainerActionsProp
               </DropdownMenuItem>
             </>
           )}
-          <DropdownMenuItem onClick={onViewLogs}>
-            <ScrollText className="size-4 mr-2" />
-            {t('container.logs')}
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 

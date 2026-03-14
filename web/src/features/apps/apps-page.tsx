@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { AppWindow, Plus } from 'lucide-react';
@@ -7,8 +8,10 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
+import type { AppResponse } from '@/lib/api-client';
 import { useApps } from './queries';
 import { AppCard } from './app-card';
+import { AppDetailPanel } from './app-detail-panel';
 
 export function AppsPage() {
   const { t } = useTranslation();
@@ -18,6 +21,7 @@ export function AppsPage() {
     queryKey: ['templates'],
     queryFn: () => api.getTemplates(),
   });
+  const [selected, setSelected] = useState<AppResponse | null>(null);
 
   if (isLoading) {
     return <PageSkeleton />;
@@ -50,10 +54,24 @@ export function AppsPage() {
               key={app.id}
               app={app}
               template={templates?.find((tpl) => tpl.name === app.template)}
+              onClick={() => setSelected(app)}
             />
           ))}
         </div>
       )}
+
+      <AppDetailPanel
+        app={selected}
+        template={
+          selected
+            ? templates?.find((tpl) => tpl.name === selected.template)
+            : undefined
+        }
+        open={!!selected}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
+        }}
+      />
     </div>
   );
 }
