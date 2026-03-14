@@ -19,12 +19,19 @@ COPY --from=frontend /web/dist ./passim/cmd/passim/dist/
 RUN cd passim && CGO_ENABLED=1 go build -o /passim ./cmd/passim/
 
 # Stage 3: Final image
-FROM alpine:3.20
+FROM alpine:3.21
 RUN apk add --no-cache ca-certificates iperf3
-COPY --from=backend /passim /usr/local/bin/passim
-COPY passim/templates/ /etc/passim/templates/
+RUN addgroup -S passim && adduser -S passim -G passim
 
+COPY --from=backend /passim /usr/local/bin/passim
+COPY --from=backend /app/passim/templates/ /etc/passim/templates/
+
+RUN mkdir -p /data && chown passim:passim /data
 VOLUME /data
 EXPOSE 8443 80
 
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO /dev/null https://localhost:8443/api/status --no-check-certificate || exit 1
+
+USER passim
 ENTRYPOINT ["passim"]
