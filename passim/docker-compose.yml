@@ -1,0 +1,39 @@
+services:
+  passim:
+    build:
+      context: ..
+      dockerfile: passim/Dockerfile
+    container_name: passim
+    restart: unless-stopped
+    ports:
+      - "8443:8443"          # Main HTTPS/HTTP port
+      - "80:80"              # ACME challenge + HTTP→HTTPS redirect
+      - "5201:5201"          # iperf3 speed test
+    volumes:
+      - passim-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # ── General ─────────────────────────────────────────────
+      - PORT=8443                         # Listen port (default: 8443)
+      # - API_KEY=your-secret-key         # Pre-set API key; omit to auto-generate on first run
+
+      # ── SSL ─────────────────────────────────────────────────
+      # SSL_MODE: self-signed | letsencrypt | off
+      #   self-signed  — auto-generate self-signed cert (default)
+      #   letsencrypt  — ACME via Let's Encrypt, requires SSL_DOMAIN or DNS_BASE_DOMAIN
+      #   off          — plain HTTP, for development only
+      - SSL_MODE=self-signed
+      # - SSL_MODE=off
+
+      # ── Let's Encrypt (only when SSL_MODE=letsencrypt) ──────
+      # Option A: you own a domain
+      # - SSL_DOMAIN=example.com          # Your domain; highest priority
+      # - SSL_EMAIL=you@example.com       # Contact email for Let's Encrypt
+      #
+      # Option B: no domain — auto-discover via DNS reflector
+      #   Discovers public IP → Base32-encodes → <encoded>.dns.passim.io
+      #   Only used when SSL_DOMAIN is NOT set
+      # - DNS_BASE_DOMAIN=dns.passim.io
+
+volumes:
+  passim-data:
