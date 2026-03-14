@@ -147,4 +147,45 @@ describe('useSSE', () => {
 
     expect(instance.close).toHaveBeenCalled();
   });
+
+  it('uses addEventListener for named events when eventName is set', () => {
+    const onMessage = vi.fn();
+    const { result } = renderHook(
+      () => useSSE<{ value: number }>('/metrics/stream', { eventName: 'metrics', onMessage }),
+      { wrapper },
+    );
+
+    const instance = getMockES().instances[0];
+
+    // onmessage should NOT be set — named events go through addEventListener
+    expect(instance.onmessage).toBeNull();
+
+    // Simulate a named SSE event dispatched by the browser
+    act(() => {
+      instance.dispatchEvent(
+        new MessageEvent('metrics', { data: '{"value":99}' }),
+      );
+    });
+
+    expect(result.current.data).toEqual({ value: 99 });
+    expect(onMessage).toHaveBeenCalledWith({ value: 99 });
+  });
+
+  it('does NOT receive named events via onmessage (regression guard)', () => {
+    const { result } = renderHook(
+      () => useSSE<{ value: number }>('/test'),
+      { wrapper },
+    );
+
+    const instance = getMockES().instances[0];
+
+    // Without eventName, only onmessage is used — named events should not update data
+    act(() => {
+      instance.dispatchEvent(
+        new MessageEvent('metrics', { data: '{"value":42}' }),
+      );
+    });
+
+    expect(result.current.data).toBeNull();
+  });
 });

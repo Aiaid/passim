@@ -25,9 +25,30 @@ class MockEventSource {
   onerror: ((ev: Event) => void) | null = null
   close = vi.fn()
 
+  private _listeners: Record<string, EventListener[]> = {}
+
   constructor(url: string) {
     this.url = url
     MockEventSource.instances.push(this)
+  }
+
+  addEventListener(type: string, listener: EventListener) {
+    if (!this._listeners[type]) this._listeners[type] = []
+    this._listeners[type].push(listener)
+  }
+
+  removeEventListener(type: string, listener: EventListener) {
+    if (!this._listeners[type]) return
+    this._listeners[type] = this._listeners[type].filter((l) => l !== listener)
+  }
+
+  /** Dispatch a named SSE event (e.g. `event: metrics`) */
+  dispatchEvent(event: Event): boolean {
+    const listeners = this._listeners[event.type] || []
+    for (const listener of listeners) {
+      listener(event)
+    }
+    return listeners.length > 0
   }
 
   static reset() {
