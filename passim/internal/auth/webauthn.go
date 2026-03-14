@@ -30,6 +30,9 @@ func (u *PassimUser) WebAuthnCredentials() []webauthn.Credential { return u.Cred
 // rpID is the domain (e.g., "localhost").
 // rpOrigin is the full origin (e.g., "https://localhost:8443").
 func NewWebAuthnManager(rpID, rpOrigin string) (*WebAuthnManager, error) {
+	if rpID == "" || rpOrigin == "" {
+		return nil, fmt.Errorf("create webauthn: rpID and rpOrigin must not be empty")
+	}
 	wan, err := webauthn.New(&webauthn.Config{
 		RPID:          rpID,
 		RPDisplayName: "Passim",
