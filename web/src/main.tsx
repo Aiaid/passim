@@ -9,7 +9,10 @@ import { App } from './app';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (failureCount, error) => {
+        if (error instanceof Error && 'status' in error && (error as { status: number }).status === 401) return false;
+        return failureCount < 1;
+      },
       refetchOnWindowFocus: false,
       staleTime: 30_000,
     },

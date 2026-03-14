@@ -35,7 +35,11 @@ export function useSSE<T>(path: string, options?: UseSSEOptions) {
     source.onerror = () => {
       source.close();
       setIsConnected(false);
-      reconnectTimeoutRef.current = setTimeout(connect, 3000);
+      // Only reconnect if still authenticated
+      const currentToken = useAuthStore.getState().token;
+      if (currentToken) {
+        reconnectTimeoutRef.current = setTimeout(connect, 3000);
+      }
     };
   }, [path, token, options]);
 

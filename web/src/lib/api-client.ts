@@ -1,3 +1,5 @@
+import { useAuthStore } from '@/stores/auth-store';
+
 const BASE = '/api';
 
 export class ApiError extends Error {
@@ -30,8 +32,7 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   });
 
   if (res.status === 401) {
-    localStorage.removeItem('auth-token');
-    window.location.href = '/login';
+    useAuthStore.getState().logout();
     throw new ApiError(401, 'Unauthorized');
   }
 

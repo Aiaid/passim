@@ -27,26 +27,26 @@ export function SystemMetrics() {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <MetricCard
         label={t('dashboard.cpu')}
-        value={metrics.cpu_percent.toFixed(1)}
+        value={(metrics.cpu_percent ?? 0).toFixed(1)}
         unit="%"
         icon={Cpu}
       />
       <MetricCard
         label={t('dashboard.memory')}
-        value={formatBytes(metrics.memory_used)}
-        unit={`/ ${formatBytes(metrics.memory_total)}`}
+        value={formatBytes(metrics.memory_used ?? 0)}
+        unit={`/ ${formatBytes(metrics.memory_total ?? 0)}`}
         icon={MemoryStick}
       />
       <MetricCard
         label={t('dashboard.disk')}
-        value={formatBytes(metrics.disk_used)}
-        unit={`/ ${formatBytes(metrics.disk_total)}`}
+        value={formatBytes(metrics.disk_used ?? 0)}
+        unit={`/ ${formatBytes(metrics.disk_total ?? 0)}`}
         icon={HardDrive}
       />
       <MetricCard
         label={t('dashboard.network')}
-        value={`↓${formatBytes(metrics.net_rx)}/s`}
-        unit={`↑${formatBytes(metrics.net_tx)}/s`}
+        value={`↓${formatBytes(metrics.net_rx ?? 0)}/s`}
+        unit={`↑${formatBytes(metrics.net_tx ?? 0)}/s`}
         icon={Network}
       />
     </div>

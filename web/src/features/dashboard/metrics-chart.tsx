@@ -24,10 +24,10 @@ export function MetricsChart() {
           minute: '2-digit',
           second: '2-digit',
         }),
-        cpu: Number(entry.cpu_percent.toFixed(1)),
+        cpu: Number((entry.cpu_percent ?? 0).toFixed(1)),
         memory:
-          entry.memory_total > 0
-            ? Number(((entry.memory_used / entry.memory_total) * 100).toFixed(1))
+          (entry.memory_total ?? 0) > 0
+            ? Number((((entry.memory_used ?? 0) / entry.memory_total) * 100).toFixed(1))
             : 0,
       })),
     [history],
