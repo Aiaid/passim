@@ -15,15 +15,15 @@ services:
     environment:
       # ── General ─────────────────────────────────────────────
       - PORT=8443                         # Listen port (default: 8443)
-      # - API_KEY=your-secret-key         # Pre-set API key; omit to auto-generate on first run
+      - API_KEY=test         # Pre-set API key; omit to auto-generate on first run
 
       # ── SSL ─────────────────────────────────────────────────
       # SSL_MODE: self-signed | letsencrypt | off
       #   self-signed  — auto-generate self-signed cert (default)
       #   letsencrypt  — ACME via Let's Encrypt, requires SSL_DOMAIN or DNS_BASE_DOMAIN
       #   off          — plain HTTP, for development only
-      - SSL_MODE=self-signed
-      # - SSL_MODE=off
+      # - SSL_MODE=self-signed
+      - SSL_MODE=off
 
       # ── Let's Encrypt (only when SSL_MODE=letsencrypt) ──────
       # Option A: you own a domain
