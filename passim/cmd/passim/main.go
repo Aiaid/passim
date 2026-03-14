@@ -89,13 +89,9 @@ func main() {
 	// SSE broker
 	sseBroker := sse.NewBroker()
 
-	// Iperf server
+	// Iperf server (default off — start via API toggle)
 	iperfSrv := speedtest.NewIperfServer("5201")
-	if err := iperfSrv.Start(); err != nil {
-		log.Printf("warning: iperf3 server failed to start: %v", err)
-	} else {
-		defer iperfSrv.Stop()
-	}
+	defer iperfSrv.Stop()
 
 	// WebAuthn manager
 	rpID := "localhost"

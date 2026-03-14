@@ -116,6 +116,11 @@ export const api = {
 
   // SSL
   getSSLStatus: () => request<SSLStatus>('/ssl/status'),
+
+  // Speedtest / iperf
+  getIperfStatus: () => request<{ status: string }>('/speedtest/iperf/status'),
+  startIperf: () => request<{ status: string }>('/speedtest/iperf/start', { method: 'POST' }),
+  stopIperf: () => request<{ status: string }>('/speedtest/iperf/stop', { method: 'POST' }),
 };
 
 // Type definitions used by api client

@@ -22,6 +22,8 @@ func registerSpeedtestProtectedRoutes(group *gin.RouterGroup, iperf *speedtest.I
 	st := group.Group("/speedtest")
 	{
 		st.GET("/iperf/status", iperfStatusHandler(iperf))
+		st.POST("/iperf/start", iperfStartHandler(iperf))
+		st.POST("/iperf/stop", iperfStopHandler(iperf))
 	}
 }
 
@@ -32,5 +34,33 @@ func iperfStatusHandler(iperf *speedtest.IperfServer) gin.HandlerFunc {
 			status = iperf.Status()
 		}
 		c.JSON(http.StatusOK, gin.H{"status": status})
+	}
+}
+
+func iperfStartHandler(iperf *speedtest.IperfServer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if iperf == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "iperf3 not available"})
+			return
+		}
+		if err := iperf.Start(); err != nil {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": iperf.Status()})
+	}
+}
+
+func iperfStopHandler(iperf *speedtest.IperfServer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if iperf == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "iperf3 not available"})
+			return
+		}
+		if err := iperf.Stop(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": iperf.Status()})
 	}
 }

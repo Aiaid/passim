@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/hooks/use-theme';
 import { usePreferencesStore } from '@/stores/preferences-store';
+import { IperfSettings } from './iperf-settings';
 
 const themes = [
   { value: 'light' as const, labelKey: 'settings.theme_light', icon: Sun },
@@ -28,53 +29,57 @@ export function GeneralSettings() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('settings.general')}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Theme */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label className="text-base">{t('settings.theme')}</Label>
-            <p className="text-sm text-muted-foreground">{t('settings.theme_desc')}</p>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.general')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Theme */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">{t('settings.theme')}</Label>
+              <p className="text-sm text-muted-foreground">{t('settings.theme_desc')}</p>
+            </div>
+            <div className="flex items-center gap-1">
+              {themes.map(({ value, labelKey, icon: Icon }) => (
+                <Button
+                  key={value}
+                  variant={theme === value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTheme(value)}
+                >
+                  <Icon className="size-4" />
+                  {t(labelKey)}
+                </Button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            {themes.map(({ value, labelKey, icon: Icon }) => (
-              <Button
-                key={value}
-                variant={theme === value ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTheme(value)}
-              >
-                <Icon className="size-4" />
-                {t(labelKey)}
-              </Button>
-            ))}
-          </div>
-        </div>
 
-        {/* Language */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label className="text-base">{t('settings.language')}</Label>
-            <p className="text-sm text-muted-foreground">{t('settings.language_desc')}</p>
+          {/* Language */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">{t('settings.language')}</Label>
+              <p className="text-sm text-muted-foreground">{t('settings.language_desc')}</p>
+            </div>
+            <div className="flex items-center gap-1">
+              {languages.map(({ value, label }) => (
+                <Button
+                  key={value}
+                  variant={language === value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleLanguageChange(value)}
+                >
+                  <Languages className="size-4" />
+                  {label}
+                </Button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            {languages.map(({ value, label }) => (
-              <Button
-                key={value}
-                variant={language === value ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleLanguageChange(value)}
-              >
-                <Languages className="size-4" />
-                {label}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      <IperfSettings />
+    </div>
   );
 }

@@ -108,9 +108,7 @@ func NewRouter(deps Deps) http.Handler {
 			}
 
 			// Protected speedtest routes
-			if deps.Iperf != nil {
-				registerSpeedtestProtectedRoutes(protected, deps.Iperf)
-			}
+			registerSpeedtestProtectedRoutes(protected, deps.Iperf)
 		}
 	}
 
