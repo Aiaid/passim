@@ -186,10 +186,68 @@ cd web && pnpm test:coverage
 
 ---
 
+## 集成测试 (Go, `//go:build integration`)
+
+**运行**: `cd passim && go test -tags=integration ./internal/api/ -v -count=1`
+
+| 测试 | 验证内容 |
+|------|---------|
+| `TestInteg_AsyncDeployLifecycle` | POST /api/apps → 202 + task_id → poll task → completed → app status=running |
+| `TestInteg_AsyncDeployFailure` | MockDocker.PullErr → task 重试 → 最终 failed → app status 非 running |
+| `TestInteg_AsyncUndeployLifecycle` | 部署 → DELETE → 202 → task completed → app 被删除 |
+| `TestInteg_AuthFlowComplete` | login → token 访问 → refresh → 新 token → bump auth_version → 旧 token 401 |
+| `TestInteg_TokenQueryParamSSE` | GET /api/metrics/stream?token=valid → 200; ?token=bad → 401 |
+| `TestInteg_ContainerListWithApps` | 部署 app → GET /containers 看到对应容器 |
+| `TestInteg_TemplateToDockerConfig` | POST /api/apps template=wireguard → 验证 MockDocker 调用参数 |
+| `TestInteg_AppSettingsUpdateValidation` | 部署 → PATCH 合法 200 → PATCH 超范围 400 → GET 确认 |
+| `TestInteg_TaskRecovery` | DB 插入 running 任务 → 新建 Queue → 任务被恢复处理 |
+| `TestInteg_ConcurrentDeploys` | 并行 POST 2 个 app → 两个都完成 |
+| `TestInteg_AppConfigFiles` | 部署带 configFiles 模板 → GET /apps/:id/configs 返回内容 |
+| `TestInteg_CORSHeaders` | OPTIONS 和 GET 请求都带 CORS headers |
+
+## E2E 测试 (Go, `//go:build e2e`)
+
+**运行**: `cd passim && go test -tags=e2e ./internal/api/ -v -count=1`
+
+| 测试 | 验证内容 |
+|------|---------|
+| `TestE2E_LoginAndProtectedRoute` | 真实 HTTP login → 用 token 访问 → 无 token 401 |
+| `TestE2E_SSEMetricsStream` | 真实 HTTP 长连接 → 读 SSE 事件 → 解析 JSON |
+| `TestE2E_SSETaskEvents` | 部署 app → 打开 task events stream → 读到状态变更 |
+| `TestE2E_DeployAndListApps` | login → deploy → list → get → delete |
+| `TestE2E_ContainerCRUD` | list → start → stop → restart → remove → logs |
+| `TestE2E_TemplateList` | GET /api/templates → 7 个模板 |
+| `TestE2E_ConcurrentRequests` | 10 个并发 GET /api/status → 全部 200 |
+| `TestE2E_InvalidJSON` | 各种畸形 JSON body → 400 |
+
+## 前端 Playwright E2E
+
+**运行**: `cd web && pnpm test:e2e`
+
+| Spec File | Tests | 验证内容 |
+|-----------|-------|---------|
+| `auth.spec.ts` | 4 | 登录/失败/未认证重定向/token 过期 |
+| `dashboard.spec.ts` | 3 | 系统指标/容器摘要/侧边栏导航 |
+| `marketplace.spec.ts` | 4 | 模板列表/分类筛选/部署流程/部署结果 |
+| `containers.spec.ts` | 3 | 容器列表/操作/日志 |
+| `settings.spec.ts` | 2 | SSL 状态/Passkey 区域 |
+
+---
+
+## 测试覆盖进展
+
+| 阶段 | Go 文件 | Go 测试 | 前端文件 | 前端测试 | 状态 |
+|------|---------|---------|---------|---------|------|
+| Phase 1 (后端核心) | 28 | 177 | — | — | ✅ 完成 |
+| Phase 2 (WebAuthn + Web UI) | 5 | 15 | 20 | 130 | ✅ 完成 |
+| 集成 + E2E 测试 | 6 | 23 | 5 | 16 | 🚧 进行中 |
+| Phase 3 (远程节点) | — | — | — | — | 📋 计划中 |
+| Phase 4 (DNS 集成) | — | — | — | — | 📋 计划中 |
+| Phase 5 (移动端) | — | — | — | — | 📋 计划中 |
+
+---
+
 ## 待改进
 
-- [ ] Go 后端: 集成测试 (`-tags=integration`) 覆盖 API→DB→Docker 全链路
-- [ ] Go 后端: E2E 测试 (`-tags=e2e`) 覆盖真实 HTTP 请求
 - [ ] 前端: 覆盖率报告 + 覆盖率门槛设置
-- [ ] 前端: E2E 测试 (Playwright) 覆盖完整用户流程
 - [ ] CI/CD: GitHub Actions 自动化测试流水线

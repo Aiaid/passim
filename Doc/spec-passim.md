@@ -75,22 +75,21 @@ POST /api/auth/refresh
   Response: { "token": "new-jwt", "expires_at": "..." }
 ```
 
-#### Passkey (WebAuthn/FIDO2) 登录 — Phase 2
-
-> Passkey 登录计划在 Phase 2 (Web UI) 中实现。
+#### Passkey (WebAuthn/FIDO2) 登录 ✅ Phase 2
 
 ```
-POST /api/auth/passkey/begin
-POST /api/auth/passkey/finish
+GET    /api/auth/passkeys/exists          # 检查是否有已注册 Passkey (公开)
+POST   /api/auth/passkey/begin            # 开始登录 (公开)
+POST   /api/auth/passkey/finish           # 完成登录 (公开)
 ```
 
-#### Passkey 管理 — Phase 2
+#### Passkey 管理 ✅ Phase 2
 
 ```
-GET    /api/auth/passkeys
-POST   /api/auth/passkey/register
-POST   /api/auth/passkey/register/finish
-DELETE /api/auth/passkeys/:id
+GET    /api/auth/passkeys                 # Passkey 列表 (需认证)
+POST   /api/auth/passkey/register         # 开始注册 (需认证)
+POST   /api/auth/passkey/register/finish  # 完成注册 (需认证)
+DELETE /api/auth/passkeys/:id             # 删除 Passkey (需认证)
 ```
 
 #### API Key 管理 (需已登录) — Phase 2
@@ -134,11 +133,11 @@ golang.org/x/crypto/bcrypt        -- API Key hash (SHA256)
 crypto/rsa + crypto/x509          -- 自签 SSL 证书
 ```
 
-#### Go 依赖 (Phase 2 计划)
+#### Go 依赖 (Phase 2 已使用)
 
 ```
-github.com/go-webauthn/webauthn   -- WebAuthn/FIDO2 (Passkey)
-github.com/caddyserver/certmagic  -- ACME 客户端 (Let's Encrypt)
+github.com/go-webauthn/webauthn   -- WebAuthn/FIDO2 (Passkey) ✅
+github.com/caddyserver/certmagic  -- ACME 客户端 (Let's Encrypt, stub)
 ```
 
 > iperf3: 使用 Alpine 系统包 `iperf3`，Go 通过 `os/exec` 调用命令行

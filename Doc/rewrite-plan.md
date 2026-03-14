@@ -648,7 +648,7 @@ GET    /ws/node?key=<api_key>       # 远程 Passim 连接端点
 - [x] 内置测速 (HTTP download/upload/ping 端点 + iperf3 server)
 - [x] SSE 实时推送 (指标流 + 任务进度 + 应用事件)
 - [ ] Dockerfile — 待编写
-- [x] 单元测试 (238 个测试，12 个包全部通过)
+- [x] 单元测试 (192 test functions, 277 test runs 含子测试, 12 个包全部通过)
 
 **交付物**: `docker run` 一行启动，可管理本机容器和应用 (无 Web UI，API-only)
 
@@ -689,21 +689,21 @@ GET  /api/speedtest/iperf/status
 
 **目标**: Vite + React + shadcn/ui 前端
 
-- [ ] 项目初始化 (Vite + React 19 + Tailwind v4 + shadcn/ui)
-- [ ] 设计系统 (OKLCH 色彩 / 暗色模式)
-- [ ] 登录页 (API Key + Passkey)
-- [ ] Dashboard 总览 (节点状态 + 快速操作)
-- [ ] 容器管理 (列表 + 操作 + 日志)
-- [ ] 应用管理
-  - 模板浏览
-  - 部署向导 (动态表单)
-  - 应用详情 + 配置导出 (下载/二维码)
-- [ ] S3 凭证管理
-- [ ] 设置页
-- [ ] SSE 实时数据集成
-- [ ] 国际化 (en-US / zh-CN)
-- [ ] 响应式布局
+- [x] 项目初始化 (Vite 8.0.0 + React 19.2.4 + TypeScript 5.9.3 + Tailwind 4.2.1 + shadcn/ui)
+- [x] 设计系统 (OKLCH 色彩 / 暗色模式)
+- [x] 登录页 (API Key + Passkey)
+- [x] Dashboard 总览 (系统指标 + 容器摘要 + 应用概览)
+- [x] 容器管理 (列表 + 操作 + 日志 Sheet)
+- [x] 应用管理 — 模板浏览 / 部署向导 (动态表单) / 应用详情 + 配置导出
+- [ ] S3 凭证管理 ← 移至 Phase 3
+- [x] 设置页 (通用 + 安全 Passkey/API Key + SSL)
+- [x] SSE 实时数据集成 (指标流 + 应用事件 + 任务进度)
+- [x] 国际化 (en-US / zh-CN)
+- [x] 响应式布局 (use-mobile hook)
+- [x] Passkey (WebAuthn) 后端 API + 前端注册/登录
+- [x] 单元测试 (Go 192 + Frontend 130 = 322 tests)
 - [ ] Go embed 嵌入 + 更新 Dockerfile
+- [ ] 集成测试 + E2E 测试 ← 当前工作
 
 **交付物**: 功能完整的单机 Passim (API + Web UI)
 

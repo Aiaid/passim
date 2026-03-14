@@ -100,6 +100,9 @@ func main() {
 		SSE:       sseBroker,
 	}
 
+	// Register task handlers (deploy/undeploy) — after deps assembled
+	api.RegisterTaskHandlers(taskQueue, deps)
+
 	router := api.NewRouter(deps)
 
 	// Serve embedded web UI

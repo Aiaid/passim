@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://localhost:8443',
+        target: process.env.E2E_API_URL || 'https://localhost:8443',
         changeOrigin: true,
         secure: false,
       },
