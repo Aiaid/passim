@@ -138,11 +138,11 @@ func main() {
 
 	// Start HTTP server
 	srv := &http.Server{
-		Addr:         ":" + port,
-		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:        ":" + port,
+		Handler:     router,
+		ReadTimeout: 15 * time.Second,
+		// No WriteTimeout — SSE streams need long-lived connections
+		IdleTimeout: 60 * time.Second,
 	}
 
 	go func() {
