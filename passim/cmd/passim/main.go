@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -9,11 +11,21 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/api"
 	"github.com/passim/passim/internal/auth"
 	"github.com/passim/passim/internal/db"
+	"github.com/passim/passim/internal/docker"
 	"github.com/passim/passim/internal/setup"
+	"github.com/passim/passim/internal/speedtest"
+	"github.com/passim/passim/internal/sse"
+	"github.com/passim/passim/internal/ssl"
+	"github.com/passim/passim/internal/task"
+	"github.com/passim/passim/internal/template"
 )
+
+//go:embed all:dist
+var webDist embed.FS
 
 func main() {
 	database, err := db.Open("/data/passim.db")
@@ -38,10 +50,64 @@ func main() {
 	}
 	jwtMgr := auth.NewJWTManager(jwtSecret, 7*24*time.Hour)
 
-	router := api.NewRouter(api.Deps{
-		DB:  database,
-		JWT: jwtMgr,
-	})
+	// Docker client
+	dockerClient, err := docker.NewClient()
+	if err != nil {
+		log.Printf("warning: docker not available: %v", err)
+	}
+
+	// Template registry
+	registry := template.NewRegistry()
+	if err := registry.LoadDir("/etc/passim/templates"); err != nil {
+		log.Printf("warning: failed to load templates: %v", err)
+	}
+
+	// SSL manager
+	sslMgr := ssl.NewSSLManager("self-signed", "/data")
+	if err := sslMgr.Init(); err != nil {
+		log.Printf("warning: SSL init failed: %v", err)
+	}
+
+	// Task queue
+	taskQueue := task.NewQueue(database, 100)
+	taskQueue.Start(2)
+
+	// SSE broker
+	sseBroker := sse.NewBroker()
+
+	// Iperf server
+	iperfSrv := speedtest.NewIperfServer("5201")
+
+	// WebAuthn manager
+	rpOrigin := "https://localhost:8443"
+	if port := os.Getenv("PORT"); port != "" {
+		rpOrigin = "https://localhost:" + port
+	}
+	webauthnMgr, err := auth.NewWebAuthnManager("localhost", rpOrigin)
+	if err != nil {
+		log.Printf("warning: WebAuthn init failed: %v", err)
+	}
+
+	deps := api.Deps{
+		DB:        database,
+		JWT:       jwtMgr,
+		WebAuthn:  webauthnMgr,
+		Docker:    dockerClient,
+		Templates: registry,
+		SSL:       sslMgr,
+		Iperf:     iperfSrv,
+		Tasks:     taskQueue,
+		SSE:       sseBroker,
+	}
+
+	router := api.NewRouter(deps)
+
+	// Serve embedded web UI
+	webFS, err := fs.Sub(webDist, "dist")
+	if err != nil {
+		log.Fatalf("failed to access embedded web files: %v", err)
+	}
+	api.ServeStatic(router.(*gin.Engine), webFS)
 
 	addr := ":8443"
 	if port := os.Getenv("PORT"); port != "" {
