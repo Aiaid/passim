@@ -1,0 +1,73 @@
+import { useLocation, Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
+import { LayoutDashboard, Container, AppWindow, Settings } from 'lucide-react';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarHeader,
+  SidebarFooter,
+} from '@/components/ui/sidebar';
+
+const navItems = [
+  { key: 'dashboard', path: '/', icon: LayoutDashboard },
+  { key: 'containers', path: '/containers', icon: Container },
+  { key: 'apps', path: '/apps', icon: AppWindow },
+];
+
+const bottomItems = [
+  { key: 'settings', path: '/settings', icon: Settings },
+];
+
+export function AppSidebar() {
+  const { t } = useTranslation();
+  const location = useLocation();
+
+  return (
+    <Sidebar>
+      <SidebarHeader className="px-4 py-3">
+        <Link to="/" className="flex items-center gap-2">
+          <span className="text-lg font-semibold">Passim</span>
+        </Link>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>{t('nav.local')}</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map((item) => (
+                <SidebarMenuItem key={item.key}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.path}>
+                    <Link to={item.path}>
+                      <item.icon className="size-4" />
+                      <span>{t(`nav.${item.key}`)}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          {bottomItems.map((item) => (
+            <SidebarMenuItem key={item.key}>
+              <SidebarMenuButton asChild isActive={location.pathname === item.path}>
+                <Link to={item.path}>
+                  <item.icon className="size-4" />
+                  <span>{t(`nav.${item.key}`)}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
