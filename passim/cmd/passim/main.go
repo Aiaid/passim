@@ -62,21 +62,24 @@ func main() {
 		log.Printf("warning: failed to load templates: %v", err)
 	}
 
-	// SSL configuration
+	// SSL configuration — SSL_MODE=off disables TLS entirely (dev mode)
 	sslMode := getEnvDefault("SSL_MODE", "self-signed")
 	sslDomain := os.Getenv("SSL_DOMAIN")
 	sslBaseDomain := os.Getenv("DNS_BASE_DOMAIN") // DNS reflector (e.g., "dns.passim.io")
 	sslEmail := os.Getenv("SSL_EMAIL")
 
-	sslMgr := ssl.NewSSLManager(ssl.SSLManagerConfig{
-		Mode:       sslMode,
-		DataDir:    "/data",
-		Domain:     sslDomain,
-		BaseDomain: sslBaseDomain,
-		Email:      sslEmail,
-	})
-	if err := sslMgr.Init(); err != nil {
-		log.Printf("warning: SSL init failed: %v", err)
+	var sslMgr *ssl.SSLManager
+	if sslMode != "off" {
+		sslMgr = ssl.NewSSLManager(ssl.SSLManagerConfig{
+			Mode:       sslMode,
+			DataDir:    "/data",
+			Domain:     sslDomain,
+			BaseDomain: sslBaseDomain,
+			Email:      sslEmail,
+		})
+		if err := sslMgr.Init(); err != nil {
+			log.Printf("warning: SSL init failed: %v", err)
+		}
 	}
 
 	// Task queue
@@ -91,13 +94,17 @@ func main() {
 
 	// WebAuthn manager
 	rpID := "localhost"
-	rpOrigin := "https://localhost:8443"
+	scheme := "https"
+	if sslMode == "off" {
+		scheme = "http"
+	}
+	rpOrigin := scheme + "://localhost:8443"
 	if sslDomain != "" {
 		rpID = sslDomain
-		rpOrigin = "https://" + sslDomain
+		rpOrigin = scheme + "://" + sslDomain
 	}
 	if port := os.Getenv("PORT"); port != "" && sslDomain == "" {
-		rpOrigin = "https://localhost:" + port
+		rpOrigin = scheme + "://localhost:" + port
 	}
 	webauthnMgr, err := auth.NewWebAuthnManager(rpID, rpOrigin)
 	if err != nil {
@@ -141,9 +148,16 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	tlsConfig, tlsErr := sslMgr.GetTLSConfig()
-
 	go func() {
+		if sslMode == "off" {
+			log.Printf("passim listening on %s (HTTP — dev mode)", addr)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server error: %v", err)
+			}
+			return
+		}
+
+		tlsConfig, tlsErr := sslMgr.GetTLSConfig()
 		if tlsErr != nil {
 			log.Printf("warning: TLS not available (%v), serving HTTP only", tlsErr)
 			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -158,16 +172,18 @@ func main() {
 		}
 	}()
 
-	// HTTP server on port 80: ACME challenges + redirect to HTTPS
-	go func() {
-		httpSrv := &http.Server{
-			Addr:    ":80",
-			Handler: sslMgr.HTTPChallengeHandler(),
-		}
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("HTTP server (:80) error: %v (ACME challenges may not work)", err)
-		}
-	}()
+	// HTTP server on port 80: ACME challenges + redirect to HTTPS (skip in dev mode)
+	if sslMode != "off" {
+		go func() {
+			httpSrv := &http.Server{
+				Addr:    ":80",
+				Handler: sslMgr.HTTPChallengeHandler(),
+			}
+			if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("HTTP server (:80) error: %v (ACME challenges may not work)", err)
+			}
+		}()
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
