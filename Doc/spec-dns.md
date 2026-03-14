@@ -199,7 +199,7 @@ Passim 节点启动时：
 
 1. 获取自身公网 IP
 2. Base32 编码 IP → 生成域名 (`ywahcia8.dns.passim.io`)
-3. 用这个域名申请 Let's Encrypt SSL 证书 (certmagic ACME HTTP-01)
+3. 用这个域名申请 Let's Encrypt SSL 证书 (autocert ACME HTTP-01)
 4. 查询 TXT 记录获取地理位置 (国旗 emoji 显示在 Dashboard)
 
 用户看到的只是 Dashboard 上的 🇯🇵 图标和正常工作的 HTTPS——不需要知道背后有 DNS 编码。

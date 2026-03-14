@@ -1,6 +1,6 @@
 # Test Inventory
 
-> 最后更新: 2026-03-14 | 总测试: **322** (Go 192 + Frontend 130) | 全部通过
+> 最后更新: 2026-03-14 | 总测试: **333** (Go 203 + Frontend 130) | 全部通过
 
 ## 运行命令
 
@@ -28,7 +28,7 @@ cd web && pnpm test:coverage
 
 ## Go 后端 (passim/)
 
-**33 test files, 192 top-level test functions, 277 test runs (含子测试)**
+**35 test files, 203 top-level test functions, 291 test runs (含子测试)**
 
 ### internal/api/ — API 层 (13 files)
 
@@ -44,7 +44,7 @@ cd web && pnpm test:coverage
 | `status_test.go` | PingHandler, Status_NoDocker, Status_ReturnsFullStructure | 系统状态 |
 | `template_test.go` | ListTemplates, ListTemplatesRequiresAuth | 模板列表 |
 | `task_test.go` | GetTask, GetTask_NotFound, ListTasks, ListTasks_Empty, ListTasks_RequiresAuth, ListTasks_WithTasks | 任务查询 |
-| `ssl_test.go` | SSLStatusEndpoint, SSLRenewEndpoint_SelfSigned | SSL 状态 |
+| `ssl_test.go` | SSLStatusEndpoint, SSLRenewEndpoint_SelfSigned, SSLUploadEndpoint, SSLUploadEndpoint_InvalidCert | SSL 状态 + 证书上传 |
 | `speedtest_test.go` | SpeedtestDownloadEndpoint, SpeedtestUploadEndpoint, SpeedtestPingEndpoint | 测速 |
 | `testhelper_test.go` | — | 测试辅助函数 (testServer, getToken 等) |
 
@@ -89,7 +89,7 @@ cd web && pnpm test:coverage
 | `speedtest/http_test.go` | DownloadHandler_DefaultSize, DownloadHandler_CustomSize, DownloadHandler_InvalidSize, UploadHandler, UploadHandler_EmptyBody, ParseSize (10 subtests) | 测速 HTTP 处理 |
 | `sse/broker_test.go` | SubscribeAndPublish, PublishNoSubscribers, PublishToCorrectTopic, MultipleTopics, Unsubscribe, ConcurrentPublish, DropEventsWhenFull, SSEEventFormat, MetricsStream, MetricsStream_NoAuth | SSE Broker |
 | `ssl/selfsigned_test.go` | GenerateSelfSigned, GenerateSelfSigned_SANs, GenerateSelfSigned_SubDir, GenerateSelfSigned_ValidCert | 自签名证书 |
-| `ssl/manager_test.go` | SSLManager_SelfSigned_Init, SSLManager_SelfSigned_InitIdempotent, SSLManager_SelfSigned_Status, SSLManager_SelfSigned_GetTLSConfig, SSLManager_Custom_Exists, SSLManager_Custom_Missing, SSLManager_Auto_Stub, SSLManager_StatusBeforeInit, SSLManager_UnknownMode | SSL 管理器 |
+| `ssl/manager_test.go` | SSLManager_SelfSigned_Init, SSLManager_SelfSigned_InitIdempotent, SSLManager_SelfSigned_Status, SSLManager_SelfSigned_GetTLSConfig, SSLManager_Auto_Init, SSLManager_Auto_NoDomain, SSLManager_Custom_Exists, SSLManager_Custom_Missing, SSLManager_UnknownMode, SSLManager_StatusBeforeInit, SSLManager_SetCustomCert, SSLManager_SetCustomCert_Invalid, SSLManager_Renew_NonAuto, SSLManager_HTTPChallengeHandler, SSLManager_GetMode (3 subtests) | SSL 管理器 (autocert ACME + 自签 + 自定义上传) |
 | `task/queue_test.go` | EnqueueAndProcess, MaxRetriesExceeded, RetryOnFailure, RecoverPending, UpdateStatus, UpdateStatusFailed | 任务队列 |
 | `task/store_test.go` | EventFormat (2 subtests) | 任务存储 |
 
@@ -240,7 +240,7 @@ cd web && pnpm test:coverage
 |------|---------|---------|---------|---------|------|
 | Phase 1 (后端核心) | 28 | 177 | — | — | ✅ 完成 |
 | Phase 2 (WebAuthn + Web UI) | 5 | 15 | 20 | 130 | ✅ 完成 |
-| 集成 + E2E 测试 | 6 | 23 | 5 | 16 | 🚧 进行中 |
+| 集成 + E2E 测试 | 6 | 23 | 5 | 16 | ✅ 完成 |
 | Phase 3 (远程节点) | — | — | — | — | 📋 计划中 |
 | Phase 4 (DNS 集成) | — | — | — | — | 📋 计划中 |
 | Phase 5 (移动端) | — | — | — | — | 📋 计划中 |

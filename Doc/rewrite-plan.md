@@ -161,7 +161,7 @@ VPS B 也连接了 C
 | Updater (Python) 独立容器 | 内置自我更新 |
 | MongoDB (集中) | SQLite (本地，每台独立) |
 | Glances 容器 (监控) | 内置 gopsutil 指标采集 |
-| SWAG 容器 (SSL) | 内置 certmagic ACME 客户端 |
+| SWAG 容器 (SSL) | 内置 autocert ACME 客户端 |
 | Speedtest 容器 (测速) | 内置 HTTP 测速端点 + iperf3 |
 | 4+ 个进程 + 数据库 | 1 个 Docker 容器 |
 | 无手机 App | Expo 手机 App (iOS + Android) |
@@ -169,7 +169,7 @@ VPS B 也连接了 C
 ### Docker 容器结构
 
 ```dockerfile
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 # 编译 Go 后端 (内嵌静态前端文件)
 COPY . .
 RUN go build -o /passim ./cmd/passim/
@@ -204,7 +204,7 @@ docker run -d \
 | `/var/run/docker.sock` | Docker Engine 通信 (必须) |
 | `/data/passim.db` | SQLite 数据库 |
 | `/data/configs/` | 应用配置文件 (Wireguard conf 等) |
-| `/data/ssl/` | SSL 证书 (certmagic 自动管理) |
+| `/data/ssl/` | SSL 证书 (autocert 自动管理) |
 
 ---
 
@@ -214,12 +214,12 @@ docker run -d \
 
 | 类别 | 选择 | 理由 |
 |------|------|------|
-| 语言 | **Go 1.23** | 单二进制、高并发、Docker SDK 原生支持 |
+| 语言 | **Go 1.25** | 单二进制、高并发、Docker SDK 原生支持 |
 | HTTP | **Gin** | 轻量框架 |
 | 数据库 | **SQLite** (go-sqlite3, WAL) | 零配置嵌入式，每台 VPS 独立 |
 | 容器 | **Docker SDK (Go)** | 直接调用 Docker Engine API |
 | 指标 | **gopsutil** | 系统指标采集，替代 Glances 容器 |
-| SSL | **certmagic** | 内置 ACME 客户端，自动 Let's Encrypt，替代 SWAG 容器 |
+| SSL | **autocert** (x/crypto) | 内置 ACME 客户端，自动 Let's Encrypt，替代 SWAG 容器 |
 | 测速 | **内置 HTTP 端点** + **iperf3** | 浏览器测速 + 节点间吞吐量测试，替代 Speedtest 容器 |
 | 多节点通信 | **WebSocket** (gorilla/websocket) | Passim 实例间双向通信 |
 | 任务 | **内存队列** + SQLite 持久化 | 单机场景不需要 Redis |
@@ -231,7 +231,7 @@ docker run -d \
 
 | 类别 | 选择 | 理由 |
 |------|------|------|
-| 构建 | **Vite 6** | 快，轻量，不需要 SSR |
+| 构建 | **Vite 8** | 快，轻量，不需要 SSR |
 | 框架 | **React 19** | |
 | UI | **shadcn/ui** + **Tailwind CSS v4** | 零运行时、OKLCH、可定制 |
 | 路由 | **React Router 7** | SPA 路由 |
@@ -331,7 +331,7 @@ passim/
 │   │   ├── worker.go               # 任务消费
 │   │   └── types.go                # 任务类型定义
 │   ├── ssl/                         # SSL/TLS 证书管理
-│   │   ├── manager.go               # certmagic ACME + 自签回退
+│   │   ├── manager.go               # autocert ACME + 自签回退
 │   │   └── selfsigned.go            # 自签证书生成
 │   ├── speedtest/                   # 内置测速
 │   │   ├── http.go                  # 浏览器测速端点 (download/upload/ping)
@@ -640,14 +640,14 @@ GET    /ws/node?key=<api_key>       # 远程 Passim 连接端点
 - [x] Docker 容器管理 API (list/start/stop/rm/logs)
 - [x] 应用模板引擎 (YAML 解析 + 参数渲染 + Docker 部署)
 - [x] 迁移所有现有应用为 YAML 模板 (7 个: wireguard, l2tp, hysteria, v2ray, webdav, samba, rdesktop)
-- [ ] 配置导出 (conf/mobileconfig/yaml) — 基础文件下载已实现，格式转换待 Phase 2
+- [ ] 配置导出格式转换 (mobileconfig) — 基础文件下载已实现，iOS mobileconfig 移至 Phase 5
 - [x] API Key 认证 + JWT (Passkey/WebAuthn 移至 Phase 2)
 - [x] SQLite 数据持久化
 - [x] 异步任务队列 (内存 channel + SQLite 持久化 + 自动重试)
-- [x] SSL 证书管理 (自签回退已实现，certmagic ACME 为 stub 待完善)
+- [x] SSL 证书管理 (自签 + autocert ACME Let's Encrypt + 自定义证书上传)
 - [x] 内置测速 (HTTP download/upload/ping 端点 + iperf3 server)
 - [x] SSE 实时推送 (指标流 + 任务进度 + 应用事件)
-- [ ] Dockerfile — 待编写
+- [x] Dockerfile (3 阶段: Node→Go→Alpine, 嵌入前端)
 - [x] 单元测试 (192 test functions, 277 test runs 含子测试, 12 个包全部通过)
 
 **交付物**: `docker run` 一行启动，可管理本机容器和应用 (无 Web UI，API-only)
@@ -685,7 +685,7 @@ POST /api/ssl/renew
 GET  /api/speedtest/iperf/status
 ```
 
-### Phase 2: Web UI (4 周)
+### Phase 2: Web UI ✅ (已完成 2026-03-14)
 
 **目标**: Vite + React + shadcn/ui 前端
 
@@ -702,8 +702,8 @@ GET  /api/speedtest/iperf/status
 - [x] 响应式布局 (use-mobile hook)
 - [x] Passkey (WebAuthn) 后端 API + 前端注册/登录
 - [x] 单元测试 (Go 192 + Frontend 130 = 322 tests)
-- [ ] Go embed 嵌入 + 更新 Dockerfile
-- [ ] 集成测试 + E2E 测试 ← 当前工作
+- [x] Go embed 嵌入 + Dockerfile (3 阶段: Node→Go→Alpine)
+- [x] 集成测试 + E2E 测试 (12 Go integration + 8 Go E2E + 16 Playwright E2E)
 
 **交付物**: 功能完整的单机 Passim (API + Web UI)
 

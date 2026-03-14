@@ -4,7 +4,11 @@ IoC/bind/passim.cloud
 
 # Go
 passim/passim
+passim/e2eserver
 *.exe
+
+# Claude Code
+.claude/
 
 # Web (Phase 2)
 web/node_modules/

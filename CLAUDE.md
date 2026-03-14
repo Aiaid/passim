@@ -13,7 +13,7 @@ Full rewrite in progress: legacy multi-component architecture → single Go bina
 | Directory | Description | Status |
 |-----------|-------------|--------|
 | `passim/` | Go backend (Gin + SQLite + Docker SDK) | Active — Phase 1 |
-| `web/` | Vite + React 19 + shadcn/ui frontend | Planned — Phase 2 |
+| `web/` | Vite + React 19 + shadcn/ui frontend | Complete — Phase 2 |
 | `app/` | Expo mobile app (iOS + Android) | Planned — Phase 5 |
 | `DNS/` | Python nserver DNS server (kept as-is) | Maintained |
 | `Doc/` | Design docs, specs, user stories | Active |

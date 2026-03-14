@@ -40,7 +40,7 @@ Docker Container: passim/passim
 │  │  └─────────┘ └──────────┘ └─────────────┘  │ │
 │  │  ┌─────────┐ ┌──────────┐ ┌─────────────┐  │ │
 │  │  │   SSL   │ │Speedtest │ │    Auth     │  │ │
-│  │  │certmagic│ │HTTP+iperf│ │ Key+Passkey │  │ │
+│  │  │autocert│ │HTTP+iperf│ │ Key+Passkey │  │ │
 │  │  └─────────┘ └──────────┘ └─────────────┘  │ │
 │  └─────────────────────┬──────────────────────┘ │
 │                        │                         │
@@ -137,7 +137,7 @@ crypto/rsa + crypto/x509          -- 自签 SSL 证书
 
 ```
 github.com/go-webauthn/webauthn   -- WebAuthn/FIDO2 (Passkey) ✅
-github.com/caddyserver/certmagic  -- ACME 客户端 (Let's Encrypt, stub)
+golang.org/x/crypto/acme/autocert -- ACME 客户端 (Let's Encrypt) ✅
 ```
 
 > iperf3: 使用 Alpine 系统包 `iperf3`，Go 通过 `os/exec` 调用命令行
@@ -371,11 +371,11 @@ Content-Length: 104857600  (100MB, 可通过 ?size= 调整，支持 mb 后缀)
 
 #### `POST /api/ssl/renew`
 
-auto 模式返回 501 (not yet implemented)，其他模式返回提示信息。
+auto 模式触发证书续期（删除缓存强制重签），其他模式返回提示信息。✅ 已实现。
 
 #### `POST /api/ssl/upload`
 
-返回 501 (not yet implemented)。Phase 2 实现 certmagic ACME 和自定义证书上传。
+自定义证书上传，接受 multipart form（cert + key 文件）。✅ 已实现。
 
 ---
 
@@ -564,13 +564,13 @@ auth:
   api_key: "auto-generated"    # 明文仅首次启动输出到日志，数据库存 hash
 
 ssl:
-  mode: "auto"               # auto (certmagic Let's Encrypt) / self-signed / custom
+  mode: "auto"               # auto (autocert Let's Encrypt) / self-signed / custom
   domain: ""                 # auto 模式需要，如 "vps.example.com"
   email: ""                  # auto 模式 ACME 联系邮箱 (可选)
   cert_path: ""              # custom 模式: 自定义证书路径
   key_path: ""               # custom 模式: 自定义私钥路径
-  # auto 模式: certmagic 自动管理，证书存储在 /data/ssl/certmagic/
-  # self-signed 模式: 首次启动自动生成自签证书到 /data/ssl/
+  # auto 模式: autocert 自动管理，证书存储在 /data/ssl/autocert/
+  # self-signed 模式: 首次启动自动生成自签证书到 /data/certs/
   # custom 模式: 使用用户提供的证书
 
 docker:
@@ -631,7 +631,7 @@ docker run passim/passim
     ▼
 [5] 如果 setup_required:
     ├─ 初始化 SSL (根据 ssl.mode):
-    │   ├─ auto → certmagic 启动 ACME，监听 :80 进行 HTTP-01 验证
+    │   ├─ auto → autocert 启动 ACME，监听 :80 进行 HTTP-01 验证
     │   ├─ self-signed → 生成自签证书到 /data/ssl/
     │   └─ custom → 验证用户提供的证书路径有效
     ├─ 初始化内置测速 (HTTP 端点 + iperf3 server)
