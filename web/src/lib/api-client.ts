@@ -114,6 +114,11 @@ export const api = {
   getTasks: () => request<Task[]>('/tasks'),
   getTask: (id: string) => request<Task>(`/tasks/${id}`),
 
+  // Settings
+  getSettings: () => request<{ node_name: string }>('/settings'),
+  updateSettings: (data: { node_name?: string }) =>
+    request<{ ok: boolean }>('/settings', { method: 'PATCH', body: JSON.stringify(data) }),
+
   // SSL
   getSSLStatus: () => request<SSLStatus>('/ssl/status'),
 
@@ -130,6 +135,9 @@ export interface StatusResponse {
     name: string;
     version: string;
     uptime: number;
+    public_ip?: string;
+    public_ip6?: string;
+    country?: string;
   };
   system: {
     cpu: { usage_percent: number; cores: number; model: string };

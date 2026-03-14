@@ -69,6 +69,8 @@ func NewRouter(deps Deps) http.Handler {
 			}
 
 			protected.GET("/status", statusHandler(deps))
+			protected.GET("/settings", getSettingsHandler(deps))
+			protected.PATCH("/settings", updateSettingsHandler(deps))
 
 			if deps.Templates != nil {
 				protected.GET("/templates", listTemplates(deps.Templates))

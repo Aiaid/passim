@@ -47,13 +47,28 @@ func IPToBase32(ipStr string) (string, error) {
 	return strings.ToLower(encoded), nil
 }
 
-func discoverPublicIP() (string, error) {
-	services := []string{
-		"https://api.ipify.org",
+// DiscoverPublicIP returns the node's public IPv4 address.
+func DiscoverPublicIP() (string, error) {
+	return discoverIP([]string{
+		"https://api4.ipify.org",
+		"https://ipv4.icanhazip.com",
 		"https://ifconfig.me/ip",
-		"https://icanhazip.com",
-	}
+	})
+}
 
+// DiscoverPublicIPv6 returns the node's public IPv6 address.
+func DiscoverPublicIPv6() (string, error) {
+	return discoverIP([]string{
+		"https://api6.ipify.org",
+		"https://ipv6.icanhazip.com",
+	})
+}
+
+func discoverPublicIP() (string, error) {
+	return DiscoverPublicIP()
+}
+
+func discoverIP(services []string) (string, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	for _, url := range services {

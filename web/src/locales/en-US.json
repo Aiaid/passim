@@ -23,6 +23,9 @@
     "general": "General",
     "security": "Security",
     "ssl": "SSL Certificate",
+    "node_name": "Node Name",
+    "node_name_desc": "Display name for this node",
+    "node_name_placeholder": "e.g., my-server",
     "theme": "Theme",
     "theme_desc": "Choose interface theme",
     "theme_light": "Light",
@@ -85,7 +88,8 @@
     "deploy_new": "Deploy New App",
     "running_of_total": "{{running}}/{{total}} running",
     "no_apps": "No apps deployed",
-    "no_apps_desc": "Deploy your first app from the marketplace"
+    "no_apps_desc": "Deploy your first app from the marketplace",
+    "node_info": "Node Info"
   },
   "container": {
     "title": "Containers",

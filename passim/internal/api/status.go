@@ -2,24 +2,33 @@ package api
 
 import (
 	"database/sql"
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/db"
 	"github.com/passim/passim/internal/metrics"
+	"github.com/passim/passim/internal/ssl"
 )
 
 type statusResponse struct {
-	Node       nodeInfo       `json:"node"`
-	System     systemInfo     `json:"system"`
+	Node       nodeInfo         `json:"node"`
+	System     systemInfo       `json:"system"`
 	Containers containersSummary `json:"containers"`
 }
 
 type nodeInfo struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Uptime  uint64 `json:"uptime"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Version    string `json:"version"`
+	Uptime     uint64 `json:"uptime"`
+	PublicIP   string `json:"public_ip,omitempty"`
+	PublicIPv6 string `json:"public_ip6,omitempty"`
+	Country    string `json:"country,omitempty"`
 }
 
 type cpuInfo struct {
@@ -67,6 +76,54 @@ type containersSummary struct {
 	Total   int `json:"total"`
 }
 
+// Cached public IPs and country (discovered lazily, once)
+var (
+	geoOnce    sync.Once
+	cachedIP   string
+	cachedIPv6 string
+	cachedCC   string
+)
+
+func discoverGeo() {
+	// IPv4
+	ip, err := ssl.DiscoverPublicIP()
+	if err == nil {
+		cachedIP = ip
+	}
+
+	// IPv6 (best-effort)
+	ip6, err := ssl.DiscoverPublicIPv6()
+	if err == nil {
+		cachedIPv6 = ip6
+	}
+
+	// Country lookup via IPv4 (or IPv6 fallback)
+	lookupIP := cachedIP
+	if lookupIP == "" {
+		lookupIP = cachedIPv6
+	}
+	if lookupIP == "" {
+		return
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("http://ip-api.com/json/" + lookupIP + "?fields=countryCode")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	var geo struct {
+		CountryCode string `json:"countryCode"`
+	}
+	if json.Unmarshal(body, &geo) == nil {
+		cachedCC = strings.ToUpper(geo.CountryCode)
+	}
+}
+
 func statusHandler(deps Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		m, err := metrics.Collect(c.Request.Context())
@@ -74,6 +131,9 @@ func statusHandler(deps Deps) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to collect metrics"})
 			return
 		}
+
+		// Discover public IPs & country (lazy, once)
+		geoOnce.Do(func() { go discoverGeo() })
 
 		// Get node info from DB (best effort)
 		nodeID, _ := db.GetConfig(deps.DB, "node_id")
@@ -100,10 +160,13 @@ func statusHandler(deps Deps) gin.HandlerFunc {
 
 		resp := statusResponse{
 			Node: nodeInfo{
-				ID:      nodeID,
-				Name:    nodeName,
-				Version: "0.1.0",
-				Uptime:  m.Uptime,
+				ID:         nodeID,
+				Name:       nodeName,
+				Version:    "0.1.0",
+				Uptime:     m.Uptime,
+				PublicIP:   cachedIP,
+				PublicIPv6: cachedIPv6,
+				Country:    cachedCC,
 			},
 			System: systemInfo{
 				CPU: cpuInfo{

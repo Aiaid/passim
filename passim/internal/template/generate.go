@@ -63,7 +63,7 @@ func uuidV4() string {
 // randomPort finds an available TCP port by binding to :0 and returning
 // the port assigned by the OS.
 func randomPort() int {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return 0
 	}

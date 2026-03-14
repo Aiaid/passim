@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { CATEGORY_ICONS } from '@/lib/constants';
 import type { AppResponse, TemplateSummary } from '@/lib/api-client';
@@ -161,6 +160,7 @@ function AppLogsTab({ app }: { app: AppResponse }) {
   const { t } = useTranslation();
   const containerId = app.container_id || null;
   const { data, isLoading, refetch } = useContainerLogs(containerId);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const lines = useMemo(() => {
@@ -210,7 +210,7 @@ function AppLogsTab({ app }: { app: AppResponse }) {
       </div>
 
       {/* Terminal body */}
-      <ScrollArea className="flex-1 bg-zinc-950">
+      <div className="flex-1 min-h-0 bg-zinc-950 overflow-y-auto" ref={scrollRef}>
         <div className="p-3">
           {isLoading ? (
             <p className="text-xs font-mono text-zinc-500 p-2">
@@ -239,7 +239,7 @@ function AppLogsTab({ app }: { app: AppResponse }) {
           )}
           <div ref={bottomRef} />
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
