@@ -17,6 +17,7 @@ import (
 type Deps struct {
 	DB        *sql.DB
 	JWT       *auth.JWTManager
+	WebAuthn  *auth.WebAuthnManager
 	Docker    docker.DockerClient
 	Templates *template.Registry
 	SSL       *ssl.SSLManager
@@ -41,6 +42,14 @@ func NewRouter(deps Deps) http.Handler {
 		{
 			authGroup.POST("/login", ah.login)
 			authGroup.POST("/refresh", ah.refresh)
+
+			// Public passkey routes (no auth required)
+			if deps.WebAuthn != nil {
+				ph := &passkeyHandler{database: deps.DB, jwt: deps.JWT, webauthn: deps.WebAuthn}
+				authGroup.POST("/passkey/begin", ph.beginLogin)
+				authGroup.POST("/passkey/finish", ph.finishLogin)
+				authGroup.GET("/passkeys/exists", ph.passkeyExists)
+			}
 		}
 
 		// Public speedtest routes (no auth)
@@ -50,6 +59,15 @@ func NewRouter(deps Deps) http.Handler {
 		protected := api.Group("")
 		protected.Use(authMiddleware(deps.JWT, deps.DB))
 		{
+			// Protected passkey management routes
+			if deps.WebAuthn != nil {
+				ph := &passkeyHandler{database: deps.DB, jwt: deps.JWT, webauthn: deps.WebAuthn}
+				protected.POST("/auth/passkey/register", ph.beginRegister)
+				protected.POST("/auth/passkey/register/finish", ph.finishRegister)
+				protected.GET("/auth/passkeys", ph.listPasskeys)
+				protected.DELETE("/auth/passkeys/:id", ph.deletePasskey)
+			}
+
 			protected.GET("/status", statusHandler(deps))
 
 			if deps.Templates != nil {
