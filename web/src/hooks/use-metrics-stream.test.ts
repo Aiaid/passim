@@ -15,31 +15,28 @@ function captureOnMessage(): (data: unknown) => void {
 
 function makeMetrics(overrides?: Partial<{
   cpu_percent: number;
-  memory_used: number;
-  memory_total: number;
+  mem_used: number;
+  mem_total: number;
   disk_used: number;
   disk_total: number;
-  net_rx: number;
-  net_tx: number;
-  timestamp: string;
+  net_bytes_sent: number;
+  net_bytes_recv: number;
 }>) {
   return {
     cpu_percent: 50,
-    memory_used: 1024,
-    memory_total: 4096,
+    mem_used: 1024,
+    mem_total: 4096,
     disk_used: 10000,
     disk_total: 50000,
-    net_rx: 100,
-    net_tx: 200,
-    timestamp: new Date().toISOString(),
+    net_bytes_sent: 200,
+    net_bytes_recv: 100,
     ...overrides,
   };
 }
 
 beforeEach(() => {
   mockUseSSE.mockClear();
-  mockUseSSE.mockImplementation((_path: string, options?: { onMessage?: (data: unknown) => void }) => {
-    // Store options so we can access onMessage
+  mockUseSSE.mockImplementation((_path: string, _options?: { eventName?: string; onMessage?: (data: unknown) => void }) => {
     return { data: null, isConnected: false };
   });
 });
@@ -53,11 +50,16 @@ describe('useMetricsStream', () => {
     expect(result.current.isConnected).toBe(false);
   });
 
+  it('passes eventName "metrics" to useSSE', () => {
+    renderHook(() => useMetricsStream());
+    const lastCall = mockUseSSE.mock.calls[mockUseSSE.mock.calls.length - 1];
+    expect(lastCall[1].eventName).toBe('metrics');
+  });
+
   it('adds a single data point to history via onMessage', () => {
     const metrics = makeMetrics({ cpu_percent: 75 });
 
-    // Make useSSE return the latest data when onMessage is called
-    mockUseSSE.mockImplementation((_path: string, options?: { onMessage?: (data: unknown) => void }) => {
+    mockUseSSE.mockImplementation((_path: string, _options?: { eventName?: string; onMessage?: (data: unknown) => void }) => {
       return { data: metrics, isConnected: true };
     });
 
@@ -83,16 +85,14 @@ describe('useMetricsStream', () => {
     });
 
     expect(result.current.history).toHaveLength(60);
-    // First entry should be index 1 (index 0 was evicted)
     expect(result.current.history[0].cpu_percent).toBe(1);
-    // Last entry should be index 60
     expect(result.current.history[59].cpu_percent).toBe(60);
   });
 
   it('returns the most recent value as latest', () => {
     const latestMetrics = makeMetrics({ cpu_percent: 99 });
 
-    mockUseSSE.mockImplementation((_path: string, _options?: { onMessage?: (data: unknown) => void }) => {
+    mockUseSSE.mockImplementation((_path: string, _options?: { eventName?: string; onMessage?: (data: unknown) => void }) => {
       return { data: latestMetrics, isConnected: true };
     });
 

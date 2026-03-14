@@ -1,15 +1,14 @@
 import { useCallback, useRef, useState } from 'react';
 import { useSSE } from './use-sse';
 
-interface MetricsData {
+export interface MetricsData {
   cpu_percent: number;
-  memory_used: number;
-  memory_total: number;
+  mem_used: number;
+  mem_total: number;
   disk_used: number;
   disk_total: number;
-  net_rx: number;
-  net_tx: number;
-  timestamp: string;
+  net_bytes_sent: number;
+  net_bytes_recv: number;
 }
 
 const BUFFER_SIZE = 60; // 5 minutes at 5s intervals
@@ -25,6 +24,7 @@ export function useMetricsStream() {
   }, []);
 
   const { data: latest, isConnected } = useSSE<MetricsData>('/metrics/stream', {
+    eventName: 'metrics',
     onMessage,
   });
 

@@ -18,16 +18,16 @@ export function MetricsChart() {
 
   const chartData = useMemo(
     () =>
-      history.map((entry) => ({
-        time: new Date(entry.timestamp).toLocaleTimeString([], {
+      history.map((entry, i) => ({
+        time: new Date(Date.now() - (history.length - 1 - i) * 5000).toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
         }),
         cpu: Number((entry.cpu_percent ?? 0).toFixed(1)),
         memory:
-          (entry.memory_total ?? 0) > 0
-            ? Number((((entry.memory_used ?? 0) / entry.memory_total) * 100).toFixed(1))
+          (entry.mem_total ?? 0) > 0
+            ? Number((((entry.mem_used ?? 0) / entry.mem_total) * 100).toFixed(1))
             : 0,
       })),
     [history],

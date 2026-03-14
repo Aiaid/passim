@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth-store';
 
 interface UseSSEOptions {
   enabled?: boolean;
+  eventName?: string;
   onMessage?: (data: unknown) => void;
 }
 
@@ -22,7 +23,7 @@ export function useSSE<T>(path: string, options?: UseSSEOptions) {
 
     source.onopen = () => setIsConnected(true);
 
-    source.onmessage = (e) => {
+    const handler = (e: MessageEvent) => {
       try {
         const parsed = JSON.parse(e.data) as T;
         setData(parsed);
@@ -31,6 +32,12 @@ export function useSSE<T>(path: string, options?: UseSSEOptions) {
         // ignore parse errors
       }
     };
+
+    if (options?.eventName) {
+      source.addEventListener(options.eventName, handler as EventListener);
+    } else {
+      source.onmessage = handler;
+    }
 
     source.onerror = () => {
       source.close();

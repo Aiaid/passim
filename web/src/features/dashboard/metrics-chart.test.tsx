@@ -27,13 +27,12 @@ describe('MetricsChart', () => {
       history: [
         {
           cpu_percent: 25.0,
-          memory_used: 500,
-          memory_total: 1000,
+          mem_used: 500,
+          mem_total: 1000,
           disk_used: 0,
           disk_total: 0,
-          net_rx: 0,
-          net_tx: 0,
-          timestamp: '2026-01-01T00:00:00Z',
+          net_bytes_recv: 0,
+          net_bytes_sent: 0,
         },
       ],
       latest: null,
@@ -43,25 +42,23 @@ describe('MetricsChart', () => {
     expect(screen.getByTestId('area-chart')).toBeInTheDocument();
   });
 
-  it('renders without crashing when memory_total is 0 (no division by zero)', () => {
+  it('renders without crashing when mem_total is 0 (no division by zero)', () => {
     vi.mocked(useMetricsStreamModule.useMetricsStream).mockReturnValue({
       history: [
         {
           cpu_percent: 10.0,
-          memory_used: 500,
-          memory_total: 0,
+          mem_used: 500,
+          mem_total: 0,
           disk_used: 0,
           disk_total: 0,
-          net_rx: 0,
-          net_tx: 0,
-          timestamp: '2026-01-01T00:00:00Z',
+          net_bytes_recv: 0,
+          net_bytes_sent: 0,
         },
       ],
       latest: null,
       isConnected: true,
     });
     render(<MetricsChart />);
-    // If there were a division by zero, the component would throw
     expect(screen.getByTestId('area-chart')).toBeInTheDocument();
   });
 });

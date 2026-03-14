@@ -120,19 +120,26 @@ export const api = {
 
 // Type definitions used by api client
 export interface StatusResponse {
-  node_id: string;
-  node_name: string;
-  uptime: number;
-  cpu_percent: number;
-  memory_used: number;
-  memory_total: number;
-  disk_used: number;
-  disk_total: number;
-  net_rx: number;
-  net_tx: number;
-  containers_running: number;
-  containers_total: number;
-  apps_count: number;
+  node: {
+    id: string;
+    name: string;
+    version: string;
+    uptime: number;
+  };
+  system: {
+    cpu: { usage_percent: number; cores: number; model: string };
+    memory: { total_bytes: number; used_bytes: number; usage_percent: number };
+    disk: { total_bytes: number; used_bytes: number; usage_percent: number };
+    network: { rx_bytes: number; tx_bytes: number };
+    load: { load1: number; load5: number; load15: number };
+    os: string;
+    kernel: string;
+  };
+  containers: {
+    running: number;
+    stopped: number;
+    total: number;
+  };
 }
 
 export interface Container {
