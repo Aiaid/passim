@@ -1,10 +1,12 @@
 package api
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"strconv"
 
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/gin-gonic/gin"
 )
 
@@ -117,8 +119,21 @@ func containerLogsHandler(deps Deps) gin.HandlerFunc {
 		}
 		defer reader.Close()
 
-		c.Header("Content-Type", "text/plain; charset=utf-8")
-		c.Status(http.StatusOK)
-		io.Copy(c.Writer, reader)
+		raw, err := io.ReadAll(reader)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read container logs"})
+			return
+		}
+
+		// Docker multiplexed stream has 8-byte headers per frame; demux them.
+		// TTY containers produce plain text — fallback to raw if demux yields nothing.
+		var buf bytes.Buffer
+		_, demuxErr := stdcopy.StdCopy(&buf, &buf, bytes.NewReader(raw))
+		if demuxErr != nil || (buf.Len() == 0 && len(raw) > 0) {
+			c.JSON(http.StatusOK, gin.H{"logs": string(raw)})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"logs": buf.String()})
 	}
 }

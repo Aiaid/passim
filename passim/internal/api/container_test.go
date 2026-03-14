@@ -149,11 +149,14 @@ func TestContainerLogs(t *testing.T) {
 	}
 
 	ct := w.Header().Get("Content-Type")
-	if !strings.Contains(ct, "text/plain") {
-		t.Errorf("expected text/plain, got %s", ct)
+	if !strings.Contains(ct, "application/json") {
+		t.Errorf("expected application/json, got %s", ct)
 	}
-	if w.Body.String() != logContent {
-		t.Errorf("expected %q, got %q", logContent, w.Body.String())
+
+	var result struct{ Logs string }
+	json.NewDecoder(w.Body).Decode(&result)
+	if result.Logs != logContent {
+		t.Errorf("expected %q, got %q", logContent, result.Logs)
 	}
 }
 
