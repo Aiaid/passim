@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +13,7 @@ func registerSSLRoutes(group *gin.RouterGroup, mgr *ssl.SSLManager) {
 	{
 		s.GET("/status", sslStatusHandler(mgr))
 		s.POST("/renew", sslRenewHandler(mgr))
-		s.POST("/upload", sslUploadHandler())
+		s.POST("/upload", sslUploadHandler(mgr))
 	}
 }
 
@@ -25,17 +26,61 @@ func sslStatusHandler(mgr *ssl.SSLManager) gin.HandlerFunc {
 
 func sslRenewHandler(mgr *ssl.SSLManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		status := mgr.Status()
-		if status.Mode == "auto" {
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "auto renewal not yet implemented"})
+		if mgr.GetMode() != "auto" {
+			c.JSON(http.StatusOK, gin.H{"message": "renewal not applicable for " + mgr.GetMode() + " mode"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "renewal not applicable for " + status.Mode + " mode"})
+		if err := mgr.Renew(c.Request.Context()); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "certificate renewal triggered"})
 	}
 }
 
-func sslUploadHandler() gin.HandlerFunc {
+func sslUploadHandler(mgr *ssl.SSLManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "custom certificate upload not yet implemented"})
+		certHeader, err := c.FormFile("cert")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "cert file required"})
+			return
+		}
+		keyHeader, err := c.FormFile("key")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "key file required"})
+			return
+		}
+
+		certFile, err := certHeader.Open()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "cannot read cert file"})
+			return
+		}
+		defer certFile.Close()
+
+		keyFile, err := keyHeader.Open()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "cannot read key file"})
+			return
+		}
+		defer keyFile.Close()
+
+		certData, err := io.ReadAll(certFile)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "cannot read cert data"})
+			return
+		}
+		keyData, err := io.ReadAll(keyFile)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "cannot read key data"})
+			return
+		}
+
+		if err := mgr.SetCustomCert(certData, keyData); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "certificate uploaded successfully"})
 	}
 }

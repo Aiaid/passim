@@ -1,7 +1,9 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -47,7 +49,7 @@ func testServerWithSSL(t *testing.T, mgr *ssl.SSLManager) (http.Handler, string)
 
 func TestSSLStatusEndpoint(t *testing.T) {
 	dir := t.TempDir()
-	mgr := ssl.NewSSLManager("self-signed", dir)
+	mgr := ssl.NewSSLManager(ssl.SSLManagerConfig{Mode: "self-signed", DataDir: dir})
 	if err := mgr.Init(); err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +79,7 @@ func TestSSLStatusEndpoint(t *testing.T) {
 
 func TestSSLRenewEndpoint_SelfSigned(t *testing.T) {
 	dir := t.TempDir()
-	mgr := ssl.NewSSLManager("self-signed", dir)
+	mgr := ssl.NewSSLManager(ssl.SSLManagerConfig{Mode: "self-signed", DataDir: dir})
 	mgr.Init()
 
 	router, apiKey := testServerWithSSL(t, mgr)
@@ -90,5 +92,72 @@ func TestSSLRenewEndpoint_SelfSigned(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestSSLUploadEndpoint(t *testing.T) {
+	dir := t.TempDir()
+	mgr := ssl.NewSSLManager(ssl.SSLManagerConfig{Mode: "self-signed", DataDir: dir})
+	mgr.Init()
+
+	router, apiKey := testServerWithSSL(t, mgr)
+	token := getToken(t, router, apiKey)
+
+	// Create a valid test cert/key pair using the existing self-signed generator
+	certDir := filepath.Join(t.TempDir(), "testcerts")
+	certPath, keyPath, err := ssl.GenerateSelfSigned(certDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certData, _ := os.ReadFile(certPath)
+	keyData, _ := os.ReadFile(keyPath)
+
+	// Build multipart form
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	certPart, _ := writer.CreateFormFile("cert", "cert.pem")
+	certPart.Write(certData)
+
+	keyPart, _ := writer.CreateFormFile("key", "key.pem")
+	keyPart.Write(keyData)
+
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/api/ssl/upload", &buf)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSSLUploadEndpoint_InvalidCert(t *testing.T) {
+	dir := t.TempDir()
+	mgr := ssl.NewSSLManager(ssl.SSLManagerConfig{Mode: "self-signed", DataDir: dir})
+	mgr.Init()
+
+	router, apiKey := testServerWithSSL(t, mgr)
+	token := getToken(t, router, apiKey)
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	certPart, _ := writer.CreateFormFile("cert", "cert.pem")
+	certPart.Write([]byte("not a cert"))
+	keyPart, _ := writer.CreateFormFile("key", "key.pem")
+	keyPart.Write([]byte("not a key"))
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/api/ssl/upload", &buf)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
 	}
 }
