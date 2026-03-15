@@ -42,9 +42,9 @@ export function AppSidebar() {
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.key}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.path}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.path} size="lg" className="text-base">
                     <Link to={item.path}>
-                      <item.icon className="size-4" />
+                      <item.icon className="size-5" />
                       <span>{t(`nav.${item.key}`)}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -58,9 +58,9 @@ export function AppSidebar() {
         <SidebarMenu>
           {bottomItems.map((item) => (
             <SidebarMenuItem key={item.key}>
-              <SidebarMenuButton asChild isActive={location.pathname === item.path}>
+              <SidebarMenuButton asChild isActive={location.pathname === item.path} size="lg" className="text-base">
                 <Link to={item.path}>
-                  <item.icon className="size-4" />
+                  <item.icon className="size-5" />
                   <span>{t(`nav.${item.key}`)}</span>
                 </Link>
               </SidebarMenuButton>
