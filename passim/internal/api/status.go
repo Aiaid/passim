@@ -22,13 +22,15 @@ type statusResponse struct {
 }
 
 type nodeInfo struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Version    string `json:"version"`
-	Uptime     uint64 `json:"uptime"`
-	PublicIP   string `json:"public_ip,omitempty"`
-	PublicIPv6 string `json:"public_ip6,omitempty"`
-	Country    string `json:"country,omitempty"`
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Version    string  `json:"version"`
+	Uptime     uint64  `json:"uptime"`
+	PublicIP   string  `json:"public_ip,omitempty"`
+	PublicIPv6 string  `json:"public_ip6,omitempty"`
+	Country    string  `json:"country,omitempty"`
+	Latitude   float64 `json:"latitude,omitempty"`
+	Longitude  float64 `json:"longitude,omitempty"`
 }
 
 type cpuInfo struct {
@@ -82,6 +84,8 @@ var (
 	cachedIP   string
 	cachedIPv6 string
 	cachedCC   string
+	cachedLat  float64
+	cachedLon  float64
 )
 
 func discoverGeo() {
@@ -107,7 +111,7 @@ func discoverGeo() {
 	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get("http://ip-api.com/json/" + lookupIP + "?fields=countryCode")
+	resp, err := client.Get("http://ip-api.com/json/" + lookupIP + "?fields=countryCode,lat,lon")
 	if err != nil {
 		return
 	}
@@ -117,10 +121,14 @@ func discoverGeo() {
 		return
 	}
 	var geo struct {
-		CountryCode string `json:"countryCode"`
+		CountryCode string  `json:"countryCode"`
+		Lat         float64 `json:"lat"`
+		Lon         float64 `json:"lon"`
 	}
 	if json.Unmarshal(body, &geo) == nil {
 		cachedCC = strings.ToUpper(geo.CountryCode)
+		cachedLat = geo.Lat
+		cachedLon = geo.Lon
 	}
 }
 
@@ -167,6 +175,8 @@ func statusHandler(deps Deps) gin.HandlerFunc {
 				PublicIP:   cachedIP,
 				PublicIPv6: cachedIPv6,
 				Country:    cachedCC,
+				Latitude:   cachedLat,
+				Longitude:  cachedLon,
 			},
 			System: systemInfo{
 				CPU: cpuInfo{
