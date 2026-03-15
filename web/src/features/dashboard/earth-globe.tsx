@@ -358,13 +358,13 @@ export function EarthGlobe({
   return (
     <div className="w-full h-full">
       <Canvas
-        camera={{ position: [globeOffsetX, 0, 4.5], fov: 45 }}
+        camera={{ position: [0, 0, 4.5], fov: 45 }}
         gl={{ antialias: true, alpha: transparent }}
         dpr={[1, 2]}
         style={{ background: transparent ? 'transparent' : '#000' }}
       >
         <OrbitControls
-          target={[globeOffsetX, 0, 0]}
+          target={[0, 0, 0]}
           enableZoom={false}
           enablePan={false}
           rotateSpeed={0.5}

@@ -1,0 +1,23 @@
+# Large directories not needed in build
+_legacy/
+.git/
+DNS/
+Doc/
+app/
+
+# Dependencies (installed inside container)
+web/node_modules/
+passim/vendor/
+
+# Build artifacts
+web/dist/
+passim/passim
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Docker
+docker-compose*.yml

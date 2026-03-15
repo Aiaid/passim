@@ -215,3 +215,30 @@
   opacity: 0;
   animation: dash-fade-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
 }
+
+/* Globe container positioning: CSS shift instead of 3D offset */
+.dash-globe-position {
+  width: 50%;
+}
+
+.dark .dash-globe-position {
+  right: -50%;
+  width: 150%;
+}
+
+/* Observatory veil: light-mode gradient from solid background → transparent space */
+.dash-space-veil {
+  background: linear-gradient(
+    to right,
+    var(--background) 0%,
+    var(--background) 38%,
+    oklch(0.96 0.01 258 / 0.88) 50%,
+    oklch(0.75 0.025 256 / 0.45) 62%,
+    oklch(0.35 0.02 260 / 0.15) 76%,
+    transparent 90%
+  );
+}
+
+.dark .dash-space-veil {
+  background: none;
+}
