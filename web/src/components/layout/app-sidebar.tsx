@@ -37,7 +37,10 @@ export function AppSidebar() {
           {state === 'collapsed' ? (
             <img src="/logo/svg/passim-icon.svg" alt="Passim" className="size-6" />
           ) : (
-            <img src="/logo/svg/passim-color.svg" alt="Passim" className="h-7" />
+            <>
+              <img src="/logo/svg/passim-color.svg" alt="Passim" className="h-7 dark:hidden" />
+              <img src="/logo/svg/passim-white.svg" alt="Passim" className="h-7 hidden dark:block" />
+            </>
           )}
         </Link>
       </SidebarHeader>
