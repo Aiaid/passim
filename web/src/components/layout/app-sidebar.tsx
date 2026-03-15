@@ -12,6 +12,7 @@ import {
   SidebarMenuButton,
   SidebarHeader,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar';
 
 const navItems = [
@@ -27,12 +28,17 @@ const bottomItems = [
 export function AppSidebar() {
   const { t } = useTranslation();
   const location = useLocation();
+  const { state } = useSidebar();
 
   return (
     <Sidebar>
       <SidebarHeader className="px-4 py-3">
         <Link to="/" className="flex items-center gap-2">
-          <span className="text-lg font-semibold">Passim</span>
+          {state === 'collapsed' ? (
+            <img src="/logo/svg/passim-icon.svg" alt="Passim" className="size-6" />
+          ) : (
+            <img src="/logo/svg/passim-color.svg" alt="Passim" className="h-7" />
+          )}
         </Link>
       </SidebarHeader>
       <SidebarContent>
