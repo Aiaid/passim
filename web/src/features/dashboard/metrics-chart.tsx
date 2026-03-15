@@ -58,7 +58,7 @@ function CustomTooltip(props: {
   if (!active || !payload?.length || label === undefined) return null;
 
   return (
-    <div className="rounded-lg border bg-popover px-3 py-2 shadow-lg">
+    <div className="rounded-lg border bg-popover/80 backdrop-blur-xl px-3 py-2 shadow-lg">
       <p className="text-xs text-muted-foreground mb-1.5">
         {formatTooltipLabel(label)}
       </p>
@@ -142,7 +142,7 @@ export function MetricsChart({ className }: { className?: string }) {
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
-                className="stroke-border/50"
+                className="stroke-border/30"
               />
               <XAxis
                 dataKey="idx"

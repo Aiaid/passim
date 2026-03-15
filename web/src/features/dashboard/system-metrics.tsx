@@ -18,7 +18,6 @@ function GaugeCard({ label, percent, detail, icon: Icon, color }: GaugeCardProps
   const circ = 2 * Math.PI * r;
   const clamped = Math.min(Math.max(percent, 0), 100);
   const offset = circ - (clamped / 100) * circ;
-  // Shift to warning/danger colors at high usage
   const strokeColor =
     clamped >= 90
       ? 'oklch(0.577 0.245 27)'
@@ -29,16 +28,21 @@ function GaugeCard({ label, percent, detail, icon: Icon, color }: GaugeCardProps
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <div className="relative size-16 shrink-0">
-            <svg viewBox="0 0 100 100" className="size-full -rotate-90">
+            {/* Colored glow behind gauge */}
+            <div
+              className="absolute inset-1 rounded-full blur-xl opacity-20"
+              style={{ backgroundColor: strokeColor }}
+            />
+            <svg viewBox="0 0 100 100" className="size-full -rotate-90 relative">
               <circle
                 cx="50"
                 cy="50"
                 r={r}
                 fill="none"
-                className="stroke-muted"
-                strokeWidth="8"
+                className="stroke-muted/30"
+                strokeWidth="5"
               />
               <circle
                 cx="50"
@@ -46,13 +50,14 @@ function GaugeCard({ label, percent, detail, icon: Icon, color }: GaugeCardProps
                 r={r}
                 fill="none"
                 stroke={strokeColor}
-                strokeWidth="8"
+                strokeWidth="5"
                 strokeLinecap="round"
                 strokeDasharray={circ}
                 strokeDashoffset={offset}
                 style={{
                   transition:
                     'stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1), stroke 0.3s',
+                  filter: `drop-shadow(0 0 5px ${strokeColor})`,
                 }}
               />
             </svg>
@@ -66,11 +71,11 @@ function GaugeCard({ label, percent, detail, icon: Icon, color }: GaugeCardProps
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <Icon className="size-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {label}
               </span>
             </div>
-            <p className="mt-0.5 text-sm font-medium">{detail}</p>
+            <p className="mt-1 text-sm font-medium">{detail}</p>
           </div>
         </div>
       </CardContent>
@@ -88,7 +93,7 @@ export function SystemMetrics() {
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <div className="size-16 rounded-full bg-muted animate-pulse" />
                 <div className="space-y-2 flex-1">
                   <div className="h-3 w-12 bg-muted animate-pulse rounded" />
@@ -113,7 +118,7 @@ export function SystemMetrics() {
       : 0;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 dash-stagger">
       <GaugeCard
         label={t('dashboard.cpu')}
         percent={cpuPercent}
@@ -139,7 +144,7 @@ export function SystemMetrics() {
         <CardContent className="p-4 h-full flex flex-col justify-center">
           <div className="flex items-center gap-1.5 mb-3">
             <Network className="size-3.5 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               {t('dashboard.network')}
             </span>
           </div>

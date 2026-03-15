@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState, useEffect } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { useQuery } from '@tanstack/react-query';
@@ -133,10 +133,27 @@ const atmosFrag = /* glsl */ `
 `;
 
 // ── Green pulsing location dot ───────────────────────────────────────
-function LocationMarker({ lat, lon, radius }: { lat: number; lon: number; radius: number }) {
+function LocationMarker({
+  lat,
+  lon,
+  radius,
+  onClick,
+}: {
+  lat: number;
+  lon: number;
+  radius: number;
+  onClick?: () => void;
+}) {
   const ref = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const pos = useMemo(() => latLonToVec3(lat, lon, radius), [lat, lon, radius]);
+
+  const setCursor = useCallback(
+    (cursor: string) => () => {
+      if (onClick) document.body.style.cursor = cursor;
+    },
+    [onClick],
+  );
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
@@ -150,6 +167,20 @@ function LocationMarker({ lat, lon, radius }: { lat: number; lon: number; radius
 
   return (
     <group position={pos}>
+      {/* Invisible larger hit area for easier clicking */}
+      {onClick && (
+        <mesh
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          onPointerOver={setCursor('pointer')}
+          onPointerOut={setCursor('default')}
+        >
+          <sphereGeometry args={[0.07, 16, 16]} />
+          <meshBasicMaterial transparent opacity={0} />
+        </mesh>
+      )}
       <mesh ref={ref}>
         <sphereGeometry args={[0.02, 16, 16]} />
         <meshBasicMaterial color="#30d158" />
@@ -216,12 +247,27 @@ function Stars() {
 }
 
 // ── Earth scene ──────────────────────────────────────────────────────
-function EarthScene({ lat, lon }: { lat?: number; lon?: number }) {
+function EarthScene({
+  lat,
+  lon,
+  offsetX = 0,
+  scaleFactor = 0.28,
+  onMarkerClick,
+}: {
+  lat?: number;
+  lon?: number;
+  offsetX?: number;
+  scaleFactor?: number;
+  onMarkerClick?: () => void;
+}) {
   const { viewport } = useThree();
   const textures = useManualTextures([TEX_DAY, TEX_NIGHT, TEX_SPEC]);
 
   const sunDir = useMemo(() => getSunDirection(new Date()), []);
-  const scale = useMemo(() => Math.min(viewport.width, viewport.height) * 0.28, [viewport]);
+  const scale = useMemo(
+    () => Math.min(viewport.width, viewport.height) * scaleFactor,
+    [viewport, scaleFactor],
+  );
   const RADIUS = 1.5;
 
   const rotation = useMemo(() => {
@@ -253,7 +299,7 @@ function EarthScene({ lat, lon }: { lat?: number; lon?: number }) {
       {/* Directional light for cloud layer */}
       <directionalLight position={sunDir.clone().multiplyScalar(10)} intensity={1.5} />
       <ambientLight intensity={0.1} />
-      <group rotation={rotation} scale={scale}>
+      <group position={[offsetX, 0, 0]} rotation={rotation} scale={scale}>
         {/* Earth */}
         <mesh>
           <sphereGeometry args={[RADIUS, 128, 128]} />
@@ -279,7 +325,12 @@ function EarthScene({ lat, lon }: { lat?: number; lon?: number }) {
         </mesh>
         {/* Location marker */}
         {lat !== undefined && lon !== undefined && (
-          <LocationMarker lat={lat} lon={lon} radius={RADIUS * 1.005} />
+          <LocationMarker
+            lat={lat}
+            lon={lon}
+            radius={RADIUS * 1.005}
+            onClick={onMarkerClick}
+          />
         )}
       </group>
     </>
@@ -287,7 +338,17 @@ function EarthScene({ lat, lon }: { lat?: number; lon?: number }) {
 }
 
 // ── Exported component ───────────────────────────────────────────────
-export function EarthGlobe({ transparent = false }: { transparent?: boolean }) {
+export function EarthGlobe({
+  transparent = false,
+  globeOffsetX = 0,
+  scaleFactor = 0.28,
+  onMarkerClick,
+}: {
+  transparent?: boolean;
+  globeOffsetX?: number;
+  scaleFactor?: number;
+  onMarkerClick?: () => void;
+}) {
   const { data: status } = useQuery({
     queryKey: ['status'],
     queryFn: () => api.getStatus(),
@@ -297,12 +358,13 @@ export function EarthGlobe({ transparent = false }: { transparent?: boolean }) {
   return (
     <div className="w-full h-full">
       <Canvas
-        camera={{ position: [0, 0, 4.5], fov: 45 }}
+        camera={{ position: [globeOffsetX, 0, 4.5], fov: 45 }}
         gl={{ antialias: true, alpha: transparent }}
         dpr={[1, 2]}
         style={{ background: transparent ? 'transparent' : '#000' }}
       >
         <OrbitControls
+          target={[globeOffsetX, 0, 0]}
           enableZoom={false}
           enablePan={false}
           rotateSpeed={0.5}
@@ -312,6 +374,9 @@ export function EarthGlobe({ transparent = false }: { transparent?: boolean }) {
         <EarthScene
           lat={status?.node.latitude}
           lon={status?.node.longitude}
+          offsetX={globeOffsetX}
+          scaleFactor={scaleFactor}
+          onMarkerClick={onMarkerClick}
         />
       </Canvas>
     </div>

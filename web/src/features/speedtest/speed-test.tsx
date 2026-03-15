@@ -93,7 +93,7 @@ export function SpeedTest() {
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 grid-cols-2">
           <ResultBox
             icon={ArrowDown}
             label={t('speedtest.download')}
