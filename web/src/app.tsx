@@ -11,12 +11,14 @@ import { DeployWizardPage } from '@/features/marketplace/deploy-wizard-page';
 import { SettingsPage } from '@/features/settings/settings-page';
 import { AppsPage } from '@/features/apps/apps-page';
 import { AppDetailPage } from '@/features/apps/app-detail-page';
+import { GlobeTestPage } from '@/features/dashboard/globe-test-page';
 
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/test" element={<GlobeTestPage />} />
         <Route element={<AuthGuard />}>
           <Route element={<AppLayout />}>
             <Route path="/" element={<DashboardPage />} />

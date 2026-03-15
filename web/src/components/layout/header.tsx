@@ -58,7 +58,11 @@ export function Header() {
     i18n.changeLanguage(lang);
   };
 
-  const country = status?.node.country ? ` (${status.node.country})` : '';
+  const countryFlag = status?.node.country
+    ? ' ' + [...status.node.country.toUpperCase()].map(c =>
+        String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)
+      ).join('')
+    : '';
 
   return (
     <header className="flex h-14 items-center gap-2 border-b px-4">
@@ -82,7 +86,7 @@ export function Header() {
                 <Globe className="size-3" />
                 <span>
                   {status.node.public_ip && (
-                    <>{status.node.public_ip}{country}</>
+                    <>{status.node.public_ip}{countryFlag}</>
                   )}
                   {status.node.public_ip && status.node.public_ip6 && ' / '}
                   {status.node.public_ip6 && (
@@ -97,7 +101,7 @@ export function Header() {
                       </TooltipContent>
                     </Tooltip>
                   )}
-                  {!status.node.public_ip && status.node.public_ip6 && country}
+                  {!status.node.public_ip && status.node.public_ip6 && countryFlag}
                 </span>
               </div>
             )}

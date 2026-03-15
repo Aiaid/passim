@@ -138,6 +138,8 @@ export interface StatusResponse {
     public_ip?: string;
     public_ip6?: string;
     country?: string;
+    latitude?: number;
+    longitude?: number;
   };
   system: {
     cpu: { usage_percent: number; cores: number; model: string };
