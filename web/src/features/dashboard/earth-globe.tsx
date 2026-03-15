@@ -1,10 +1,11 @@
 import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Html } from '@react-three/drei';
 import { useQuery } from '@tanstack/react-query';
 import * as THREE from 'three';
-import { api } from '@/lib/api-client';
+import { api, type StatusResponse } from '@/lib/api-client';
 import { usePreferencesStore } from '@/stores/preferences-store';
+import { formatUptime } from '@/lib/utils';
 
 // ── Texture URLs ─────────────────────────────────────────────────────
 const TEX_DAY = 'https://unpkg.com/three-globe@2.41.2/example/img/earth-blue-marble.jpg';
@@ -138,21 +139,117 @@ const atmosFrag = /* glsl */ `
   }
 `;
 
+// ── Country code → flag emoji ─────────────────────────────────────────
+function countryFlag(code: string): string {
+  return [...code.toUpperCase()]
+    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
+}
+
+// ── Billboard info card (HTML overlay above marker) ──────────────────
+function MarkerBillboard({
+  status,
+  onClick,
+  visible,
+}: {
+  status: StatusResponse;
+  onClick?: () => void;
+  visible: boolean;
+}) {
+  const { node, system, containers } = status;
+
+  return (
+    <Html
+      position={[0, 0, 0]}
+      center
+      distanceFactor={3}
+      style={{
+        pointerEvents: visible ? 'auto' : 'none',
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.3s ease',
+      }}
+      zIndexRange={[50, 0]}
+    >
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
+        onMouseEnter={() => { if (onClick) document.body.style.cursor = 'pointer'; }}
+        onMouseLeave={() => { document.body.style.cursor = 'default'; }}
+        className="node-billboard"
+      >
+        {/* Card */}
+        <div className="node-billboard-card">
+          {/* Header row */}
+          <div className="node-billboard-header">
+            <span className="node-billboard-ping">
+              <span className="node-billboard-ping-ring" />
+              <span className="node-billboard-ping-dot" />
+            </span>
+            <span className="node-billboard-name">{node.name}</span>
+            {node.country && (
+              <span className="node-billboard-flag">{countryFlag(node.country)}</span>
+            )}
+          </div>
+
+          {/* Stats row */}
+          <div className="node-billboard-stats">
+            <div className="node-billboard-stat">
+              <span className="node-billboard-stat-value">
+                {system.cpu.usage_percent.toFixed(0)}%
+              </span>
+              <span className="node-billboard-stat-label">CPU</span>
+            </div>
+            <div className="node-billboard-divider" />
+            <div className="node-billboard-stat">
+              <span className="node-billboard-stat-value">
+                {system.memory.usage_percent.toFixed(0)}%
+              </span>
+              <span className="node-billboard-stat-label">MEM</span>
+            </div>
+            <div className="node-billboard-divider" />
+            <div className="node-billboard-stat">
+              <span className="node-billboard-stat-value">{containers.running}</span>
+              <span className="node-billboard-stat-label">
+                {containers.running === 1 ? 'CTR' : 'CTRs'}
+              </span>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="node-billboard-footer">
+            <span>{node.public_ip ?? '—'}</span>
+            <span>up {formatUptime(node.uptime)}</span>
+          </div>
+
+          {/* Triangle pointer */}
+          <div className="node-billboard-arrow" />
+        </div>
+      </div>
+    </Html>
+  );
+}
+
 // ── Green pulsing location dot ───────────────────────────────────────
 function LocationMarker({
   lat,
   lon,
   radius,
   onClick,
+  status,
 }: {
   lat: number;
   lon: number;
   radius: number;
   onClick?: () => void;
+  status?: StatusResponse;
 }) {
   const ref = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
   const pos = useMemo(() => latLonToVec3(lat, lon, radius), [lat, lon, radius]);
+  const [visible, setVisible] = useState(true);
 
   const setCursor = useCallback(
     (cursor: string) => () => {
@@ -161,7 +258,13 @@ function LocationMarker({
     [onClick],
   );
 
-  useFrame(({ clock }) => {
+  // Temp vectors to avoid allocations in useFrame
+  const _worldPos = useMemo(() => new THREE.Vector3(), []);
+  const _camDir = useMemo(() => new THREE.Vector3(), []);
+  const _normal = useMemo(() => new THREE.Vector3(), []);
+  const _center = useMemo(() => new THREE.Vector3(), []);
+
+  useFrame(({ clock, camera }) => {
     const t = clock.getElapsedTime();
     if (ref.current) ref.current.scale.setScalar(1 + Math.sin(t * 3) * 0.2);
     if (glowRef.current) {
@@ -169,10 +272,23 @@ function LocationMarker({
       glowRef.current.scale.setScalar(1 + pulse * 4);
       (glowRef.current.material as THREE.MeshBasicMaterial).opacity = (1 - pulse) * 0.35;
     }
+
+    // Occlusion: hide when marker faces away from camera
+    if (groupRef.current) {
+      groupRef.current.getWorldPosition(_worldPos);
+      // Earth center = parent group's world position
+      groupRef.current.parent?.getWorldPosition(_center);
+      _normal.subVectors(_worldPos, _center).normalize();
+      _camDir.subVectors(camera.position, _worldPos).normalize();
+      const facing = _normal.dot(_camDir) > 0.05;
+      if (facing !== visible) setVisible(facing);
+    }
   });
 
   return (
-    <group position={pos}>
+    <group ref={groupRef} position={pos}>
+      {/* Billboard info card */}
+      {status && <MarkerBillboard status={status} onClick={onClick} visible={visible} />}
       {/* Invisible larger hit area for easier clicking */}
       {onClick && (
         <mesh
@@ -289,6 +405,7 @@ function EarthScene({
   scaleFactor = 0.28,
   onMarkerClick,
   isDark,
+  status,
 }: {
   lat?: number;
   lon?: number;
@@ -296,6 +413,7 @@ function EarthScene({
   scaleFactor?: number;
   onMarkerClick?: () => void;
   isDark: boolean;
+  status?: StatusResponse;
 }) {
   const { viewport } = useThree();
   const textures = useManualTextures([TEX_DAY, TEX_NIGHT, TEX_SPEC]);
@@ -374,6 +492,7 @@ function EarthScene({
             lon={lon}
             radius={RADIUS * 1.005}
             onClick={onMarkerClick}
+            status={status}
           />
         )}
       </group>
@@ -445,6 +564,7 @@ export function EarthGlobe({
           scaleFactor={scaleFactor}
           onMarkerClick={onMarkerClick}
           isDark={isDark}
+          status={status}
         />
       </Canvas>
     </div>
