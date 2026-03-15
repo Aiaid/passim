@@ -12,11 +12,14 @@ FROM golang:1.25-alpine AS backend
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /app
 COPY passim/go.mod passim/go.sum ./passim/
-RUN cd passim && go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    cd passim && go mod download
 COPY passim/ ./passim/
 # Copy frontend build output into Go embed directory
 COPY --from=frontend /web/dist ./passim/cmd/passim/dist/
-RUN cd passim && CGO_ENABLED=1 go build -o /passim ./cmd/passim/
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    cd passim && CGO_ENABLED=1 go build -o /passim ./cmd/passim/
 
 # Stage 3: Final image
 FROM alpine:3.21

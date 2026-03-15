@@ -3,8 +3,8 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.975 0.006 255);
+  --foreground: oklch(0.145 0.01 255);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -27,8 +27,8 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar-bg: oklch(0.985 0 0);
-  --sidebar-fg: oklch(0.145 0 0);
+  --sidebar-bg: oklch(0.97 0.006 255);
+  --sidebar-fg: oklch(0.145 0.01 255);
   --sidebar-primary: oklch(0.205 0.085 265.76);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
@@ -151,13 +151,13 @@
 
 /* Glass card treatment — scoped to dashboard */
 .dashboard-glass [data-slot="card"] {
-  background: oklch(1 0 0 / 0.55);
-  backdrop-filter: blur(24px) saturate(1.8);
-  border-color: oklch(0.88 0 0);
+  background: oklch(0.98 0.004 255 / 0.45);
+  backdrop-filter: blur(28px) saturate(1.8);
+  border-color: oklch(0.88 0.01 255 / 0.6);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.5),
-    0 1px 3px oklch(0 0 0 / 0.04),
-    0 8px 32px oklch(0 0 0 / 0.05);
+    0 1px 3px oklch(0.3 0.02 255 / 0.06),
+    0 6px 24px oklch(0.3 0.02 255 / 0.05);
   transition:
     transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
@@ -167,16 +167,16 @@
 .dashboard-glass [data-slot="card"]:hover {
   transform: translateY(-2px);
   box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.6),
-    0 2px 6px oklch(0 0 0 / 0.06),
-    0 16px 44px oklch(0 0 0 / 0.1);
+    inset 0 1px 0 oklch(1 0 0 / 0.7),
+    0 2px 6px oklch(0.3 0.02 255 / 0.08),
+    0 14px 40px oklch(0.3 0.02 255 / 0.1);
 }
 
 .dark .dashboard-glass [data-slot="card"] {
-  background: oklch(0.11 0.008 265 / 0.6);
-  border-color: oklch(1 0 0 / 0.07);
+  background: oklch(0.18 0.01 265 / 0.35);
+  border-color: oklch(1 0 0 / 0.08);
   box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.04),
+    inset 0 1px 0 oklch(1 0 0 / 0.06),
     0 1px 3px oklch(0 0 0 / 0.3),
     0 8px 32px oklch(0 0 0 / 0.4);
 }
@@ -216,29 +216,13 @@
   animation: dash-fade-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
 }
 
-/* Globe container positioning: CSS shift instead of 3D offset */
+/* Globe container positioning: CSS shift so globe appears on the right */
 .dash-globe-position {
-  width: 50%;
-}
-
-.dark .dash-globe-position {
   right: -50%;
   width: 150%;
+  mix-blend-mode: darken;
+}
+.dark .dash-globe-position {
+  mix-blend-mode: normal;
 }
 
-/* Observatory veil: light-mode gradient from solid background → transparent space */
-.dash-space-veil {
-  background: linear-gradient(
-    to right,
-    var(--background) 0%,
-    var(--background) 38%,
-    oklch(0.96 0.01 258 / 0.88) 50%,
-    oklch(0.75 0.025 256 / 0.45) 62%,
-    oklch(0.35 0.02 260 / 0.15) 76%,
-    transparent 90%
-  );
-}
-
-.dark .dash-space-veil {
-  background: none;
-}

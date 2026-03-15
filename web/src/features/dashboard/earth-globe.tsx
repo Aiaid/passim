@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei';
 import { useQuery } from '@tanstack/react-query';
 import * as THREE from 'three';
 import { api } from '@/lib/api-client';
+import { usePreferencesStore } from '@/stores/preferences-store';
 
 // ── Texture URLs ─────────────────────────────────────────────────────
 const TEX_DAY = 'https://unpkg.com/three-globe@2.41.2/example/img/earth-blue-marble.jpg';
@@ -68,6 +69,7 @@ const earthFrag = /* glsl */ `
   uniform sampler2D uNightMap;
   uniform sampler2D uSpecMap;
   uniform vec3 uSunDir;
+  uniform float uMinBrightness;
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vWorldPos;
@@ -102,6 +104,9 @@ const earthFrag = /* glsl */ `
     float rim = 1.0 - max(dot(N, V), 0.0);
     color += vec3(0.3, 0.6, 1.0) * pow(rim, 5.0) * 0.08 * dayMix;
 
+    // Light-mode: lift dark areas so the globe doesn't look like a black hole
+    color = max(color, vec3(uMinBrightness));
+
     gl_FragColor = vec4(color, 1.0);
   }
 `;
@@ -119,16 +124,17 @@ const atmosVert = /* glsl */ `
 
 const atmosFrag = /* glsl */ `
   uniform vec3 uSunDir;
+  uniform float uGlowStrength;
   varying vec3 vNormal;
   varying vec3 vWorldPos;
   void main() {
     vec3 N = normalize(vNormal);
     vec3 V = normalize(cameraPosition - vWorldPos);
     float rim = 1.0 - max(dot(N, V), 0.0);
-    float glow = pow(rim, 5.0);
+    float glow = pow(rim, 3.0);
     float sunSide = max(dot(N, uSunDir), 0.0);
-    vec3 color = mix(vec3(0.005, 0.015, 0.06), vec3(0.2, 0.5, 1.0), sunSide);
-    gl_FragColor = vec4(color, glow * 0.08 * (0.3 + 0.7 * sunSide));
+    vec3 color = mix(vec3(0.1, 0.2, 0.5), vec3(0.3, 0.55, 1.0), sunSide);
+    gl_FragColor = vec4(color, glow * uGlowStrength * (0.3 + 0.7 * sunSide));
   }
 `;
 
@@ -222,26 +228,55 @@ function CloudLayer({ radius }: { radius: number }) {
 }
 
 // ── Stars ────────────────────────────────────────────────────────────
-function Stars() {
-  const positions = useMemo(() => {
-    const arr = new Float32Array(3000 * 3);
-    for (let i = 0; i < 3000; i++) {
-      const r = 12 + Math.random() * 15;
+function Stars({ isDark }: { isDark: boolean }) {
+  const geo = useMemo(() => {
+    const count = isDark ? 3000 : 1500;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+
+    // Light mode: dark enough to contrast on near-white bg
+    const palette = [
+      [0.20, 0.30, 0.55],  // dark blue
+      [0.50, 0.40, 0.18],  // dark gold
+      [0.32, 0.33, 0.38],  // dark gray
+      [0.35, 0.25, 0.50],  // dark purple
+    ];
+
+    for (let i = 0; i < count; i++) {
+      const r = 10 + Math.random() * 18;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      arr[i * 3 + 2] = r * Math.cos(phi);
+      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      positions[i * 3 + 2] = r * Math.cos(phi);
+
+      if (isDark) {
+        colors[i * 3] = 1;
+        colors[i * 3 + 1] = 1;
+        colors[i * 3 + 2] = 1;
+      } else {
+        const c = palette[Math.floor(Math.random() * palette.length)];
+        colors[i * 3] = c[0];
+        colors[i * 3 + 1] = c[1];
+        colors[i * 3 + 2] = c[2];
+      }
     }
-    return arr;
-  }, []);
+    return { positions, colors };
+  }, [isDark]);
 
   return (
     <points>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-position" args={[geo.positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[geo.colors, 3]} />
       </bufferGeometry>
-      <pointsMaterial color="#ffffff" size={0.04} sizeAttenuation transparent opacity={0.7} />
+      <pointsMaterial
+        vertexColors
+        size={isDark ? 0.04 : 0.18}
+        sizeAttenuation
+        transparent
+        opacity={isDark ? 0.7 : 0.8}
+      />
     </points>
   );
 }
@@ -253,12 +288,14 @@ function EarthScene({
   offsetX = 0,
   scaleFactor = 0.28,
   onMarkerClick,
+  isDark,
 }: {
   lat?: number;
   lon?: number;
   offsetX?: number;
   scaleFactor?: number;
   onMarkerClick?: () => void;
+  isDark: boolean;
 }) {
   const { viewport } = useThree();
   const textures = useManualTextures([TEX_DAY, TEX_NIGHT, TEX_SPEC]);
@@ -286,19 +323,26 @@ function EarthScene({
       uNightMap: { value: textures[1] },
       uSpecMap: { value: textures[2] },
       uSunDir: { value: sunDir },
+      uMinBrightness: { value: isDark ? 0.0 : 0.15 },
     };
-  }, [textures, sunDir]);
+  }, [textures, sunDir, isDark]);
 
-  const atmosUniforms = useMemo(() => ({ uSunDir: { value: sunDir } }), [sunDir]);
+  const atmosUniforms = useMemo(
+    () => ({
+      uSunDir: { value: sunDir },
+      uGlowStrength: { value: isDark ? 0.08 : 0.12 },
+    }),
+    [sunDir, isDark],
+  );
 
-  if (!earthUniforms) return <Stars />;
+  if (!earthUniforms) return <Stars isDark={isDark} />;
 
   return (
     <>
-      <Stars />
+      <Stars isDark={isDark} />
       {/* Directional light for cloud layer */}
-      <directionalLight position={sunDir.clone().multiplyScalar(10)} intensity={1.5} />
-      <ambientLight intensity={0.1} />
+      <directionalLight position={sunDir.clone().multiplyScalar(10)} intensity={isDark ? 1.5 : 2.0} />
+      <ambientLight intensity={isDark ? 0.1 : 0.5} />
       <group position={[offsetX, 0, 0]} rotation={rotation} scale={scale}>
         {/* Earth */}
         <mesh>
@@ -311,9 +355,9 @@ function EarthScene({
         </mesh>
         {/* Cloud layer */}
         <CloudLayer radius={RADIUS * 1.008} />
-        {/* Atmosphere */}
+        {/* Atmosphere — larger halo in light mode */}
         <mesh>
-          <sphereGeometry args={[RADIUS * 1.012, 64, 64]} />
+          <sphereGeometry args={[RADIUS * (isDark ? 1.012 : 1.03), 64, 64]} />
           <shaderMaterial
             vertexShader={atmosVert}
             fragmentShader={atmosFrag}
@@ -337,18 +381,41 @@ function EarthScene({
   );
 }
 
+// ── Resolve effective dark mode ───────────────────────────────────────
+function useIsDark() {
+  const { theme } = usePreferencesStore();
+  const [isDark, setIsDark] = useState(() => {
+    if (theme === 'dark') return true;
+    if (theme === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    if (theme !== 'system') {
+      setIsDark(theme === 'dark');
+      return;
+    }
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDark(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [theme]);
+
+  return isDark;
+}
+
 // ── Exported component ───────────────────────────────────────────────
 export function EarthGlobe({
-  transparent = false,
   globeOffsetX = 0,
   scaleFactor = 0.28,
   onMarkerClick,
 }: {
-  transparent?: boolean;
   globeOffsetX?: number;
   scaleFactor?: number;
   onMarkerClick?: () => void;
 }) {
+  const isDark = useIsDark();
   const { data: status } = useQuery({
     queryKey: ['status'],
     queryFn: () => api.getStatus(),
@@ -359,10 +426,10 @@ export function EarthGlobe({
     <div className="w-full h-full">
       <Canvas
         camera={{ position: [0, 0, 4.5], fov: 45 }}
-        gl={{ antialias: true, alpha: transparent }}
+        gl={{ antialias: true, alpha: false }}
         dpr={[1, 2]}
-        style={{ background: transparent ? 'transparent' : '#000' }}
       >
+        <color attach="background" args={[isDark ? '#000000' : '#f4f5f8']} />
         <OrbitControls
           target={[0, 0, 0]}
           enableZoom={false}
@@ -377,6 +444,7 @@ export function EarthGlobe({
           offsetX={globeOffsetX}
           scaleFactor={scaleFactor}
           onMarkerClick={onMarkerClick}
+          isDark={isDark}
         />
       </Canvas>
     </div>
