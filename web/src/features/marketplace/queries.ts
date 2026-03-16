@@ -8,6 +8,15 @@ export function useTemplates() {
   });
 }
 
+export function useTemplate(name: string | undefined) {
+  return useQuery({
+    queryKey: ['template-detail', name],
+    queryFn: () => api.getTemplate(name!),
+    enabled: !!name,
+    staleTime: Infinity,
+  });
+}
+
 export function useDeployApp() {
   return useMutation({
     mutationFn: ({ template, settings }: { template: string; settings: Record<string, unknown> }) =>

@@ -22,7 +22,7 @@ export function TemplateGrid({ templates, hasFilter }: TemplateGridProps) {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 app-stagger">
       {templates.map((template) => (
         <TemplateCard key={template.name} template={template} />
       ))}

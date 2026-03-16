@@ -1,8 +1,9 @@
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Check, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 import { useTaskStatus } from './queries';
 
 interface DeployProgressProps {
@@ -11,16 +12,22 @@ interface DeployProgressProps {
   onRetry: () => void;
 }
 
-function statusToProgress(status: string): number {
+interface Step {
+  key: string;
+  label: string;
+  failed?: boolean;
+}
+
+function statusToStepIndex(status: string): number {
   switch (status) {
     case 'pending':
-      return 15;
+      return 0;
     case 'running':
-      return 60;
+      return 2;
     case 'done':
-      return 100;
+      return 4; // past all steps
     case 'failed':
-      return 100;
+      return 3; // on step 4 (failed)
     default:
       return 0;
   }
@@ -32,43 +39,100 @@ export function DeployProgress({ appId, taskId, onRetry }: DeployProgressProps) 
 
   const { data: task } = useTaskStatus(taskId);
   const status = task?.status ?? 'pending';
-  const progress = statusToProgress(status);
 
-  if (status === 'done') {
-    return (
-      <div className="flex flex-col items-center gap-4 py-8 text-center">
-        <CheckCircle className="size-12 text-green-500" />
-        <p className="text-lg font-medium">{t('marketplace.deploy_success')}</p>
-        <Progress value={100} className="w-full" />
-        <Button onClick={() => navigate(`/apps/${appId}`)}>
-          {t('marketplace.view_app')}
-        </Button>
-      </div>
-    );
-  }
+  const isFailed = status === 'failed';
+  const isDone = status === 'done';
+  const stepIndex = statusToStepIndex(status);
 
-  if (status === 'failed') {
-    return (
-      <div className="flex flex-col items-center gap-4 py-8 text-center">
-        <XCircle className="size-12 text-destructive" />
-        <p className="text-lg font-medium">{t('marketplace.deploy_failed')}</p>
-        {task?.result && (
-          <p className="text-sm text-muted-foreground max-w-md">{task.result}</p>
-        )}
-        <Progress value={100} className="w-full" />
-        <Button variant="outline" onClick={onRetry}>
-          {t('marketplace.retry')}
-        </Button>
-      </div>
-    );
-  }
+  const steps: Step[] = [
+    { key: 'pending', label: t('marketplace.step_pending') },
+    { key: 'pulling', label: t('marketplace.step_pulling') },
+    { key: 'deploying', label: t('marketplace.step_deploying') },
+    { key: 'running', label: isFailed ? t('marketplace.step_failed') : t('marketplace.step_running'), failed: isFailed },
+  ];
 
-  // pending or running
   return (
-    <div className="flex flex-col items-center gap-4 py-8 text-center">
-      <Loader2 className="size-12 animate-spin text-muted-foreground" />
-      <p className="text-lg font-medium">{t('marketplace.deploying')}</p>
-      <Progress value={progress} className="w-full" />
+    <div className="flex flex-col items-center gap-6">
+      {/* Horizontal step indicators */}
+      <div className="flex w-full items-center justify-between py-8">
+        {steps.map((step, i) => (
+          <React.Fragment key={step.key}>
+            {i > 0 && (
+              <div
+                className={cn(
+                  'mx-2 h-0.5 flex-1 transition-colors duration-300',
+                  stepIndex > i ? 'bg-green-500' : 'bg-muted',
+                )}
+              />
+            )}
+            <div className="flex flex-col items-center gap-2">
+              <div
+                className={cn(
+                  'flex size-10 items-center justify-center rounded-full border-2 transition-all duration-300',
+                  stepIndex > i
+                    ? 'border-green-500 bg-green-500 text-white'
+                    : stepIndex === i && step.failed
+                      ? 'border-destructive bg-destructive text-white'
+                      : stepIndex === i
+                        ? 'border-primary text-primary'
+                        : 'border-muted text-muted-foreground',
+                )}
+              >
+                {stepIndex > i ? (
+                  <Check
+                    className="size-5"
+                    style={{ animation: 'step-check 0.4s ease-out forwards' }}
+                  />
+                ) : step.failed && stepIndex === i ? (
+                  <X className="size-5" />
+                ) : stepIndex === i ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : (
+                  <span className="text-sm">{i + 1}</span>
+                )}
+              </div>
+              <span
+                className={cn(
+                  'text-xs',
+                  stepIndex === i && step.failed
+                    ? 'font-medium text-destructive'
+                    : stepIndex === i
+                      ? 'font-medium text-foreground'
+                      : 'text-muted-foreground',
+                )}
+              >
+                {step.label}
+              </span>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Success state */}
+      {isDone && (
+        <div className="flex flex-col items-center gap-3 pb-4 text-center">
+          <p className="text-lg font-medium">{t('marketplace.deploy_success')}</p>
+          <p className="text-sm text-muted-foreground">
+            {t('marketplace.connection_info_available')}
+          </p>
+          <Button onClick={() => navigate(`/apps/${appId}`)} className="mt-2">
+            {t('marketplace.view_app')}
+          </Button>
+        </div>
+      )}
+
+      {/* Failure state */}
+      {isFailed && (
+        <div className="flex flex-col items-center gap-3 pb-4 text-center">
+          <p className="text-lg font-medium">{t('marketplace.deploy_failed')}</p>
+          {task?.result && (
+            <p className="max-w-md text-sm text-muted-foreground">{task.result}</p>
+          )}
+          <Button variant="outline" onClick={onRetry} className="mt-2">
+            {t('marketplace.retry')}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

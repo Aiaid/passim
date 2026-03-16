@@ -75,6 +75,7 @@ func NewRouter(deps Deps) http.Handler {
 			protected.PATCH("/settings", updateSettingsHandler(deps))
 
 			if deps.Templates != nil {
+				protected.GET("/templates/:name", getTemplateHandler(deps))
 				protected.GET("/templates", listTemplates(deps.Templates))
 			}
 

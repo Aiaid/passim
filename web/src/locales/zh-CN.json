@@ -139,7 +139,27 @@
     "events_connected": "已连接",
     "events_disconnected": "未连接",
     "no_events": "暂无事件",
-    "back": "返回"
+    "back": "返回",
+    "credentials": "凭据",
+    "connection_details": "连接信息",
+    "connection_guide": "连接指南",
+    "how_to_connect": "如何连接",
+    "show_password": "显示",
+    "hide_password": "隐藏",
+    "copy": "复制",
+    "copied": "已复制！",
+    "server_address": "服务器地址",
+    "ports": "端口",
+    "limitations": "已知限制",
+    "restart": "重启",
+    "stop": "停止",
+    "start": "启动",
+    "view_detail": "查看详情",
+    "source": "来源",
+    "license": "协议",
+    "redeploying": "重新部署中...",
+    "settings_tab": "设置",
+    "running_count": "{{count}} 个运行中"
   },
   "speedtest": {
     "title": "网络测速",
@@ -189,6 +209,16 @@
     "retry": "重试",
     "back": "返回",
     "no_templates": "没有模板",
-    "no_match": "没有匹配的模板"
+    "no_match": "没有匹配的模板",
+    "setup_guide": "安装指南",
+    "source_code": "源代码",
+    "license": "协议",
+    "limitations_notice": "已知限制",
+    "step_pending": "等待中",
+    "step_pulling": "拉取镜像",
+    "step_deploying": "部署中",
+    "step_running": "运行中",
+    "step_failed": "失败",
+    "connection_info_available": "连接信息将在应用详情页显示"
   }
 }

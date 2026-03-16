@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { PageSkeleton } from '@/components/shared/loading-skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import type { AppResponse } from '@/lib/api-client';
@@ -24,6 +25,8 @@ export function AppsPage() {
   });
   const [selected, setSelected] = useState<AppResponse | null>(null);
 
+  const runningCount = apps?.filter(a => a.status === 'running').length ?? 0;
+
   if (isLoading) {
     return <PageSkeleton />;
   }
@@ -31,7 +34,7 @@ export function AppsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={t('app.title')}
+        title={<>{t('app.title')}{runningCount > 0 && <Badge variant="secondary" className="ml-2">{t('app.running_count', { count: runningCount })}</Badge>}</>}
         actions={
           <Button onClick={() => navigate('/apps/new')}>
             <Plus className="mr-2 size-4" />
@@ -49,7 +52,7 @@ export function AppsPage() {
           onAction={() => navigate('/apps/new')}
         />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 app-stagger">
           {apps.map((app) => (
             <AppCard
               key={app.id}

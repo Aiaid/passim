@@ -1,7 +1,9 @@
-import { Package } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusBadge } from '@/components/shared/status-badge';
-import { CATEGORY_ICONS } from '@/lib/constants';
+import { CategoryIcon } from '@/components/shared/category-icon';
+import { StatusIndicator } from '@/components/shared/status-indicator';
+import { CATEGORY_GRADIENTS } from '@/lib/constants';
+import { localized } from '@/lib/utils';
 import type { AppResponse, TemplateSummary } from '@/lib/api-client';
 
 interface AppCardProps {
@@ -11,27 +13,39 @@ interface AppCardProps {
 }
 
 export function AppCard({ app, template, onClick }: AppCardProps) {
-  const Icon = template
-    ? CATEGORY_ICONS[template.category] || Package
-    : Package;
-  const deployedDate = new Date(app.deployed_at).toLocaleDateString();
+  const { i18n } = useTranslation();
 
   return (
     <Card
-      className="cursor-pointer transition-colors hover:bg-accent/50"
+      className="cursor-pointer overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
       onClick={onClick}
     >
+      <div
+        className="h-[3px] w-full"
+        style={{
+          background:
+            CATEGORY_GRADIENTS[template?.category ?? ''] ||
+            CATEGORY_GRADIENTS.vpn,
+        }}
+      />
       <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-          <Icon className="size-5 text-muted-foreground" />
-        </div>
+        <CategoryIcon
+          category={template?.category ?? ''}
+          templateName={app.template}
+        />
         <div className="min-w-0 flex-1">
-          <CardTitle className="text-base">{app.template}</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">{deployedDate}</p>
+          <CardTitle className="text-base font-semibold capitalize">
+            {app.template}
+          </CardTitle>
+          {template?.description && (
+            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+              {localized(template.description, i18n.language)}
+            </p>
+          )}
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <StatusBadge status={app.status} />
+        <StatusIndicator status={app.status} showLabel />
       </CardContent>
     </Card>
   );

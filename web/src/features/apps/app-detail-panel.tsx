@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
-import { X, ExternalLink, RotateCcw, Package } from 'lucide-react';
+import { X, ExternalLink, RotateCcw } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -9,9 +9,13 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from '@/components/shared/status-badge';
-import { CATEGORY_ICONS } from '@/lib/constants';
+import { CategoryIcon } from '@/components/shared/category-icon';
+import { CredentialField } from '@/components/shared/credential-field';
+import { CATEGORY_GRADIENTS } from '@/lib/constants';
+import { useTemplateDetail } from './queries';
 import type { AppResponse, TemplateSummary } from '@/lib/api-client';
 import { useContainerLogs } from '@/features/containers/queries';
 
@@ -33,10 +37,6 @@ export function AppDetailPanel({
 
   if (!app) return null;
 
-  const Icon = template
-    ? CATEGORY_ICONS[template.category] || Package
-    : Package;
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -47,9 +47,11 @@ export function AppDetailPanel({
         <SheetHeader className="px-5 py-4 border-b space-y-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <Icon className="size-4 text-muted-foreground" />
-              </div>
+              <CategoryIcon
+                category={template?.category ?? ''}
+                templateName={app.template}
+                size="sm"
+              />
               <div className="min-w-0">
                 <SheetTitle className="text-base truncate">
                   {app.template}
@@ -59,18 +61,17 @@ export function AppDetailPanel({
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-0.5 shrink-0 ml-3">
+            <div className="flex items-center gap-1.5 shrink-0 ml-3">
               <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   onOpenChange(false);
                   navigate(`/apps/${app.id}`);
                 }}
-                title={t('app.detail')}
               >
-                <ExternalLink className="size-3.5" />
+                {t('app.view_detail')}
+                <ExternalLink className="ml-1.5 size-3.5" />
               </Button>
               <Button
                 variant="ghost"
@@ -83,6 +84,13 @@ export function AppDetailPanel({
             </div>
           </div>
         </SheetHeader>
+        <div
+          className="h-0.5"
+          style={{
+            background:
+              CATEGORY_GRADIENTS[template?.category ?? ''] || 'var(--border)',
+          }}
+        />
 
         {/* Tabs */}
         <Tabs defaultValue="info" className="flex-1 flex flex-col overflow-hidden">
@@ -90,6 +98,9 @@ export function AppDetailPanel({
             <TabsList className="w-full">
               <TabsTrigger value="info" className="flex-1">
                 {t('app.info')}
+              </TabsTrigger>
+              <TabsTrigger value="credentials" className="flex-1">
+                {t('app.credentials')}
               </TabsTrigger>
               <TabsTrigger value="logs" className="flex-1">
                 {t('container.logs')}
@@ -101,6 +112,10 @@ export function AppDetailPanel({
             <AppInfoTab app={app} />
           </TabsContent>
 
+          <TabsContent value="credentials" className="flex-1 overflow-auto mt-0 px-5 py-4">
+            <AppCredentialsTab app={app} />
+          </TabsContent>
+
           <TabsContent value="logs" className="flex-1 overflow-hidden mt-0">
             <AppLogsTab app={app} />
           </TabsContent>
@@ -110,10 +125,11 @@ export function AppDetailPanel({
   );
 }
 
-/* ── Info Tab ────────────────────────────────────── */
+/* -- Info Tab ------------------------------------------------ */
 
 function AppInfoTab({ app }: { app: AppResponse }) {
   const { t } = useTranslation();
+  const { data: templateDetail } = useTemplateDetail(app?.template);
 
   const fields = [
     { label: t('app.status'), value: <StatusBadge status={app.status} /> },
@@ -134,6 +150,33 @@ function AppInfoTab({ app }: { app: AppResponse }) {
 
   return (
     <div className="space-y-4">
+      {templateDetail?.source && (
+        <div className="space-y-2 pb-3 border-b">
+          {templateDetail.source.url && (
+            <div className="flex items-start justify-between gap-4">
+              <span className="text-sm text-muted-foreground shrink-0">
+                {t('app.source')}
+              </span>
+              <a
+                href={templateDetail.source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-primary hover:underline text-right truncate max-w-[60%]"
+              >
+                {templateDetail.source.url}
+              </a>
+            </div>
+          )}
+          {templateDetail.source.license && (
+            <div className="flex items-start justify-between gap-4">
+              <span className="text-sm text-muted-foreground shrink-0">
+                {t('app.license')}
+              </span>
+              <Badge variant="secondary">{templateDetail.source.license}</Badge>
+            </div>
+          )}
+        </div>
+      )}
       {fields.map((f) => (
         <div key={f.label} className="flex items-start justify-between gap-4">
           <span className="text-sm text-muted-foreground shrink-0">
@@ -154,7 +197,38 @@ function AppInfoTab({ app }: { app: AppResponse }) {
   );
 }
 
-/* ── Logs Tab ────────────────────────────────────── */
+/* -- Credentials Tab ----------------------------------------- */
+
+const SENSITIVE_PATTERN = /password|psk|secret|key|uuid|token/i;
+
+function AppCredentialsTab({ app }: { app: AppResponse }) {
+  const { t } = useTranslation();
+  const settings = app.settings ?? {};
+  const entries = Object.entries(settings);
+
+  if (entries.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <p className="text-sm text-muted-foreground">{t('common.no_data')}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {entries.map(([key, value]) => (
+        <CredentialField
+          key={key}
+          label={key}
+          value={String(value)}
+          sensitive={SENSITIVE_PATTERN.test(key)}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* -- Logs Tab ------------------------------------------------ */
 
 function AppLogsTab({ app }: { app: AppResponse }) {
   const { t } = useTranslation();
@@ -187,21 +261,21 @@ function AppLogsTab({ app }: { app: AppResponse }) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Terminal chrome */}
-      <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-zinc-800">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted dark:bg-zinc-900 border-b border-border dark:border-zinc-800">
         <div className="flex items-center gap-2">
           <div className="flex gap-1.5">
             <span className="size-2.5 rounded-full bg-[oklch(0.577_0.245_27)]" />
             <span className="size-2.5 rounded-full bg-[oklch(0.75_0.18_80)]" />
             <span className="size-2.5 rounded-full bg-[oklch(0.65_0.2_145)]" />
           </div>
-          <span className="text-[11px] text-zinc-500 font-mono ml-1">
+          <span className="text-[11px] text-muted-foreground dark:text-zinc-500 font-mono ml-1">
             {app.template}
           </span>
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className="size-7 text-zinc-400 hover:text-zinc-200"
+          className="size-7 text-muted-foreground hover:text-foreground"
           onClick={() => refetch()}
           disabled={isLoading}
         >
@@ -210,14 +284,14 @@ function AppLogsTab({ app }: { app: AppResponse }) {
       </div>
 
       {/* Terminal body */}
-      <div className="flex-1 min-h-0 bg-zinc-950 overflow-y-auto" ref={scrollRef}>
+      <div className="flex-1 min-h-0 bg-muted/30 dark:bg-zinc-950 overflow-y-auto" ref={scrollRef}>
         <div className="p-3">
           {isLoading ? (
-            <p className="text-xs font-mono text-zinc-500 p-2">
+            <p className="text-xs font-mono text-muted-foreground p-2">
               {t('common.loading')}
             </p>
           ) : lines.length === 0 ? (
-            <p className="text-xs font-mono text-zinc-500 p-2">
+            <p className="text-xs font-mono text-muted-foreground p-2">
               {t('common.no_data')}
             </p>
           ) : (
@@ -225,12 +299,12 @@ function AppLogsTab({ app }: { app: AppResponse }) {
               {lines.map((line, i) => (
                 <div
                   key={i}
-                  className="flex hover:bg-zinc-900/60 rounded-sm group"
+                  className="flex hover:bg-muted dark:hover:bg-zinc-900/60 rounded-sm group"
                 >
-                  <span className="select-none text-right text-zinc-600 w-8 shrink-0 pr-3 group-hover:text-zinc-500">
+                  <span className="select-none text-right text-muted-foreground/50 dark:text-zinc-600 w-8 shrink-0 pr-3 group-hover:text-zinc-500">
                     {i + 1}
                   </span>
-                  <span className="text-zinc-300 whitespace-pre-wrap break-all flex-1">
+                  <span className="text-foreground dark:text-zinc-300 whitespace-pre-wrap break-all flex-1">
                     {line}
                   </span>
                 </div>

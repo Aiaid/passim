@@ -73,3 +73,12 @@ export function useTemplateForApp(templateName: string | undefined) {
 
   return templates?.find((t) => t.name === templateName);
 }
+
+export function useTemplateDetail(templateName: string | undefined) {
+  return useQuery({
+    queryKey: ['template-detail', templateName],
+    queryFn: () => api.getTemplate(templateName!),
+    enabled: !!templateName,
+    staleTime: Infinity,
+  });
+}

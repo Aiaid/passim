@@ -139,7 +139,27 @@
     "events_connected": "Connected",
     "events_disconnected": "Disconnected",
     "no_events": "No events yet",
-    "back": "Back"
+    "back": "Back",
+    "credentials": "Credentials",
+    "connection_details": "Connection Details",
+    "connection_guide": "Connection Guide",
+    "how_to_connect": "How to Connect",
+    "show_password": "Show",
+    "hide_password": "Hide",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "server_address": "Server Address",
+    "ports": "Ports",
+    "limitations": "Known Limitations",
+    "restart": "Restart",
+    "stop": "Stop",
+    "start": "Start",
+    "view_detail": "View Details",
+    "source": "Source",
+    "license": "License",
+    "redeploying": "Redeploying...",
+    "settings_tab": "Settings",
+    "running_count": "{{count}} running"
   },
   "speedtest": {
     "title": "Speed Test",
@@ -189,6 +209,16 @@
     "retry": "Retry",
     "back": "Back",
     "no_templates": "No templates available",
-    "no_match": "No templates match your search"
+    "no_match": "No templates match your search",
+    "setup_guide": "Setup Guide",
+    "source_code": "Source Code",
+    "license": "License",
+    "limitations_notice": "Known Limitations",
+    "step_pending": "Pending",
+    "step_pulling": "Pulling Image",
+    "step_deploying": "Deploying",
+    "step_running": "Running",
+    "step_failed": "Failed",
+    "connection_info_available": "Connection info will be available on the app detail page"
   }
 }

@@ -94,6 +94,7 @@ export const api = {
 
   // Templates
   getTemplates: () => request<TemplateSummary[]>('/templates'),
+  getTemplate: (name: string) => request<TemplateDetail>(`/templates/${name}`),
 
   // Apps
   deployApp: (template: string, settings: Record<string, unknown>) =>
@@ -104,7 +105,7 @@ export const api = {
   getApps: () => request<AppResponse[]>('/apps'),
   getApp: (id: string) => request<AppResponse>(`/apps/${id}`),
   updateApp: (id: string, settings: Record<string, unknown>) =>
-    request<void>(`/apps/${id}`, { method: 'PATCH', body: JSON.stringify({ settings }) }),
+    request<{ status: string; task_id?: string; settings?: Record<string, unknown> }>(`/apps/${id}`, { method: 'PATCH', body: JSON.stringify({ settings }) }),
   deleteApp: (id: string) => request<void>(`/apps/${id}`, { method: 'DELETE' }),
   getAppConfigs: (id: string) => request<string[]>(`/apps/${id}/configs`),
   getAppConfigFile: (id: string, file: string) =>
@@ -172,6 +173,20 @@ export interface TemplateSummary {
   icon: string;
   description: Record<string, string>;
   settings: SettingInfo[];
+}
+
+export interface ClientEntry {
+  url?: string;
+  label?: Record<string, string>;
+  description?: Record<string, string>;
+}
+
+export interface TemplateDetail extends TemplateSummary {
+  version: string;
+  guide?: { setup?: Record<string, string>; usage?: Record<string, string> };
+  clients?: { web?: ClientEntry; mobile?: ClientEntry; desktop?: ClientEntry };
+  source?: { url?: string; license?: string };
+  limitations?: string[];
 }
 
 export interface SettingInfo {

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -255,6 +255,12 @@ function SettingField({ setting, lang }: { setting: SettingInfo; lang: string })
                 onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
               />
             </FormControl>
+            {generated && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Sparkles className="size-3" />
+                {t('marketplace.auto_generated')}
+              </p>
+            )}
             <FormMessage />
           </FormItem>
         )}
@@ -279,6 +285,12 @@ function SettingField({ setting, lang }: { setting: SettingInfo; lang: string })
               value={(field.value as string) ?? ''}
             />
           </FormControl>
+          {generated && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Sparkles className="size-3" />
+              {t('marketplace.auto_generated')}
+            </p>
+          )}
           <FormMessage />
         </FormItem>
       )}

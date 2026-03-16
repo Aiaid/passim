@@ -33,6 +33,16 @@ interface AppSettingsFormProps {
   settingsSchema: SettingInfo[];
 }
 
+function isSensitiveSetting(key: string): boolean {
+  return /password|psk|secret|key|uuid|token/i.test(key);
+}
+
+function maskValue(value: unknown): string {
+  const str = String(value ?? '-');
+  if (str === '-') return str;
+  return '\u2022'.repeat(Math.min(str.length, 20));
+}
+
 function buildSchema(settings: SettingInfo[]) {
   const shape: Record<string, z.ZodTypeAny> = {};
 
@@ -92,23 +102,29 @@ export function AppSettingsForm({ appId, currentSettings, settingsSchema }: AppS
           {settingsSchema.map((s) => {
             const label = localized(s.label, i18n.language);
             const value = currentSettings[s.key];
+            const sensitive = isSensitiveSetting(s.key);
             return (
               <div key={s.key} className="flex items-center justify-between rounded-md border px-3 py-2">
                 <span className="text-sm text-muted-foreground">{label}</span>
                 <span className="text-sm font-medium">
                   {s.type === 'boolean'
                     ? value ? 'On' : 'Off'
-                    : String(value ?? '-')}
+                    : sensitive ? maskValue(value) : String(value ?? '-')}
                 </span>
               </div>
             );
           })}
-          {settingsSchema.length === 0 && Object.entries(currentSettings).map(([key, value]) => (
-            <div key={key} className="flex items-center justify-between rounded-md border px-3 py-2">
-              <span className="text-sm text-muted-foreground">{key}</span>
-              <span className="text-sm font-medium">{String(value ?? '-')}</span>
-            </div>
-          ))}
+          {settingsSchema.length === 0 && Object.entries(currentSettings).map(([key, value]) => {
+            const sensitive = isSensitiveSetting(key);
+            return (
+              <div key={key} className="flex items-center justify-between rounded-md border px-3 py-2">
+                <span className="text-sm text-muted-foreground">{key}</span>
+                <span className="text-sm font-medium">
+                  {sensitive ? maskValue(value) : String(value ?? '-')}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
