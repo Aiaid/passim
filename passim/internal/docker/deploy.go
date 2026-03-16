@@ -123,10 +123,10 @@ func Undeploy(ctx context.Context, client DockerClient, containerID string, appN
 		removeExisting(ctx, client, containerName)
 	}
 
-	// Clean up config directory
+	// Clean up app directory (configs, state, etc.)
 	if dataDir != "" && appName != "" && len(appID) >= 8 {
-		configDir := filepath.Join(dataDir, "apps", appName+"-"+appID[:8], "configs")
-		os.RemoveAll(configDir)
+		appDir := filepath.Join(dataDir, "apps", appName+"-"+appID[:8])
+		os.RemoveAll(appDir)
 	}
 
 	return nil

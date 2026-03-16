@@ -94,7 +94,7 @@ func NewRouter(deps Deps) http.Handler {
 			protected.PATCH("/apps/:id", updateAppHandler(deps))
 			protected.DELETE("/apps/:id", deleteAppHandler(deps))
 			protected.GET("/apps/:id/configs", appConfigsHandler(deps))
-			protected.GET("/apps/:id/configs/:file", appConfigFileHandler(deps))
+			protected.GET("/apps/:id/configs/*filepath", appConfigFileHandler(deps))
 
 			// Task routes
 			protected.GET("/tasks", listTasksHandler(deps))

@@ -567,8 +567,8 @@ func TestHysteriaConfigTemplate(t *testing.T) {
 	if !strings.Contains(cf.Template, "password") {
 		t.Error("hysteria config template does not contain password reference")
 	}
-	if !strings.Contains(cf.Path, "hysteria") {
-		t.Errorf("hysteria config path %q does not reference hysteria directory", cf.Path)
+	if cf.Path != "config.yaml" {
+		t.Errorf("hysteria config path = %q, want config.yaml", cf.Path)
 	}
 }
 

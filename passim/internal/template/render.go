@@ -15,11 +15,17 @@ type NodeInfo struct {
 	DataDir  string
 }
 
+// AppInfo describes the deployed app instance for template rendering.
+type AppInfo struct {
+	Dir string // per-app directory, e.g. /data/apps/wireguard-abc12345
+}
+
 // RenderData carries all data available during template rendering.
 type RenderData struct {
 	Settings  map[string]interface{}
 	Node      NodeInfo
 	Generated map[string]string
+	App       AppInfo
 }
 
 // RenderedTemplate holds the fully-resolved container specification.
@@ -55,6 +61,7 @@ func buildFlatMap(data RenderData) map[string]interface{} {
 	for k, v := range data.Generated {
 		m["generated_"+k] = v
 	}
+	m["app_dir"] = data.App.Dir
 	return m
 }
 
@@ -84,7 +91,7 @@ func renderString(s string, flatMap map[string]interface{}) (string, error) {
 func convertPlaceholders(s string) string {
 	result := s
 	// Replace known prefixes with dot-accessed underscore keys
-	for _, prefix := range []string{"settings", "node", "generated"} {
+	for _, prefix := range []string{"settings", "node", "generated", "app"} {
 		old := "{{" + prefix + "."
 		new := "{{." + prefix + "_"
 		result = strings.ReplaceAll(result, old, new)

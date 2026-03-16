@@ -54,7 +54,7 @@ container:
   ports:
     - "3389:3389"
   volumes:
-    - "{{node.data_dir}}/configs/rdesktop:/config"
+    - "{{app.dir}}/configs:/config"
   environment:
     PUID: "1000"
     PGID: "1000"

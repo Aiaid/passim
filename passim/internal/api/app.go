@@ -102,6 +102,7 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 		if dataDir == "" {
 			dataDir = defaultDataDir
 		}
+		appID := uuid.New().String()
 		hostname, _ := os.Hostname()
 		tz := os.Getenv("TZ")
 		if tz == "" {
@@ -113,10 +114,12 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			Hostname:  hostname,
 			DataDir:   dataDir,
 		}
+		appDir := filepath.Join(dataDir, "apps", t.Name+"-"+appID[:8])
 		rendered, err := tmpl.Render(t, tmpl.RenderData{
 			Settings:  merged,
 			Node:      nodeInfo,
 			Generated: generated,
+			App:       tmpl.AppInfo{Dir: appDir},
 		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "render failed: " + err.Error()})
@@ -124,7 +127,6 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		// 5. Build deploy request
-		appID := uuid.New().String()
 
 		var configFiles []docker.DeployConfigFile
 		for _, cf := range rendered.ConfigFiles {
@@ -350,6 +352,7 @@ func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[stri
 	if tz == "" {
 		tz = time.Now().Location().String()
 	}
+	appDir := filepath.Join(dataDir, "apps", t.Name+"-"+appID[:8])
 	rendered, err := tmpl.Render(t, tmpl.RenderData{
 		Settings: settings,
 		Node: tmpl.NodeInfo{
@@ -359,6 +362,7 @@ func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[stri
 			DataDir:   dataDir,
 		},
 		Generated: generated,
+		App:       tmpl.AppInfo{Dir: appDir},
 	})
 	if err != nil {
 		return nil, err
@@ -512,7 +516,19 @@ func appConfigsHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		configDir := filepath.Join(dataDir, "apps", app.Template+"-"+app.ID[:8], "configs")
-		entries, err := os.ReadDir(configDir)
+
+		var files []string
+		err = filepath.Walk(configDir, func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if info.IsDir() {
+				return nil
+			}
+			rel, _ := filepath.Rel(configDir, path)
+			files = append(files, rel)
+			return nil
+		})
 		if err != nil {
 			if os.IsNotExist(err) {
 				c.JSON(http.StatusOK, []string{})
@@ -522,12 +538,6 @@ func appConfigsHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		var files []string
-		for _, e := range entries {
-			if !e.IsDir() {
-				files = append(files, e.Name())
-			}
-		}
 		if files == nil {
 			files = []string{}
 		}
@@ -538,7 +548,18 @@ func appConfigsHandler(deps Deps) gin.HandlerFunc {
 func appConfigFileHandler(deps Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
+		// Support both :file param and *filepath wildcard
 		filename := c.Param("file")
+		if filename == "" {
+			filename = c.Param("filepath")
+		}
+		// Gin wildcard includes leading "/"
+		filename = strings.TrimPrefix(filename, "/")
+
+		if filename == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "file path required"})
+			return
+		}
 
 		app, err := db.GetApp(deps.DB, id)
 		if err != nil {
@@ -555,11 +576,12 @@ func appConfigFileHandler(deps Deps) gin.HandlerFunc {
 			dataDir = defaultDataDir
 		}
 
-		configPath := filepath.Join(dataDir, "apps", app.Template+"-"+app.ID[:8], "configs", filename)
+		configBase := filepath.Join(dataDir, "apps", app.Template+"-"+app.ID[:8], "configs")
+		configPath := filepath.Join(configBase, filename)
 
-		// Prevent path traversal
+		// Prevent path traversal — file must be under the config directory
 		absConfig, _ := filepath.Abs(configPath)
-		absBase, _ := filepath.Abs(filepath.Join(dataDir, "apps"))
+		absBase, _ := filepath.Abs(configBase)
 		if !strings.HasPrefix(absConfig, absBase+string(filepath.Separator)) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file path"})
 			return
@@ -575,6 +597,6 @@ func appConfigFileHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		c.Data(http.StatusOK, "text/plain; charset=utf-8", data)
+		c.JSON(http.StatusOK, gin.H{"content": string(data)})
 	}
 }

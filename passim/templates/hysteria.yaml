@@ -58,7 +58,7 @@ container:
   ports:
     - "{{settings.port}}:443/udp"
   volumes:
-    - "{{node.data_dir}}/configs/hysteria:/etc/hysteria"
+    - "{{app.dir}}/configs:/etc/hysteria"
   environment: {}
   labels:
     io.passim: vpn
@@ -69,7 +69,7 @@ container:
     - "/etc/hysteria/config.yaml"
 config:
   files:
-    - path: "{{node.data_dir}}/configs/hysteria/config.yaml"
+    - path: "config.yaml"
       template: |
         listen: :443
         auth:

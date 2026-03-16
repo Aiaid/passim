@@ -683,8 +683,12 @@ func TestInteg_AppConfigFiles(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("get config file: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	if w.Body.String() != configContent {
-		t.Errorf("config content = %q, want %q", w.Body.String(), configContent)
+	var cfResp struct {
+		Content string `json:"content"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &cfResp)
+	if cfResp.Content != configContent {
+		t.Errorf("config content = %q, want %q", cfResp.Content, configContent)
 	}
 
 	// GET non-existent config -> 404

@@ -60,7 +60,7 @@ container:
     - "500:500/udp"
     - "4500:4500/udp"
   volumes:
-    - "{{node.data_dir}}/configs/l2tp:/etc/ipsec.d"
+    - "{{app.dir}}/configs:/etc/ipsec.d"
     - "/lib/modules:/lib/modules:ro"
   environment:
     VPN_IPSEC_PSK: "{{settings.vpn_psk}}"

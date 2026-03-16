@@ -347,8 +347,86 @@ func TestAppConfigs(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("get config: expected 200, got %d", w.Code)
 	}
-	if w.Body.String() != "config content" {
-		t.Errorf("body = %q", w.Body.String())
+	var cfResp struct {
+		Content string `json:"content"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &cfResp)
+	if cfResp.Content != "config content" {
+		t.Errorf("content = %q, want %q", cfResp.Content, "config content")
+	}
+}
+
+func TestAppConfigs_NestedFiles(t *testing.T) {
+	router, apiKey, _, dataDir := setupAppTest(t)
+	token := getToken(t, router, apiKey)
+
+	// Deploy an app
+	body, _ := json.Marshal(map[string]interface{}{
+		"template": "testapp",
+	})
+	req := httptest.NewRequest("POST", "/api/apps", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	var deployed appResponse
+	json.Unmarshal(w.Body.Bytes(), &deployed)
+
+	// Simulate WireGuard-style nested config files (wg_confs/peer*.conf)
+	configDir := filepath.Join(dataDir, "apps", "testapp-"+deployed.ID[:8], "configs", "wg_confs")
+	os.MkdirAll(configDir, 0755)
+	os.WriteFile(filepath.Join(configDir, "peer1.conf"), []byte("[Interface]\nAddress = 10.0.0.2/24"), 0644)
+	os.WriteFile(filepath.Join(configDir, "peer2.conf"), []byte("[Interface]\nAddress = 10.0.0.3/24"), 0644)
+
+	// List configs should return nested paths
+	req = httptest.NewRequest("GET", "/api/apps/"+deployed.ID+"/configs", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("list configs: expected 200, got %d", w.Code)
+	}
+	var files []string
+	json.Unmarshal(w.Body.Bytes(), &files)
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %d: %v", len(files), files)
+	}
+
+	// Should contain relative paths with subdirectory
+	hasPeer1 := false
+	hasPeer2 := false
+	for _, f := range files {
+		if f == filepath.Join("wg_confs", "peer1.conf") {
+			hasPeer1 = true
+		}
+		if f == filepath.Join("wg_confs", "peer2.conf") {
+			hasPeer2 = true
+		}
+	}
+	if !hasPeer1 {
+		t.Errorf("missing wg_confs/peer1.conf in %v", files)
+	}
+	if !hasPeer2 {
+		t.Errorf("missing wg_confs/peer2.conf in %v", files)
+	}
+
+	// Download nested config file via wildcard path
+	req = httptest.NewRequest("GET", "/api/apps/"+deployed.ID+"/configs/wg_confs/peer1.conf", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("get nested config: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var cfResp struct {
+		Content string `json:"content"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &cfResp)
+	if cfResp.Content != "[Interface]\nAddress = 10.0.0.2/24" {
+		t.Errorf("content = %q", cfResp.Content)
 	}
 }
 
