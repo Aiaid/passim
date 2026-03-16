@@ -110,14 +110,21 @@ func Undeploy(ctx context.Context, client DockerClient, containerID string, appN
 		return fmt.Errorf("docker client is nil")
 	}
 
-	// Stop + remove container
+	// Stop + remove by container ID (if known)
 	if containerID != "" {
 		_ = client.StopContainer(ctx, containerID)
 		_ = client.RemoveContainer(ctx, containerID)
 	}
 
+	// Also remove by container name — catches orphans from failed deploys
+	// where containerID was never recorded in the DB
+	if appName != "" && len(appID) >= 8 {
+		containerName := "passim-" + appName + "-" + appID[:8]
+		removeExisting(ctx, client, containerName)
+	}
+
 	// Clean up config directory
-	if dataDir != "" && appName != "" {
+	if dataDir != "" && appName != "" && len(appID) >= 8 {
 		configDir := filepath.Join(dataDir, "apps", appName+"-"+appID[:8], "configs")
 		os.RemoveAll(configDir)
 	}
