@@ -42,26 +42,21 @@ function buildSchema(settings: SettingInfo[]) {
   const shape: Record<string, z.ZodTypeAny> = {};
 
   for (const s of settings) {
-    const optional = isGenerated(s.default);
+    const generated = isGenerated(s.default);
+    const allowEmpty = generated || s.default === '' || s.advanced;
 
     if (s.type === 'number') {
       let schema = z.coerce.number();
       if (s.min !== undefined) schema = schema.min(s.min);
       if (s.max !== undefined) schema = schema.max(s.max);
-      shape[s.key] = optional ? schema.optional() : schema;
+      shape[s.key] = generated ? schema.optional() : schema;
     } else if (s.type === 'boolean') {
       shape[s.key] = z.boolean().optional();
     } else {
       // string
-      if (s.options && s.options.length > 0) {
-        shape[s.key] = optional
-          ? z.string().optional()
-          : z.string().min(1);
-      } else {
-        shape[s.key] = optional
-          ? z.string().optional()
-          : z.string().min(1);
-      }
+      shape[s.key] = allowEmpty
+        ? z.string().optional()
+        : z.string().min(1);
     }
   }
 

@@ -28,7 +28,11 @@ export function useTaskStatus(taskId: string | undefined) {
   return useQuery({
     queryKey: ['task', taskId],
     queryFn: () => api.getTask(taskId!),
-    refetchInterval: 2000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === 'completed' || status === 'failed') return false;
+      return 2000;
+    },
     enabled: !!taskId,
   });
 }

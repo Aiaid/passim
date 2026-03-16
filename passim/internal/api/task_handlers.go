@@ -27,12 +27,26 @@ func makeDeployHandler(deps Deps) task.TaskHandler {
 
 		appID := t.Target // target is the app ID
 
-		publishEvent(deps.SSE, "task:"+t.ID, "status", `{"status":"running","message":"pulling image"}`)
-		publishEvent(deps.SSE, "app:"+appID, "progress", `{"status":"deploying","progress":25}`)
+		// Phase 1: Pull image (usually the slowest step)
+		_ = task.UpdateStatus(deps.DB, t.ID, "pulling", "", t.Retries)
+		publishEvent(deps.SSE, "task:"+t.ID, "status", `{"status":"pulling"}`)
+		publishEvent(deps.SSE, "app:"+appID, "progress", `{"status":"pulling","progress":25}`)
 
-		result, err := docker.Deploy(ctx, deps.Docker, &req)
+		if err := docker.PrepareAndPull(ctx, deps.Docker, &req); err != nil {
+			if t.Retries+1 >= t.MaxRetries {
+				_ = db.UpdateApp(deps.DB, appID, "failed", "")
+				publishEvent(deps.SSE, "app:"+appID, "deploy", `{"status":"failed"}`)
+			}
+			return fmt.Errorf("deploy: %w", err)
+		}
+
+		// Phase 2: Create and start container
+		_ = task.UpdateStatus(deps.DB, t.ID, "deploying", "", t.Retries)
+		publishEvent(deps.SSE, "task:"+t.ID, "status", `{"status":"deploying"}`)
+		publishEvent(deps.SSE, "app:"+appID, "progress", `{"status":"deploying","progress":75}`)
+
+		result, err := docker.CreateAndRun(ctx, deps.Docker, &req)
 		if err != nil {
-			// Only mark app as failed on final retry (not intermediate retries)
 			if t.Retries+1 >= t.MaxRetries {
 				_ = db.UpdateApp(deps.DB, appID, "failed", "")
 				publishEvent(deps.SSE, "app:"+appID, "deploy", `{"status":"failed"}`)

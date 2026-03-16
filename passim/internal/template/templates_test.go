@@ -187,23 +187,15 @@ func TestAllTemplatesGenerateValues(t *testing.T) {
 
 			result := GenerateValues(tmpl.Generated)
 
-			if len(result) != len(tmpl.Generated) {
-				t.Errorf("GenerateValues returned %d values, expected %d", len(result), len(tmpl.Generated))
-			}
-
 			for _, spec := range tmpl.Generated {
-				val, ok := result[spec.Key]
-				if !ok {
-					t.Errorf("generated key %q not found in result", spec.Key)
-					continue
-				}
-				if val == "" {
-					t.Errorf("generated key %q has empty value", spec.Key)
-				}
-
 				// Type-specific checks
 				switch spec.Type {
 				case "random_string":
+					val, ok := result[spec.Key]
+					if !ok {
+						t.Errorf("generated key %q not found in result", spec.Key)
+						continue
+					}
 					expectedLen := spec.Length
 					if expectedLen <= 0 {
 						expectedLen = 32 // default
@@ -212,10 +204,36 @@ func TestAllTemplatesGenerateValues(t *testing.T) {
 						t.Errorf("generated key %q: length %d, expected %d", spec.Key, len(val), expectedLen)
 					}
 				case "uuid_v4":
-					// UUID v4 format: 8-4-4-4-12
+					val, ok := result[spec.Key]
+					if !ok {
+						t.Errorf("generated key %q not found in result", spec.Key)
+						continue
+					}
 					parts := strings.Split(val, "-")
 					if len(parts) != 5 {
 						t.Errorf("generated key %q: invalid UUID format %q", spec.Key, val)
+					}
+				case "tls_self_signed":
+					cert, hasCert := result[spec.Key+"_cert"]
+					key, hasKey := result[spec.Key+"_key"]
+					if !hasCert || !hasKey {
+						t.Errorf("tls_self_signed %q: missing cert or key", spec.Key)
+						continue
+					}
+					if !strings.Contains(cert, "BEGIN CERTIFICATE") {
+						t.Errorf("tls_self_signed %q: cert missing PEM header", spec.Key)
+					}
+					if !strings.Contains(key, "BEGIN EC PRIVATE KEY") {
+						t.Errorf("tls_self_signed %q: key missing PEM header", spec.Key)
+					}
+				default:
+					val, ok := result[spec.Key]
+					if !ok {
+						t.Errorf("generated key %q not found in result", spec.Key)
+						continue
+					}
+					if val == "" {
+						t.Errorf("generated key %q has empty value", spec.Key)
 					}
 				}
 			}

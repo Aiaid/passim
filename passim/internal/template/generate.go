@@ -1,10 +1,17 @@
 package template
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net"
+	"strings"
+	"time"
 )
 
 const defaultRandomStringLength = 32
@@ -28,6 +35,10 @@ func GenerateValues(specs []GeneratedSpec) map[string]string {
 			result[spec.Key] = uuidV4()
 		case "random_port":
 			result[spec.Key] = fmt.Sprintf("%d", randomPort())
+		case "tls_self_signed":
+			cert, key := generateSelfSignedCert()
+			result[spec.Key+"_cert"] = cert
+			result[spec.Key+"_key"] = key
 		default:
 			result[spec.Key] = ""
 		}
@@ -89,4 +100,39 @@ func randomPort() int {
 	}
 	defer l.Close()
 	return l.Addr().(*net.TCPAddr).Port
+}
+
+// generateSelfSignedCert creates a self-signed ECDSA certificate and returns
+// the PEM-encoded certificate and private key strings.
+func generateSelfSignedCert() (certPEM, keyPEM string) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return "", ""
+	}
+
+	serial, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	tmpl := &x509.Certificate{
+		SerialNumber: serial,
+		Subject:      pkix.Name{CommonName: "hysteria"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(100 * 365 * 24 * time.Hour), // ~100 years
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		return "", ""
+	}
+
+	keyDER, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		return "", ""
+	}
+
+	var certBuf, keyBuf strings.Builder
+	pem.Encode(&certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	pem.Encode(&keyBuf, &pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+
+	return certBuf.String(), keyBuf.String()
 }

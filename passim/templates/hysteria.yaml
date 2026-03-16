@@ -53,6 +53,8 @@ generated:
   - key: password
     type: random_string
     length: 32
+  - key: tls
+    type: tls_self_signed
 container:
   image: tobyxdd/hysteria
   ports:
@@ -72,6 +74,15 @@ config:
     - path: "config.yaml"
       template: |
         listen: :443
+        {{- if .settings_domain}}
+        acme:
+          domains:
+            - {{settings.domain}}
+        {{- else}}
+        tls:
+          cert: /etc/hysteria/server.crt
+          key: /etc/hysteria/server.key
+        {{- end}}
         auth:
           type: password
           password: {{settings.password}}
@@ -80,3 +91,7 @@ config:
           proxy:
             url: https://news.ycombinator.com/
             rewriteHost: true
+    - path: "server.crt"
+      template: "{{generated.tls_cert}}"
+    - path: "server.key"
+      template: "{{generated.tls_key}}"

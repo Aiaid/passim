@@ -20,11 +20,13 @@ interface Step {
 
 function statusToStepIndex(status: string): number {
   switch (status) {
-    case 'pending':
+    case 'queued':
       return 0;
-    case 'running':
+    case 'pulling':
+      return 1;
+    case 'deploying':
       return 2;
-    case 'done':
+    case 'completed':
       return 4; // past all steps
     case 'failed':
       return 3; // on step 4 (failed)
@@ -41,7 +43,7 @@ export function DeployProgress({ appId, taskId, onRetry }: DeployProgressProps) 
   const status = task?.status ?? 'pending';
 
   const isFailed = status === 'failed';
-  const isDone = status === 'done';
+  const isDone = status === 'completed';
   const stepIndex = statusToStepIndex(status);
 
   const steps: Step[] = [

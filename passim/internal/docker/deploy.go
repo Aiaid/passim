@@ -37,42 +37,46 @@ type DeployResult struct {
 	ContainerID string
 }
 
-// Deploy orchestrates the full deployment: write configs → pull image →
-// stop/remove old container → create & start new one.
-func Deploy(ctx context.Context, client DockerClient, req *DeployRequest) (*DeployResult, error) {
+// PrepareAndPull writes config files and pulls the container image.
+// This is the first phase of deployment (typically the slowest due to image pull).
+func PrepareAndPull(ctx context.Context, client DockerClient, req *DeployRequest) error {
 	if client == nil {
-		return nil, fmt.Errorf("docker client is nil")
+		return fmt.Errorf("docker client is nil")
 	}
 
-	// 1. Pre-create volume directories and write config files
 	if err := ensureVolumeDirs(req); err != nil {
-		return nil, fmt.Errorf("create volume dirs: %w", err)
+		return fmt.Errorf("create volume dirs: %w", err)
 	}
 	if err := writeConfigFiles(req); err != nil {
-		return nil, fmt.Errorf("write configs: %w", err)
+		return fmt.Errorf("write configs: %w", err)
 	}
 
-	// 2. Pull image
 	reader, err := client.PullImage(ctx, req.Image)
 	if err != nil {
-		return nil, fmt.Errorf("pull image %s: %w", req.Image, err)
+		return fmt.Errorf("pull image %s: %w", req.Image, err)
 	}
 	if reader != nil {
 		io.Copy(io.Discard, reader)
 		reader.Close()
 	}
+	return nil
+}
 
-	// 3. Stop and remove old container with same name (redeploy case)
+// CreateAndRun stops any old container and creates + starts the new one.
+// This is the second phase of deployment.
+func CreateAndRun(ctx context.Context, client DockerClient, req *DeployRequest) (*DeployResult, error) {
+	if client == nil {
+		return nil, fmt.Errorf("docker client is nil")
+	}
+
 	containerName := "passim-" + req.AppName + "-" + req.AppID[:8]
 	removeExisting(ctx, client, containerName)
 
-	// 4. Build env slice
 	var envSlice []string
 	for k, v := range req.Env {
 		envSlice = append(envSlice, k+"="+v)
 	}
 
-	// 5. Ensure labels include passim metadata
 	if req.Labels == nil {
 		req.Labels = make(map[string]string)
 	}
@@ -80,7 +84,6 @@ func Deploy(ctx context.Context, client DockerClient, req *DeployRequest) (*Depl
 	req.Labels["io.passim.app.id"] = req.AppID
 	req.Labels["io.passim.app.template"] = req.AppName
 
-	// 6. Create and start container
 	cfg := &ContainerConfig{
 		Name:          containerName,
 		Image:         req.Image,
@@ -102,6 +105,16 @@ func Deploy(ctx context.Context, client DockerClient, req *DeployRequest) (*Depl
 	}
 
 	return &DeployResult{ContainerID: id}, nil
+}
+
+// Deploy orchestrates the full deployment in one call.
+// Used by the sync path (no task queue). For async deploys with progress,
+// use PrepareAndPull + CreateAndRun separately.
+func Deploy(ctx context.Context, client DockerClient, req *DeployRequest) (*DeployResult, error) {
+	if err := PrepareAndPull(ctx, client, req); err != nil {
+		return nil, err
+	}
+	return CreateAndRun(ctx, client, req)
 }
 
 // Undeploy stops and removes the container for an app, and cleans up config files.
