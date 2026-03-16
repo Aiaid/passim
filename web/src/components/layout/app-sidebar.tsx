@@ -1,6 +1,7 @@
-import { useLocation, Link } from 'react-router';
+import { useLocation, Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Container, AppWindow, Settings } from 'lucide-react';
+import { LayoutDashboard, Container, AppWindow, Settings, LogOut } from 'lucide-react';
+import { useAuthStore } from '@/stores/auth-store';
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +29,8 @@ const bottomItems = [
 export function AppSidebar() {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
+  const logout = useAuthStore((s) => s.logout);
   const { state } = useSidebar();
 
   return (
@@ -75,6 +78,16 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              size="lg"
+              className="text-base text-muted-foreground hover:text-destructive"
+              onClick={() => { logout(); navigate('/login', { replace: true }); }}
+            >
+              <LogOut className="size-5" />
+              <span>{t('nav.logout')}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

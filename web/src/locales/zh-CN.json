@@ -4,7 +4,8 @@
     "dashboard": "仪表盘",
     "containers": "容器",
     "apps": "应用",
-    "settings": "设置"
+    "settings": "设置",
+    "logout": "退出登录"
   },
   "common": {
     "loading": "加载中...",

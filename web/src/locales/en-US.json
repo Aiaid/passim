@@ -4,7 +4,8 @@
     "dashboard": "Dashboard",
     "containers": "Containers",
     "apps": "Apps",
-    "settings": "Settings"
+    "settings": "Settings",
+    "logout": "Log Out"
   },
   "common": {
     "loading": "Loading...",
