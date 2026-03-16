@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -81,6 +82,7 @@ func (h *passkeyHandler) finishLogin(c *gin.Context) {
 
 	cred, err := h.webauthn.FinishLogin(user, httpReq)
 	if err != nil {
+		log.Printf("passkey login failed: %v", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "passkey verification failed"})
 		return
 	}
@@ -175,11 +177,13 @@ func (h *passkeyHandler) finishRegister(c *gin.Context) {
 
 	id := uuid.New().String()
 	pk := &db.Passkey{
-		ID:           id,
-		CredentialID: cred.ID,
-		PublicKey:    cred.PublicKey,
-		Name:         req.Name,
-		SignCount:    cred.Authenticator.SignCount,
+		ID:             id,
+		CredentialID:   cred.ID,
+		PublicKey:      cred.PublicKey,
+		Name:           req.Name,
+		SignCount:      cred.Authenticator.SignCount,
+		BackupEligible: cred.Flags.BackupEligible,
+		BackupState:    cred.Flags.BackupState,
 	}
 	if err := db.CreatePasskey(h.database, pk); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store passkey"})
@@ -256,6 +260,10 @@ func buildPassimUser(passkeys []db.Passkey) *auth.PassimUser {
 		creds = append(creds, webauthn.Credential{
 			ID:        pk.CredentialID,
 			PublicKey: pk.PublicKey,
+			Flags: webauthn.CredentialFlags{
+				BackupEligible: pk.BackupEligible,
+				BackupState:    pk.BackupState,
+			},
 			Authenticator: webauthn.Authenticator{
 				SignCount: pk.SignCount,
 			},

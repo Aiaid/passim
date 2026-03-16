@@ -8,19 +8,21 @@ import (
 
 // Passkey represents a WebAuthn passkey credential row.
 type Passkey struct {
-	ID           string `json:"id"`
-	CredentialID []byte `json:"credential_id"`
-	PublicKey    []byte `json:"public_key"`
-	Name         string `json:"name"`
-	SignCount    uint32 `json:"sign_count"`
-	CreatedAt    string `json:"created_at"`
-	LastUsedAt   string `json:"last_used_at"`
+	ID             string `json:"id"`
+	CredentialID   []byte `json:"credential_id"`
+	PublicKey      []byte `json:"public_key"`
+	Name           string `json:"name"`
+	SignCount      uint32 `json:"sign_count"`
+	BackupEligible bool   `json:"backup_eligible"`
+	BackupState    bool   `json:"backup_state"`
+	CreatedAt      string `json:"created_at"`
+	LastUsedAt     string `json:"last_used_at"`
 }
 
 func CreatePasskey(database *sql.DB, p *Passkey) error {
 	_, err := database.Exec(
-		`INSERT INTO passkeys (id, credential_id, public_key, name, sign_count) VALUES (?, ?, ?, ?, ?)`,
-		p.ID, p.CredentialID, p.PublicKey, p.Name, p.SignCount,
+		`INSERT INTO passkeys (id, credential_id, public_key, name, sign_count, backup_eligible, backup_state) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.CredentialID, p.PublicKey, p.Name, p.SignCount, p.BackupEligible, p.BackupState,
 	)
 	if err != nil {
 		return fmt.Errorf("create passkey: %w", err)
@@ -31,9 +33,9 @@ func CreatePasskey(database *sql.DB, p *Passkey) error {
 func GetPasskey(database *sql.DB, id string) (*Passkey, error) {
 	var p Passkey
 	err := database.QueryRow(
-		`SELECT id, credential_id, public_key, COALESCE(name,''), sign_count, COALESCE(created_at,''), COALESCE(last_used_at,'')
+		`SELECT id, credential_id, public_key, COALESCE(name,''), sign_count, backup_eligible, backup_state, COALESCE(created_at,''), COALESCE(last_used_at,'')
 		 FROM passkeys WHERE id = ?`, id,
-	).Scan(&p.ID, &p.CredentialID, &p.PublicKey, &p.Name, &p.SignCount, &p.CreatedAt, &p.LastUsedAt)
+	).Scan(&p.ID, &p.CredentialID, &p.PublicKey, &p.Name, &p.SignCount, &p.BackupEligible, &p.BackupState, &p.CreatedAt, &p.LastUsedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -46,9 +48,9 @@ func GetPasskey(database *sql.DB, id string) (*Passkey, error) {
 func GetPasskeyByCredentialID(database *sql.DB, credentialID []byte) (*Passkey, error) {
 	var p Passkey
 	err := database.QueryRow(
-		`SELECT id, credential_id, public_key, COALESCE(name,''), sign_count, COALESCE(created_at,''), COALESCE(last_used_at,'')
+		`SELECT id, credential_id, public_key, COALESCE(name,''), sign_count, backup_eligible, backup_state, COALESCE(created_at,''), COALESCE(last_used_at,'')
 		 FROM passkeys WHERE credential_id = ?`, credentialID,
-	).Scan(&p.ID, &p.CredentialID, &p.PublicKey, &p.Name, &p.SignCount, &p.CreatedAt, &p.LastUsedAt)
+	).Scan(&p.ID, &p.CredentialID, &p.PublicKey, &p.Name, &p.SignCount, &p.BackupEligible, &p.BackupState, &p.CreatedAt, &p.LastUsedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -60,7 +62,7 @@ func GetPasskeyByCredentialID(database *sql.DB, credentialID []byte) (*Passkey, 
 
 func ListPasskeys(database *sql.DB) ([]Passkey, error) {
 	rows, err := database.Query(
-		`SELECT id, credential_id, public_key, COALESCE(name,''), sign_count, COALESCE(created_at,''), COALESCE(last_used_at,'')
+		`SELECT id, credential_id, public_key, COALESCE(name,''), sign_count, backup_eligible, backup_state, COALESCE(created_at,''), COALESCE(last_used_at,'')
 		 FROM passkeys ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -71,7 +73,7 @@ func ListPasskeys(database *sql.DB) ([]Passkey, error) {
 	var passkeys []Passkey
 	for rows.Next() {
 		var p Passkey
-		if err := rows.Scan(&p.ID, &p.CredentialID, &p.PublicKey, &p.Name, &p.SignCount, &p.CreatedAt, &p.LastUsedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.CredentialID, &p.PublicKey, &p.Name, &p.SignCount, &p.BackupEligible, &p.BackupState, &p.CreatedAt, &p.LastUsedAt); err != nil {
 			return nil, fmt.Errorf("scan passkey: %w", err)
 		}
 		passkeys = append(passkeys, p)
