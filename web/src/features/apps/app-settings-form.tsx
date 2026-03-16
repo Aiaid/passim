@@ -167,7 +167,7 @@ export function AppSettingsForm({ appId, currentSettings, settingsSchema }: AppS
 function SettingField({ setting, lang }: { setting: SettingInfo; lang: string }) {
   const label = localized(setting.label, lang);
 
-  if (setting.type === 'string' && setting.options && setting.options.length > 0) {
+  if ((setting.type === 'string' || setting.type === 'select') && setting.options && setting.options.length > 0) {
     return (
       <FormField
         name={setting.key}
@@ -182,8 +182,8 @@ function SettingField({ setting, lang }: { setting: SettingInfo; lang: string })
               </FormControl>
               <SelectContent>
                 {setting.options!.map((opt) => (
-                  <SelectItem key={opt} value={opt}>
-                    {opt}
+                  <SelectItem key={String(opt.value)} value={String(opt.value)}>
+                    {localized(opt.label, lang)}
                   </SelectItem>
                 ))}
               </SelectContent>
