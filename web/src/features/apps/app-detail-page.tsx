@@ -27,11 +27,7 @@ export function AppDetailPage() {
 
   const parsedSettings = useMemo(() => {
     if (!app?.settings) return {};
-    try {
-      return JSON.parse(app.settings) as Record<string, unknown>;
-    } catch {
-      return {};
-    }
+    return app.settings as Record<string, unknown>;
   }, [app?.settings]);
 
   if (isLoading || !app) {

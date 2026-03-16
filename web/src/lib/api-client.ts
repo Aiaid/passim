@@ -188,7 +188,7 @@ export interface SettingInfo {
 export interface AppResponse {
   id: string;
   template: string;
-  settings: string;
+  settings: Record<string, unknown>;
   status: string;
   container_id: string;
   deployed_at: string;

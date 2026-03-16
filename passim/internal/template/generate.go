@@ -60,6 +60,26 @@ func uuidV4() string {
 		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 }
 
+// ResolveGeneratedDefaults replaces {{generated.KEY}} placeholder strings
+// in merged settings with actual generated values. This is needed because
+// ValidateSettings applies literal default strings like "{{generated.vpn_password}}"
+// before generated values exist.
+func ResolveGeneratedDefaults(merged map[string]interface{}, generated map[string]string) {
+	for key, val := range merged {
+		s, ok := val.(string)
+		if !ok {
+			continue
+		}
+		for gKey, gVal := range generated {
+			placeholder := "{{generated." + gKey + "}}"
+			if s == placeholder {
+				merged[key] = gVal
+				break
+			}
+		}
+	}
+}
+
 // randomPort finds an available TCP port by binding to :0 and returning
 // the port assigned by the OS.
 func randomPort() int {

@@ -125,6 +125,87 @@ func TestGenerateUnknownType(t *testing.T) {
 	}
 }
 
+func TestResolveGeneratedDefaults(t *testing.T) {
+	generated := map[string]string{
+		"vpn_password": "actualPass123",
+		"vpn_psk":      "actualPSK456",
+	}
+
+	tests := []struct {
+		name     string
+		merged   map[string]interface{}
+		wantPass string
+		wantPSK  string
+		wantUser string
+	}{
+		{
+			name: "resolves generated placeholders",
+			merged: map[string]interface{}{
+				"vpn_user":     "vpnuser",
+				"vpn_password": "{{generated.vpn_password}}",
+				"vpn_psk":      "{{generated.vpn_psk}}",
+			},
+			wantPass: "actualPass123",
+			wantPSK:  "actualPSK456",
+			wantUser: "vpnuser",
+		},
+		{
+			name: "preserves user-provided values",
+			merged: map[string]interface{}{
+				"vpn_user":     "myuser",
+				"vpn_password": "mypassword",
+				"vpn_psk":      "mypsk",
+			},
+			wantPass: "mypassword",
+			wantPSK:  "mypsk",
+			wantUser: "myuser",
+		},
+		{
+			name: "handles mixed user and generated",
+			merged: map[string]interface{}{
+				"vpn_user":     "myuser",
+				"vpn_password": "{{generated.vpn_password}}",
+				"vpn_psk":      "customPSK",
+			},
+			wantPass: "actualPass123",
+			wantPSK:  "customPSK",
+			wantUser: "myuser",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ResolveGeneratedDefaults(tt.merged, generated)
+			if got := tt.merged["vpn_password"].(string); got != tt.wantPass {
+				t.Errorf("vpn_password = %q, want %q", got, tt.wantPass)
+			}
+			if got := tt.merged["vpn_psk"].(string); got != tt.wantPSK {
+				t.Errorf("vpn_psk = %q, want %q", got, tt.wantPSK)
+			}
+			if got := tt.merged["vpn_user"].(string); got != tt.wantUser {
+				t.Errorf("vpn_user = %q, want %q", got, tt.wantUser)
+			}
+		})
+	}
+}
+
+func TestResolveGeneratedDefaultsNonString(t *testing.T) {
+	merged := map[string]interface{}{
+		"count": 42,
+		"flag":  true,
+	}
+	generated := map[string]string{"key": "value"}
+
+	ResolveGeneratedDefaults(merged, generated)
+
+	if merged["count"] != 42 {
+		t.Errorf("count changed unexpectedly")
+	}
+	if merged["flag"] != true {
+		t.Errorf("flag changed unexpectedly")
+	}
+}
+
 func TestGenerateMultipleSpecs(t *testing.T) {
 	specs := []GeneratedSpec{
 		{Key: "secret", Type: "random_string", Length: 16},

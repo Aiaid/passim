@@ -90,10 +90,11 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		// 3. Generate values
+		// 3. Generate values and resolve generated references in settings
 		var generated map[string]string
 		if len(t.Generated) > 0 {
 			generated = tmpl.GenerateValues(t.Generated)
+			tmpl.ResolveGeneratedDefaults(merged, generated)
 		}
 
 		// 4. Render template
@@ -338,8 +339,62 @@ type updateAppRequest struct {
 	Settings map[string]interface{} `json:"settings"`
 }
 
+// buildDeployReq renders a template with the given settings and returns a DeployRequest.
+func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[string]interface{}, generated map[string]string) (*docker.DeployRequest, error) {
+	dataDir := deps.DataDir
+	if dataDir == "" {
+		dataDir = defaultDataDir
+	}
+	hostname, _ := os.Hostname()
+	tz := os.Getenv("TZ")
+	if tz == "" {
+		tz = time.Now().Location().String()
+	}
+	rendered, err := tmpl.Render(t, tmpl.RenderData{
+		Settings: settings,
+		Node: tmpl.NodeInfo{
+			PublicIP:  cachedIP,
+			Timezone:  tz,
+			Hostname:  hostname,
+			DataDir:   dataDir,
+		},
+		Generated: generated,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var configFiles []docker.DeployConfigFile
+	for _, cf := range rendered.ConfigFiles {
+		configFiles = append(configFiles, docker.DeployConfigFile{
+			Path:    cf.Path,
+			Content: cf.Content,
+		})
+	}
+
+	return &docker.DeployRequest{
+		AppID:       appID,
+		AppName:     t.Name,
+		Image:       rendered.Image,
+		Env:         rendered.Environment,
+		Ports:       rendered.Ports,
+		Volumes:     rendered.Volumes,
+		Labels:      rendered.Labels,
+		CapAdd:      rendered.CapAdd,
+		Sysctls:     rendered.Sysctls,
+		Args:        rendered.Args,
+		ConfigFiles: configFiles,
+		DataDir:     dataDir,
+		DataVolume:  deps.DataVolume,
+	}, nil
+}
+
 func updateAppHandler(deps Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !requireDocker(deps, c) {
+			return
+		}
+
 		id := c.Param("id")
 
 		app, err := db.GetApp(deps.DB, id)
@@ -358,25 +413,69 @@ func updateAppHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		// Validate settings against template if available
-		if deps.Templates != nil {
-			t, ok := deps.Templates.Get(app.Template)
-			if ok && req.Settings != nil {
-				_, err := tmpl.ValidateSettings(t.Settings, req.Settings)
-				if err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-					return
-				}
-			}
+		// Look up template
+		if deps.Templates == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "template registry not available"})
+			return
+		}
+		t, ok := deps.Templates.Get(app.Template)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "template not found: " + app.Template})
+			return
 		}
 
-		settingsJSON, _ := json.Marshal(req.Settings)
+		// Validate and merge settings
+		if req.Settings == nil {
+			req.Settings = make(map[string]interface{})
+		}
+		merged, err := tmpl.ValidateSettings(t.Settings, req.Settings)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Save settings to DB
+		settingsJSON, _ := json.Marshal(merged)
 		if err := db.UpdateAppSettings(deps.DB, id, string(settingsJSON)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		// Re-read for response
+		// Render template and rebuild container with new settings
+		deployReq, err := buildDeployReq(deps, t, app.ID, merged, nil)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "render failed: " + err.Error()})
+			return
+		}
+
+		// Async path: enqueue redeploy task
+		if deps.Tasks != nil {
+			_ = db.UpdateApp(deps.DB, id, "deploying", app.ContainerID)
+
+			payload, _ := json.Marshal(deployReq)
+			taskID, err := deps.Tasks.Enqueue("deploy", app.ID, string(payload))
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "enqueue redeploy: " + err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusAccepted, gin.H{
+				"status":   "deploying",
+				"task_id":  taskID,
+				"settings": merged,
+			})
+			return
+		}
+
+		// Sync path: redeploy immediately
+		result, err := docker.Deploy(c.Request.Context(), deps.Docker, deployReq)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "redeploy failed: " + err.Error()})
+			return
+		}
+
+		_ = db.UpdateApp(deps.DB, id, "running", result.ContainerID)
+
 		updated, _ := db.GetApp(deps.DB, id)
 		var settings map[string]interface{}
 		json.Unmarshal([]byte(updated.Settings), &settings)
