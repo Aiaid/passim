@@ -14,16 +14,12 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { Container } from '@/lib/api-client';
 import { useContainerAction, useRemoveContainer, useContainerLogs } from './queries';
+import { mapState } from './container-list';
 
 interface ContainerDetailPanelProps {
   container: Container | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-function mapState(state: string): string {
-  if (state === 'exited') return 'stopped';
-  return state;
 }
 
 function displayName(container: Container): string {

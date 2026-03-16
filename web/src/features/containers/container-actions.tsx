@@ -18,6 +18,7 @@ import {
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { Container } from '@/lib/api-client';
 import { useContainerAction, useRemoveContainer } from './queries';
+import { mapState } from './container-list';
 
 interface ContainerActionsProps {
   container: Container;
@@ -29,7 +30,7 @@ export function ContainerActions({ container }: ContainerActionsProps) {
   const containerAction = useContainerAction();
   const removeContainer = useRemoveContainer();
 
-  const isRunning = container.State === 'running';
+  const isRunning = mapState(container.State) === 'running';
   const name = container.Names[0]?.replace(/^\//, '') ?? container.Id.slice(0, 12);
   const isPending = containerAction.isPending || removeContainer.isPending;
 

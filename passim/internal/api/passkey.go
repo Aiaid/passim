@@ -52,7 +52,7 @@ func (h *passkeyHandler) beginLogin(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin login"})
 		return
 	}
-	c.JSON(http.StatusOK, assertion)
+	c.JSON(http.StatusOK, assertion.Response)
 }
 
 // finishLogin completes the WebAuthn login ceremony and issues a JWT.
@@ -138,7 +138,7 @@ func (h *passkeyHandler) beginRegister(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin registration"})
 		return
 	}
-	c.JSON(http.StatusOK, creation)
+	c.JSON(http.StatusOK, creation.Response)
 }
 
 type finishRegisterRequest struct {

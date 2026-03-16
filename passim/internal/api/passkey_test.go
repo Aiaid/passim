@@ -281,11 +281,11 @@ func TestPasskeyBeginRegisterSuccess(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	// Verify response contains publicKey creation options.
+	// Verify response contains creation options (unwrapped from publicKey).
 	var resp map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &resp)
-	if resp["publicKey"] == nil {
-		t.Error("expected publicKey in response")
+	if resp["challenge"] == nil {
+		t.Error("expected challenge in response")
 	}
 }
 

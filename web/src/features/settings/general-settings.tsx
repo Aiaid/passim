@@ -54,7 +54,7 @@ export function GeneralSettings() {
 
   function handleSaveName() {
     if (nodeName !== null) {
-      updateSettings.mutate({ node_name: nodeName });
+      updateSettings.mutate({ node_name: nodeName.trim() });
     }
   }
 

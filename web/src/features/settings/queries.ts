@@ -6,6 +6,7 @@ export function useSSLStatus() {
     queryKey: ['ssl-status'],
     queryFn: () => api.getSSLStatus(),
     staleTime: 60_000,
+    retry: false,
   });
 }
 
@@ -21,11 +22,21 @@ export function useRegisterPasskey() {
 
   return useMutation({
     mutationFn: async ({ name, credential }: { name: string; credential: unknown }) => {
-      return api.passkeyRegisterFinish({ ...credential as Record<string, unknown>, name });
+      return api.passkeyRegisterFinish({ name, response: credential });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['passkeys'] });
       queryClient.invalidateQueries({ queryKey: ['passkey-exists'] });
+    },
+  });
+}
+
+export function useRenewSSL() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.renewSSL(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ssl-status'] });
     },
   });
 }

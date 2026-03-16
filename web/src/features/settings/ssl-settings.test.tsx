@@ -9,6 +9,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('./queries', () => ({
   useSSLStatus: vi.fn(() => ({ data: undefined, isLoading: false })),
+  useRenewSSL: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 describe('SSLSettings', () => {

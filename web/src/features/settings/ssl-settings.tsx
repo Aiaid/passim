@@ -1,10 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { Shield, CheckCircle, AlertTriangle, Lock } from 'lucide-react';
+import { Shield, CheckCircle, AlertTriangle, Lock, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { TableSkeleton } from '@/components/shared/loading-skeleton';
-import { useSSLStatus } from './queries';
+import { toast } from 'sonner';
+import { useSSLStatus, useRenewSSL } from './queries';
 
 function isExpiringSoon(expiresAt: string): boolean {
   if (!expiresAt) return false;
@@ -28,7 +30,8 @@ function formatDate(dateStr: string): string {
 
 export function SSLSettings() {
   const { t } = useTranslation();
-  const { data: ssl, isLoading } = useSSLStatus();
+  const { data: ssl, isLoading, isError } = useSSLStatus();
+  const renewSSL = useRenewSSL();
 
   if (isLoading) {
     return (
@@ -43,7 +46,7 @@ export function SSLSettings() {
     );
   }
 
-  if (!ssl) {
+  if (isError || !ssl) {
     return (
       <Card>
         <CardHeader>
@@ -110,6 +113,25 @@ export function SSLSettings() {
               {expiringSoon && <AlertTriangle className="inline size-3.5 mr-1" />}
               {formatDate(ssl.expires_at)}
             </span>
+          </div>
+        )}
+
+        {/* Renew */}
+        {ssl.mode === 'auto' && (
+          <div className="flex items-center justify-between pt-2">
+            <Label className="text-base">{t('settings.ssl_renew')}</Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => renewSSL.mutate(undefined, {
+                onSuccess: () => toast.success(t('settings.ssl_renew_success')),
+                onError: (err) => toast.error(err.message),
+              })}
+              disabled={renewSSL.isPending}
+            >
+              <RefreshCw className={`size-4 ${renewSSL.isPending ? 'animate-spin' : ''}`} />
+              {t('settings.ssl_renew')}
+            </Button>
           </div>
         )}
       </CardContent>

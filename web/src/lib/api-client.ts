@@ -122,6 +122,7 @@ export const api = {
 
   // SSL
   getSSLStatus: () => request<SSLStatus>('/ssl/status'),
+  renewSSL: () => request<{ message: string }>('/ssl/renew', { method: 'POST' }),
 
   // Speedtest / iperf
   getIperfStatus: () => request<{ status: string }>('/speedtest/iperf/status'),
@@ -189,6 +190,11 @@ export interface TemplateDetail extends TemplateSummary {
   limitations?: string[];
 }
 
+export interface SettingOptionInfo {
+  value: unknown;
+  label: Record<string, string>;
+}
+
 export interface SettingInfo {
   key: string;
   type: string;
@@ -196,7 +202,7 @@ export interface SettingInfo {
   default?: unknown;
   min?: number;
   max?: number;
-  options?: string[];
+  options?: SettingOptionInfo[];
   advanced?: boolean;
 }
 
@@ -228,6 +234,7 @@ export interface SSLStatus {
   valid: boolean;
   domain: string;
   expires_at: string;
+  issuer?: string;
 }
 
 // WebAuthn types for browsers that don't have full type definitions

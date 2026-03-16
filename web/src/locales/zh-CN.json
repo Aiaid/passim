@@ -66,7 +66,9 @@
     "ssl_valid": "有效",
     "ssl_invalid": "无效",
     "ssl_expires": "到期时间",
-    "ssl_not_configured": "未配置 SSL"
+    "ssl_not_configured": "未配置 SSL",
+    "ssl_renew": "续签证书",
+    "ssl_renew_success": "证书续签已触发"
   },
   "auth": {
     "sign_in": "登录",

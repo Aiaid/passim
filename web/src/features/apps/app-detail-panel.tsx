@@ -16,6 +16,7 @@ import { CategoryIcon } from '@/components/shared/category-icon';
 import { CredentialField } from '@/components/shared/credential-field';
 import { CATEGORY_GRADIENTS } from '@/lib/constants';
 import { useTemplateDetail } from './queries';
+import { ConnectionGuide } from './connection-guide';
 import type { AppResponse, TemplateSummary } from '@/lib/api-client';
 import { useContainerLogs } from '@/features/containers/queries';
 
@@ -193,6 +194,7 @@ function AppInfoTab({ app }: { app: AppResponse }) {
           )}
         </div>
       ))}
+      {templateDetail && <ConnectionGuide template={templateDetail} />}
     </div>
   );
 }

@@ -10,7 +10,7 @@ interface ContainerListProps {
   containers: Container[];
 }
 
-function mapState(state: string): string {
+export function mapState(state: string): string {
   if (state === 'exited') return 'stopped';
   return state;
 }
@@ -27,7 +27,8 @@ const borderColor: Record<string, string> = {
 };
 
 export function ContainerList({ containers }: ContainerListProps) {
-  const [selected, setSelected] = useState<Container | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = selectedId ? containers.find((c) => c.Id === selectedId) ?? null : null;
 
   return (
     <>
@@ -43,7 +44,7 @@ export function ContainerList({ containers }: ContainerListProps) {
                 'overflow-hidden transition-all hover:shadow-md border-l-[3px] cursor-pointer',
                 borderColor[state] || 'border-l-status-stopped',
               )}
-              onClick={() => setSelected(container)}
+              onClick={() => setSelectedId(container.Id)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -84,7 +85,7 @@ export function ContainerList({ containers }: ContainerListProps) {
         container={selected}
         open={!!selected}
         onOpenChange={(open) => {
-          if (!open) setSelected(null);
+          if (!open) setSelectedId(null);
         }}
       />
     </>

@@ -17,6 +17,11 @@ type templateSummary struct {
 	Settings    []settingInfo     `json:"settings"`
 }
 
+type optionInfo struct {
+	Value interface{}       `json:"value"`
+	Label map[string]string `json:"label"`
+}
+
 type settingInfo struct {
 	Key         string            `json:"key"`
 	Type        string            `json:"type"`
@@ -28,6 +33,7 @@ type settingInfo struct {
 	Advanced    bool              `json:"advanced,omitempty"`
 	Description map[string]string `json:"description,omitempty"`
 	Pattern     string            `json:"pattern,omitempty"`
+	Options     []optionInfo      `json:"options,omitempty"`
 }
 
 // guideInfo is the JSON shape for template guide instructions.
@@ -73,7 +79,7 @@ type templateDetail struct {
 func convertSettings(src []tmpl.Setting) []settingInfo {
 	settings := make([]settingInfo, 0, len(src))
 	for _, s := range src {
-		settings = append(settings, settingInfo{
+		si := settingInfo{
 			Key:         s.Key,
 			Type:        s.Type,
 			Min:         s.Min,
@@ -84,7 +90,11 @@ func convertSettings(src []tmpl.Setting) []settingInfo {
 			Advanced:    s.Advanced,
 			Description: s.Description,
 			Pattern:     s.Pattern,
-		})
+		}
+		for _, o := range s.Options {
+			si.Options = append(si.Options, optionInfo{Value: o.Value, Label: o.Label})
+		}
+		settings = append(settings, si)
 	}
 	return settings
 }
