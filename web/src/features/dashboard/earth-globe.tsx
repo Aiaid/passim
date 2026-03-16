@@ -740,7 +740,6 @@ function EarthScene({
   const { viewport } = useThree();
   const textures = useManualTextures([TEX_DAY, TEX_NIGHT, TEX_SPEC]);
 
-  const sunDir = useMemo(() => getSunDirection(new Date()), []);
   const scale = useMemo(
     () => Math.min(viewport.width, viewport.height) * scaleFactor,
     [viewport, scaleFactor],
@@ -755,6 +754,14 @@ function EarthScene({
     }
     return new THREE.Euler(tilt, 0, 0);
   }, [lat, lon]);
+
+  // Sun direction: compute in model space, then rotate to world space
+  // so the day/night terminator matches the globe's visual rotation
+  const sunDirModel = useMemo(() => getSunDirection(new Date()), []);
+  const sunDir = useMemo(
+    () => sunDirModel.clone().applyEuler(rotation).normalize(),
+    [sunDirModel, rotation],
+  );
 
   const earthUniforms = useMemo(() => {
     if (!textures) return null;
