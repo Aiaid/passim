@@ -31,16 +31,16 @@ export function NodeDetailPanel({ open, onOpenChange }: NodeDetailPanelProps) {
 
   const sections = [
     {
-      title: t('dashboard.node_info', 'Node'),
+      title: t('dashboard.node_info'),
       icon: Server,
       fields: [
-        { label: t('dashboard.node_name', 'Name'), value: node.name },
-        { label: t('dashboard.version', 'Version'), value: `v${node.version}` },
-        { label: t('dashboard.uptime', 'Uptime'), value: formatUptime(node.uptime) },
+        { label: t('dashboard.node_name'), value: node.name },
+        { label: t('dashboard.version'), value: `v${node.version}` },
+        { label: t('dashboard.uptime'), value: formatUptime(node.uptime) },
       ],
     },
     {
-      title: t('dashboard.network', 'Network'),
+      title: t('dashboard.network'),
       icon: Globe,
       fields: [
         ...(node.public_ip
@@ -55,7 +55,7 @@ export function NodeDetailPanel({ open, onOpenChange }: NodeDetailPanelProps) {
         ...(node.latitude && node.longitude
           ? [
               {
-                label: t('dashboard.coordinates', 'Coordinates'),
+                label: t('dashboard.coordinates'),
                 value: `${node.latitude.toFixed(2)}, ${node.longitude.toFixed(2)}`,
                 mono: true,
               },
@@ -64,42 +64,42 @@ export function NodeDetailPanel({ open, onOpenChange }: NodeDetailPanelProps) {
       ],
     },
     {
-      title: t('dashboard.system', 'System'),
+      title: t('dashboard.system'),
       icon: Cpu,
       fields: [
-        { label: t('dashboard.cpu_model', 'CPU'), value: system.cpu.model },
-        { label: t('dashboard.cores', 'Cores'), value: `${system.cpu.cores}` },
+        { label: t('dashboard.cpu_model'), value: system.cpu.model },
+        { label: t('dashboard.cores'), value: `${system.cpu.cores}` },
         {
-          label: t('dashboard.memory', 'Memory'),
+          label: t('dashboard.memory'),
           value: formatBytes(system.memory.total_bytes),
         },
         {
-          label: t('dashboard.disk', 'Disk'),
+          label: t('dashboard.disk'),
           value: formatBytes(system.disk.total_bytes),
         },
-        { label: 'OS', value: system.os },
-        { label: 'Kernel', value: system.kernel, mono: true },
+        { label: t('dashboard.os'), value: system.os },
+        { label: t('dashboard.kernel'), value: system.kernel, mono: true },
       ],
     },
     {
-      title: t('dashboard.load', 'Load Average'),
+      title: t('dashboard.load'),
       icon: Gauge,
       fields: [
-        { label: '1 min', value: system.load.load1.toFixed(2) },
-        { label: '5 min', value: system.load.load5.toFixed(2) },
-        { label: '15 min', value: system.load.load15.toFixed(2) },
+        { label: t('dashboard.load_1m'), value: system.load.load1.toFixed(2) },
+        { label: t('dashboard.load_5m'), value: system.load.load5.toFixed(2) },
+        { label: t('dashboard.load_15m'), value: system.load.load15.toFixed(2) },
       ],
     },
     {
-      title: t('dashboard.containers', 'Containers'),
+      title: t('dashboard.containers'),
       icon: Container,
       fields: [
         {
-          label: t('dashboard.running', 'Running'),
+          label: t('dashboard.running'),
           value: `${containers.running}`,
         },
         {
-          label: t('dashboard.total', 'Total'),
+          label: t('dashboard.total'),
           value: `${containers.total}`,
         },
       ],

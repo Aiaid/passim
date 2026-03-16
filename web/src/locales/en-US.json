@@ -16,7 +16,9 @@
     "confirm": "Confirm",
     "search": "Search...",
     "no_data": "No data",
-    "actions": "Actions"
+    "actions": "Actions",
+    "on": "On",
+    "off": "Off"
   },
   "settings": {
     "title": "Settings",
@@ -89,7 +91,24 @@
     "running_of_total": "{{running}}/{{total}} running",
     "no_apps": "No apps deployed",
     "no_apps_desc": "Deploy your first app from the marketplace",
-    "node_info": "Node Info"
+    "node_info": "Node Info",
+    "node_name": "Name",
+    "version": "Version",
+    "uptime": "Uptime",
+    "coordinates": "Coordinates",
+    "system": "System",
+    "cpu_model": "CPU",
+    "cores": "Cores",
+    "os": "OS",
+    "kernel": "Kernel",
+    "load": "Load Average",
+    "load_1m": "1 min",
+    "load_5m": "5 min",
+    "load_15m": "15 min",
+    "running": "Running",
+    "total": "Total",
+    "rx": "↓ RX",
+    "tx": "↑ TX"
   },
   "container": {
     "title": "Containers",
@@ -108,7 +127,8 @@
     "confirm_remove": "Are you sure you want to remove container {{name}}? This cannot be undone.",
     "confirm_remove_title": "Remove Container",
     "no_containers": "No containers",
-    "no_containers_desc": "Containers will appear here after deploying apps"
+    "no_containers_desc": "Containers will appear here after deploying apps",
+    "id": "ID"
   },
   "app": {
     "title": "Apps",

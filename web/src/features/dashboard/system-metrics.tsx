@@ -150,13 +150,13 @@ export function SystemMetrics() {
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">↓ RX</span>
+              <span className="text-xs text-muted-foreground">{t('dashboard.rx')}</span>
               <span className="text-sm font-bold tabular-nums">
                 {formatBytes(latest.net_bytes_recv ?? 0)}/s
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">↑ TX</span>
+              <span className="text-xs text-muted-foreground">{t('dashboard.tx')}</span>
               <span className="text-sm font-bold tabular-nums">
                 {formatBytes(latest.net_bytes_sent ?? 0)}/s
               </span>

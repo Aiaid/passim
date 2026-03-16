@@ -16,7 +16,9 @@
     "confirm": "确认",
     "search": "搜索...",
     "no_data": "暂无数据",
-    "actions": "操作"
+    "actions": "操作",
+    "on": "开启",
+    "off": "关闭"
   },
   "settings": {
     "title": "设置",
@@ -89,7 +91,24 @@
     "running_of_total": "{{running}}/{{total}} 运行中",
     "no_apps": "尚未部署应用",
     "no_apps_desc": "从模板市场部署你的第一个应用",
-    "node_info": "节点信息"
+    "node_info": "节点信息",
+    "node_name": "名称",
+    "version": "版本",
+    "uptime": "运行时间",
+    "coordinates": "坐标",
+    "system": "系统",
+    "cpu_model": "CPU",
+    "cores": "核心数",
+    "os": "操作系统",
+    "kernel": "内核",
+    "load": "负载均值",
+    "load_1m": "1 分钟",
+    "load_5m": "5 分钟",
+    "load_15m": "15 分钟",
+    "running": "运行中",
+    "total": "总计",
+    "rx": "↓ 接收",
+    "tx": "↑ 发送"
   },
   "container": {
     "title": "容器",
@@ -108,7 +127,8 @@
     "confirm_remove": "确定要删除容器 {{name}} 吗？此操作不可撤销。",
     "confirm_remove_title": "删除容器",
     "no_containers": "没有容器",
-    "no_containers_desc": "部署应用后将在此显示容器"
+    "no_containers_desc": "部署应用后将在此显示容器",
+    "id": "ID"
   },
   "app": {
     "title": "应用",

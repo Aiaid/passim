@@ -108,7 +108,7 @@ export function AppSettingsForm({ appId, currentSettings, settingsSchema }: AppS
                 <span className="text-sm text-muted-foreground">{label}</span>
                 <span className="text-sm font-medium">
                   {s.type === 'boolean'
-                    ? value ? 'On' : 'Off'
+                    ? value ? t('common.on') : t('common.off')
                     : sensitive ? maskValue(value) : String(value ?? '-')}
                 </span>
               </div>

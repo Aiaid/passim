@@ -199,7 +199,7 @@ function InfoTab({ container, state }: { container: Container; state: string }) 
     { label: t('container.state'), value: <StatusBadge status={state} /> },
     { label: t('container.status'), value: container.Status },
     { label: t('container.image'), value: container.Image, mono: true },
-    { label: 'ID', value: container.Id.slice(0, 12), mono: true },
+    { label: t('container.id'), value: container.Id.slice(0, 12), mono: true },
     { label: t('container.created_at'), value: created.toLocaleString() },
   ];
 

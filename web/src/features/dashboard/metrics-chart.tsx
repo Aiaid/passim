@@ -25,8 +25,8 @@ interface TooltipPayloadEntry {
 }
 
 const SERIES = [
-  { key: 'cpu', label: 'CPU', colorVar: '--color-chart-1' },
-  { key: 'memory', label: 'Memory', colorVar: '--color-chart-2' },
+  { key: 'cpu', labelKey: 'dashboard.cpu', colorVar: '--color-chart-1' },
+  { key: 'memory', labelKey: 'dashboard.memory', colorVar: '--color-chart-2' },
 ] as const;
 
 // Buffer = 60 points (5 min @ 5s intervals). Always show the full range.
@@ -54,6 +54,7 @@ function CustomTooltip(props: {
   payload?: TooltipPayloadEntry[];
   label?: number;
 }) {
+  const { t } = useTranslation();
   const { active, payload, label } = props;
   if (!active || !payload?.length || label === undefined) return null;
 
@@ -69,7 +70,7 @@ function CustomTooltip(props: {
             style={{ backgroundColor: entry.color }}
           />
           <span className="text-muted-foreground">
-            {entry.dataKey === 'cpu' ? 'CPU' : 'Memory'}
+            {entry.dataKey === 'cpu' ? t('dashboard.cpu') : t('dashboard.memory')}
           </span>
           <span className="ml-auto font-bold tabular-nums">
             {entry.value}%
@@ -112,7 +113,7 @@ export function MetricsChart({ className }: { className?: string }) {
                   className="size-2 rounded-full"
                   style={{ backgroundColor: `var(${s.colorVar})` }}
                 />
-                <span className="text-xs text-muted-foreground">{s.label}</span>
+                <span className="text-xs text-muted-foreground">{t(s.labelKey)}</span>
               </div>
             ))}
           </div>
