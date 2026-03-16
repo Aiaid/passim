@@ -52,6 +52,21 @@ func (b *Broker) Subscribe(topics ...string) *Subscriber {
 	return sub
 }
 
+// SubscribeAll creates a subscriber that receives events on all topics.
+// Call Unsubscribe when done.
+func (b *Broker) SubscribeAll() *Subscriber {
+	sub := &Subscriber{
+		ch:     make(chan Event, 64),
+		topics: nil, // nil means all topics
+	}
+
+	b.mu.Lock()
+	b.subscribers[sub] = struct{}{}
+	b.mu.Unlock()
+
+	return sub
+}
+
 // Unsubscribe removes a subscriber and closes its channel.
 func (b *Broker) Unsubscribe(sub *Subscriber) {
 	b.mu.Lock()
@@ -66,7 +81,7 @@ func (b *Broker) Publish(event Event) {
 	defer b.mu.RUnlock()
 
 	for sub := range b.subscribers {
-		if sub.topics[event.Topic] {
+		if sub.topics == nil || sub.topics[event.Topic] {
 			select {
 			case sub.ch <- event:
 			default:

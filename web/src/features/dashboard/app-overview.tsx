@@ -7,12 +7,13 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { useAppsSummary } from './queries';
+import { useEventStream } from '@/hooks/use-event-stream';
 
 export function AppOverview({ className }: { className?: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data: apps, isLoading } = useAppsSummary();
+  const { apps } = useEventStream();
+  const isLoading = apps === null;
 
   return (
     <Card className={cn('flex flex-col overflow-hidden', className)}>

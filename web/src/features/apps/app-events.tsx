@@ -4,7 +4,7 @@ import { Circle, Wifi, WifiOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/shared/empty-state';
-import { useSSE } from '@/hooks/use-sse';
+import { useEventStream, useResourceEvents } from '@/hooks/use-event-stream';
 
 interface AppEvent {
   type: string;
@@ -20,11 +20,16 @@ export function AppEvents({ appId }: AppEventsProps) {
   const { t } = useTranslation();
   const [events, setEvents] = useState<AppEvent[]>([]);
 
-  const { isConnected } = useSSE<AppEvent>(`/apps/${appId}/events`, {
-    onMessage: (raw) => {
-      const event = raw as AppEvent;
-      setEvents((prev) => [event, ...prev]);
-    },
+  const { isConnected } = useEventStream();
+
+  useResourceEvents(`app:${appId}`, (raw) => {
+    const wrapper = raw as { type: string; data: string };
+    const event: AppEvent = {
+      type: wrapper.type,
+      data: typeof wrapper.data === 'string' ? wrapper.data : JSON.stringify(wrapper.data),
+      timestamp: new Date().toISOString(),
+    };
+    setEvents((prev) => [event, ...prev]);
   });
 
   return (

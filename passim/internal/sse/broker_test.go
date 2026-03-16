@@ -167,6 +167,54 @@ func TestConcurrentPublish(t *testing.T) {
 	}
 }
 
+func TestSubscribeAll(t *testing.T) {
+	b := NewBroker()
+
+	// SubscribeAll should receive events on any topic
+	allSub := b.SubscribeAll()
+	defer b.Unsubscribe(allSub)
+
+	// Regular subscriber should only receive its own topic
+	topicSub := b.Subscribe("metrics")
+	defer b.Unsubscribe(topicSub)
+
+	b.Publish(Event{Topic: "metrics", Data: "m1"})
+	b.Publish(Event{Topic: "tasks", Data: "t1"})
+	b.Publish(Event{Topic: "app:xyz", Data: "a1"})
+
+	// allSub should get all 3
+	got := make([]string, 0, 3)
+	for i := 0; i < 3; i++ {
+		select {
+		case e := <-allSub.Chan():
+			got = append(got, e.Data)
+		case <-time.After(time.Second):
+			t.Fatalf("allSub timeout after %d events", i)
+		}
+	}
+	if len(got) != 3 {
+		t.Fatalf("allSub got %d events, want 3", len(got))
+	}
+
+	// topicSub should only get "m1"
+	select {
+	case e := <-topicSub.Chan():
+		if e.Data != "m1" {
+			t.Errorf("topicSub got %q, want m1", e.Data)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("topicSub timeout")
+	}
+
+	// topicSub should NOT get the other events
+	select {
+	case e := <-topicSub.Chan():
+		t.Errorf("topicSub unexpectedly got: %v", e)
+	case <-time.After(50 * time.Millisecond):
+		// expected
+	}
+}
+
 func TestPublishNoSubscribers(t *testing.T) {
 	b := NewBroker()
 	// Should not panic

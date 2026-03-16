@@ -5,7 +5,6 @@ export function useContainers() {
   return useQuery({
     queryKey: ['containers'],
     queryFn: () => api.getContainers(),
-    refetchInterval: 10_000,
   });
 }
 

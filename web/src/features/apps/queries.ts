@@ -8,7 +8,6 @@ export function useApps() {
   return useQuery({
     queryKey: ['apps'],
     queryFn: () => api.getApps(),
-    refetchInterval: 15_000,
   });
 }
 

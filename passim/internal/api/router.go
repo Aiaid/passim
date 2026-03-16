@@ -103,8 +103,11 @@ func NewRouter(deps Deps) http.Handler {
 			// App events
 			protected.GET("/apps/:id/events", appEventsHandler(deps))
 
-			// Metrics stream
+			// Metrics stream (legacy — kept for backward compat)
 			protected.GET("/metrics/stream", metricsStreamHandler(deps))
+
+			// Unified SSE stream (replaces metrics/stream + polling)
+			protected.GET("/stream", unifiedStreamHandler(deps))
 
 			// SSL routes
 			if deps.SSL != nil {

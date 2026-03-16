@@ -6,20 +6,27 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en-US' } }),
 }));
 
-let capturedOnMessage: ((data: unknown) => void) | undefined;
 let mockIsConnected = false;
+let capturedResourceHandler: ((data: unknown) => void) | undefined;
 
-vi.mock('@/hooks/use-sse', () => ({
-  useSSE: vi.fn((_path: string, options?: { onMessage?: (data: unknown) => void }) => {
-    capturedOnMessage = options?.onMessage;
-    return { data: null, isConnected: mockIsConnected };
+vi.mock('@/hooks/use-event-stream', () => ({
+  useEventStream: vi.fn(() => ({
+    metrics: null,
+    metricsHistory: [],
+    status: null,
+    containers: null,
+    apps: null,
+    isConnected: mockIsConnected,
+  })),
+  useResourceEvents: vi.fn((_topic: string, handler: (data: unknown) => void) => {
+    capturedResourceHandler = handler;
   }),
 }));
 
 describe('AppEvents', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    capturedOnMessage = undefined;
+    capturedResourceHandler = undefined;
     mockIsConnected = false;
   });
 
@@ -45,14 +52,14 @@ describe('AppEvents', () => {
   it('accumulates events in reverse order (newest first)', () => {
     render(<AppEvents appId="app-1" />);
 
-    expect(capturedOnMessage).toBeDefined();
+    expect(capturedResourceHandler).toBeDefined();
 
     act(() => {
-      capturedOnMessage!({ type: 'deploy', data: 'First event', timestamp: '2026-03-14T10:00:00Z' });
+      capturedResourceHandler!({ type: 'deploy', data: 'First event' });
     });
 
     act(() => {
-      capturedOnMessage!({ type: 'health', data: 'Second event', timestamp: '2026-03-14T10:01:00Z' });
+      capturedResourceHandler!({ type: 'health', data: 'Second event' });
     });
 
     // Both events should be visible

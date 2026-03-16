@@ -99,8 +99,7 @@ web/src/
 │       ├── ssl-settings.tsx
 │       └── iperf-settings.tsx            # iperf3 测速服务开关
 ├── hooks/                                # 自定义 Hooks
-│   ├── use-sse.ts                        # SSE 实时数据
-│   ├── use-metrics-stream.ts            # 指标流 + 60条缓冲
+│   ├── use-event-stream.tsx             # 统一 SSE 流: EventStreamProvider + useEventStream + useResourceEvents
 │   ├── use-mobile.ts                     # 响应式检测
 │   └── use-theme.ts                      # 主题切换
 ├── lib/                                  # 工具库
@@ -338,31 +337,23 @@ export const api = {
 };
 ```
 
-### SSE Hook `hooks/use-sse.ts`
+### 统一 SSE 流 `hooks/use-event-stream.tsx`
+
+单一 `EventSource` 连接到 `/api/stream`，替代之前的多 SSE 连接 + HTTP 轮询。
 
 ```tsx
-export function useSSE<T>(url: string, options?: { enabled?: boolean }) {
-  const [data, setData] = useState<T | null>(null);
+// EventStreamProvider — 在 AuthGuard 内包裹整个应用
+// 连接建立时后端推送全量快照，之后按事件类型定时推送
 
-  useEffect(() => {
-    if (options?.enabled === false) return;
+// 消费全局数据（metrics, status, containers, apps）
+const { metrics, metricsHistory, status, containers, apps, isConnected } = useEventStream();
 
-    const token = localStorage.getItem('token');
-    const source = new EventSource(`${url}?token=${token}`);
-
-    source.onmessage = (e) => setData(JSON.parse(e.data));
-    source.onerror = () => {
-      source.close();
-      // 3s 后重连
-      setTimeout(() => { /* 重新创建 EventSource */ }, 3000);
-    };
-
-    return () => source.close();
-  }, [url, options?.enabled]);
-
-  return data;
-}
+// 订阅动态事件（部署进度等）
+useResourceEvents('app:abc-123', (data) => { /* handle */ });
+useResourceEvents('task:xyz-789', (data) => { /* handle */ });
 ```
+
+SSE 数据同时通过 `queryClient.setQueryData()` 写入 React Query 缓存，确保 mutation 的 `invalidateQueries` 仍然生效。断线 3s 后自动重连。
 
 ### 动态表单 `components/app/app-form.tsx`
 

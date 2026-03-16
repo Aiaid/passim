@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useContainersSummary } from './queries';
+import { useEventStream } from '@/hooks/use-event-stream';
 
 const MAX_SHOWN = 5;
 
@@ -16,7 +16,8 @@ function containerName(names: string[]): string {
 export function ContainerSummary() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data: containers, isLoading } = useContainersSummary();
+  const { containers } = useEventStream();
+  const isLoading = containers === null;
 
   const runningCount = containers?.filter((c) => c.State === 'running').length ?? 0;
   const totalCount = containers?.length ?? 0;

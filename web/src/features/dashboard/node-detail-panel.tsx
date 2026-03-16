@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { formatBytes, formatUptime } from '@/lib/utils';
-import { useStatus } from './queries';
+import { useEventStream } from '@/hooks/use-event-stream';
 
 interface NodeDetailPanelProps {
   open: boolean;
@@ -23,7 +23,7 @@ function countryFlag(code: string): string {
 
 export function NodeDetailPanel({ open, onOpenChange }: NodeDetailPanelProps) {
   const { t } = useTranslation();
-  const { data: status } = useStatus();
+  const { status } = useEventStream();
 
   if (!status) return null;
 

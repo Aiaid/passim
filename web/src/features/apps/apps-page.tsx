@@ -9,14 +9,15 @@ import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import type { AppResponse } from '@/lib/api-client';
-import { useApps } from './queries';
+import { useEventStream } from '@/hooks/use-event-stream';
 import { AppCard } from './app-card';
 import { AppDetailPanel } from './app-detail-panel';
 
 export function AppsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data: apps, isLoading } = useApps();
+  const { apps } = useEventStream();
+  const isLoading = apps === null;
   const { data: templates } = useQuery({
     queryKey: ['templates'],
     queryFn: () => api.getTemplates(),

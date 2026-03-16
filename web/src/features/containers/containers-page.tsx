@@ -3,12 +3,13 @@ import { Container } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { CardGridSkeleton } from '@/components/shared/loading-skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
-import { useContainers } from './queries';
+import { useEventStream } from '@/hooks/use-event-stream';
 import { ContainerList } from './container-list';
 
 export function ContainersPage() {
   const { t } = useTranslation();
-  const { data: containers, isLoading } = useContainers();
+  const { containers } = useEventStream();
+  const isLoading = containers === null;
 
   return (
     <div className="space-y-6">

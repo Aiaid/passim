@@ -173,14 +173,46 @@ golang.org/x/crypto/acme/autocert -- ACME 客户端 (Let's Encrypt) ✅
 > Phase 1 实现不含 `services` 和 `remote_nodes` 字段。`network` 不含 rate 字段。这些将在 Phase 2/3 补充。
 > `public_ip` / `public_ip6` / `country` 在首次请求时懒加载 (sync.Once)，通过外部服务发现 (api4.ipify.org / api6.ipify.org)，国家通过 ip-api.com 查询。
 
-#### `GET /api/metrics/stream` (SSE) ✅ Phase 1
+#### `GET /api/stream` (统一 SSE) ✅ Phase 1
+
+单一 SSE 连接，通过 event name 区分数据类型。连接建立时立即推送全量快照。
+
+| SSE event name | 推送方式 | Payload |
+|---|---|---|
+| `metrics` | 5s 定时 | `SystemMetrics` JSON |
+| `status` | 30s 定时 | `statusResponse` JSON |
+| `containers` | 10s 定时 | `[]Container` JSON |
+| `apps` | 15s 定时 | `[]appResponse` JSON |
+| `task:{id}` | 实时 (Broker) | `{"type":"...","data":{...}}` |
+| `app:{id}` | 实时 (Broker) | `{"type":"...","data":{...}}` |
+
+```
+event: metrics
+data: {"hostname":"...","cpu_percent":23.5,"mem_percent":37.5,...}
+
+event: status
+data: {"node":{...},"system":{...},"containers":{...}}
+
+event: containers
+data: [{"id":"abc","name":"nginx","state":"running",...}]
+
+event: apps
+data: [{"id":"...","template":"wireguard","status":"running",...}]
+
+event: app:abc-123
+data: {"type":"deploy","data":{"status":"running"}}
+```
+
+> 后端使用 `http.ResponseController` 禁用 SSE 连接的 WriteDeadline。metrics 收集在独立 goroutine 中运行（~1s 阻塞不影响其他事件推送）。status 事件复用 metrics 缓存避免重复采集。
+
+#### `GET /api/metrics/stream` (SSE, legacy) ✅ Phase 1
 
 ```
 event: metrics
 data: {"hostname":"...","cpu_percent":23.5,"mem_percent":37.5,...,"timestamp":"2026-03-12T10:00:05Z"}
 ```
 
-立即发送一次初始指标，之后每 5 秒推送一次。SSE 格式 (`text/event-stream`)。
+立即发送一次初始指标，之后每 5 秒推送一次。SSE 格式 (`text/event-stream`)。已被 `/api/stream` 替代，保留用于向后兼容。
 
 ### 容器管理 ✅ Phase 1
 
@@ -283,7 +315,7 @@ data: {"hostname":"...","cpu_percent":23.5,"mem_percent":37.5,...,"timestamp":"2
 { "status": "deleted" }
 ```
 
-#### `GET /api/apps/:id/events` (SSE) ✅ Phase 1
+#### `GET /api/apps/:id/events` (SSE, legacy) ✅ Phase 1
 
 ```
 event: progress
@@ -293,7 +325,7 @@ event: deploy
 data: {"status":"running"}
 ```
 
-当 SSE broker 未启用时返回 503。
+当 SSE broker 未启用时返回 503。已被 `/api/stream` 的 `app:{id}` 事件替代，保留用于向后兼容。
 
 #### `GET /api/apps/:id/configs`
 
@@ -321,9 +353,9 @@ data: {"status":"running"}
 
 返回单个任务详情。404 if not found。
 
-#### `GET /api/tasks/:id/events` (SSE)
+#### `GET /api/tasks/:id/events` (SSE, legacy)
 
-订阅 `task:{id}` topic 的 SSE 事件流。当 SSE broker 未启用时返回 503。
+订阅 `task:{id}` topic 的 SSE 事件流。当 SSE broker 未启用时返回 503。已被 `/api/stream` 的 `task:{id}` 事件替代，保留用于向后兼容。
 
 ### 测速 ✅ Phase 1
 

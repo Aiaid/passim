@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Card, CardContent } from '@/components/ui/card';
-import { useMetricsStream } from '@/hooks/use-metrics-stream';
+import { useEventStream } from '@/hooks/use-event-stream';
 
 interface DataPoint {
   idx: number;
@@ -82,7 +82,7 @@ function CustomTooltip(props: {
 
 export function MetricsChart({ className }: { className?: string }) {
   const { t } = useTranslation();
-  const { history } = useMetricsStream();
+  const { metricsHistory: history } = useEventStream();
 
   // Map data so the newest point is always at idx=59, oldest fills leftward.
   const chartData = useMemo<DataPoint[]>(

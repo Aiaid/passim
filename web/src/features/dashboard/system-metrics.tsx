@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Cpu, MemoryStick, HardDrive, Network } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useMetricsStream } from '@/hooks/use-metrics-stream';
+import { useEventStream } from '@/hooks/use-event-stream';
 import { formatBytes } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 
@@ -85,7 +85,7 @@ function GaugeCard({ label, percent, detail, icon: Icon, color }: GaugeCardProps
 
 export function SystemMetrics() {
   const { t } = useTranslation();
-  const { latest, isConnected } = useMetricsStream();
+  const { metrics: latest, isConnected } = useEventStream();
 
   if (!isConnected || !latest) {
     return (
