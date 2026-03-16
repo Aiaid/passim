@@ -141,6 +141,8 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, cfg *ContainerConf
 		return "", fmt.Errorf("create container: %w", err)
 	}
 	if err := c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		// Clean up the created container so it doesn't become an orphan
+		_ = c.cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
 		return "", fmt.Errorf("start container: %w", err)
 	}
 	return resp.ID, nil
