@@ -271,6 +271,8 @@ export interface RemoteNode {
   address: string;
   status: 'connecting' | 'connected' | 'disconnected';
   country?: string;
+  latitude?: number;
+  longitude?: number;
   last_seen?: string;
   created_at: string;
   metrics?: {

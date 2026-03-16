@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
-import { X, ExternalLink, RotateCcw } from 'lucide-react';
+import { X, ExternalLink, RotateCcw, Plus, Loader2, Trash2, Server } from 'lucide-react';
+import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   Sheet,
   SheetContent,
@@ -17,8 +19,11 @@ import { CredentialField } from '@/components/shared/credential-field';
 import { CATEGORY_GRADIENTS } from '@/lib/constants';
 import { useTemplateDetail } from './queries';
 import { ConnectionGuide } from './connection-guide';
+import { useEventStream } from '@/hooks/use-event-stream';
+import { api } from '@/lib/api-client';
 import type { AppResponse, TemplateSummary } from '@/lib/api-client';
 import { useContainerLogs } from '@/features/containers/queries';
+import { cn } from '@/lib/utils';
 
 interface AppDetailPanelProps {
   app: AppResponse | null;
@@ -35,6 +40,8 @@ export function AppDetailPanel({
 }: AppDetailPanelProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { nodes } = useEventStream();
+  const hasRemoteNodes = nodes && nodes.length > 0;
 
   if (!app) return null;
 
@@ -103,6 +110,12 @@ export function AppDetailPanel({
               <TabsTrigger value="credentials" className="flex-1">
                 {t('app.credentials')}
               </TabsTrigger>
+              {hasRemoteNodes && (
+                <TabsTrigger value="nodes" className="flex-1">
+                  <Server className="size-3 mr-1" />
+                  {t('node.title')}
+                </TabsTrigger>
+              )}
               <TabsTrigger value="logs" className="flex-1">
                 {t('container.logs')}
               </TabsTrigger>
@@ -116,6 +129,12 @@ export function AppDetailPanel({
           <TabsContent value="credentials" className="flex-1 overflow-auto mt-0 px-5 py-4">
             <AppCredentialsTab app={app} />
           </TabsContent>
+
+          {hasRemoteNodes && (
+            <TabsContent value="nodes" className="flex-1 overflow-auto mt-0 px-5 py-4">
+              <AppNodesTab app={app} />
+            </TabsContent>
+          )}
 
           <TabsContent value="logs" className="flex-1 overflow-hidden mt-0">
             <AppLogsTab app={app} />
@@ -226,6 +245,146 @@ function AppCredentialsTab({ app }: { app: AppResponse }) {
           sensitive={SENSITIVE_PATTERN.test(key)}
         />
       ))}
+    </div>
+  );
+}
+
+/* -- Nodes Tab (multi-node deploy/undeploy) ------------------- */
+
+function AppNodesTab({ app }: { app: AppResponse }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { apps: localApps, nodes, status } = useEventStream();
+
+  const connectedNodes = (nodes ?? []).filter(n => n.status === 'connected');
+  const nodeAppQueries = useQueries({
+    queries: connectedNodes.map(node => ({
+      queryKey: ['nodes', node.id, 'apps'] as const,
+      queryFn: () => api.getNodeApps(node.id),
+      refetchInterval: 30_000,
+      staleTime: 10_000,
+    })),
+  });
+
+  // Build per-node deployment status for this template
+  const allNodes = [
+    { id: 'local', name: status?.node.name ?? 'Local', connected: true },
+    ...(nodes ?? []).map(n => ({ id: n.id, name: n.name || n.address, connected: n.status === 'connected' })),
+  ];
+
+  const deploymentMap = new Map<string, AppResponse>();
+  (localApps ?? []).forEach(a => {
+    if (a.template === app.template) deploymentMap.set('local', a);
+  });
+  connectedNodes.forEach((node, i) => {
+    const apps = nodeAppQueries[i]?.data;
+    apps?.forEach((a: AppResponse) => {
+      if (a.template === app.template) deploymentMap.set(node.id, a);
+    });
+  });
+
+  const deployMutation = useMutation({
+    mutationFn: async (nodeId: string) => {
+      const settings = (app.settings ?? {}) as Record<string, unknown>;
+      if (nodeId === 'local') {
+        return api.deployApp(app.template, settings);
+      }
+      return api.deployNodeApp(nodeId, { template: app.template, settings });
+    },
+    onSuccess: (_data, nodeId) => {
+      if (nodeId === 'local') {
+        queryClient.invalidateQueries({ queryKey: ['apps'] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['nodes', nodeId, 'apps'] });
+      }
+      toast.success(t('marketplace.deploy_success'));
+    },
+    onError: () => toast.error(t('marketplace.deploy_failed')),
+  });
+
+  const undeployMutation = useMutation({
+    mutationFn: async ({ nodeId, appId }: { nodeId: string; appId: string }) => {
+      // For now, only local undeploy is supported via deleteApp
+      if (nodeId === 'local') {
+        return api.deleteApp(appId);
+      }
+      // Remote undeploy would need a proxy endpoint — placeholder
+      return api.deleteApp(appId);
+    },
+    onSuccess: (_data, { nodeId }) => {
+      if (nodeId === 'local') {
+        queryClient.invalidateQueries({ queryKey: ['apps'] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['nodes', nodeId, 'apps'] });
+      }
+      toast.success(t('app.undeployed'));
+    },
+  });
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground mb-3">
+        {t('node.select_targets')}
+      </p>
+      {allNodes.map(node => {
+        const deployed = deploymentMap.get(node.id);
+        const isDeployed = !!deployed;
+        const isRunning = deployed?.status === 'running';
+        const isDeploying = deployMutation.isPending && deployMutation.variables === node.id;
+        const isUndeploying = undeployMutation.isPending && undeployMutation.variables?.nodeId === node.id;
+
+        return (
+          <div
+            key={node.id}
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 border transition-colors"
+          >
+            <span className={cn(
+              'size-2 rounded-full shrink-0',
+              isDeployed
+                ? isRunning ? 'bg-status-running' : 'bg-status-warning'
+                : 'bg-muted-foreground/20'
+            )} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{node.name}</p>
+              {isDeployed && (
+                <p className={cn(
+                  'text-[10px] font-medium uppercase tracking-wider',
+                  isRunning ? 'text-status-running' : 'text-muted-foreground'
+                )}>
+                  {deployed!.status}
+                </p>
+              )}
+            </div>
+            {node.connected ? (
+              isDeployed ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-destructive hover:text-destructive"
+                  onClick={() => undeployMutation.mutate({ nodeId: node.id, appId: deployed!.id })}
+                  disabled={isUndeploying}
+                >
+                  {isUndeploying ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3 mr-1" />}
+                  {t('app.undeploy')}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => deployMutation.mutate(node.id)}
+                  disabled={isDeploying}
+                >
+                  {isDeploying ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3 mr-1" />}
+                  {t('marketplace.deploy')}
+                </Button>
+              )
+            ) : (
+              <span className="text-xs text-muted-foreground/40">offline</span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

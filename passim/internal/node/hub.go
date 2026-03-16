@@ -23,6 +23,8 @@ type NodeInfo struct {
 	Address    string          `json:"address"`
 	Status     string          `json:"status"`
 	Country    string          `json:"country,omitempty"`
+	Latitude   float64         `json:"latitude"`
+	Longitude  float64         `json:"longitude"`
 	LastSeen   string          `json:"last_seen,omitempty"`
 	CreatedAt  string          `json:"created_at"`
 	Metrics    *NodeMetrics    `json:"metrics,omitempty"`
@@ -72,6 +74,8 @@ type RemoteConn struct {
 	info       db.RemoteNode
 	status     string // connecting, connected, disconnected
 	lastSeen   time.Time
+	latitude   float64
+	longitude  float64
 	metrics    *NodeMetrics
 	containers []NodeContainer
 	token      string // JWT from remote login
@@ -375,6 +379,8 @@ func (h *Hub) buildNodeInfo(rc *RemoteConn) *NodeInfo {
 		Address:   rc.info.Address,
 		Status:    rc.status,
 		Country:   rc.info.Country,
+		Latitude:  rc.latitude,
+		Longitude: rc.longitude,
 		CreatedAt: rc.info.CreatedAt,
 	}
 

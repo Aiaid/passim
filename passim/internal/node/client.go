@@ -17,14 +17,27 @@ import (
 	"github.com/passim/passim/internal/sse"
 )
 
-// defaultHTTPClient returns an http.Client that skips TLS verification
+// defaultTransport returns an http.Transport that skips TLS verification
 // (remote Passim nodes use self-signed certificates by default).
+func defaultTransport() *http.Transport {
+	return &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+}
+
+// defaultHTTPClient returns an http.Client for normal API calls (30s timeout).
 func defaultHTTPClient() *http.Client {
 	return &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
+		Timeout:   30 * time.Second,
+		Transport: defaultTransport(),
+	}
+}
+
+// sseHTTPClient returns an http.Client for long-lived SSE streams (no timeout).
+// Cancellation is handled via context instead.
+func sseHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: defaultTransport(),
 	}
 }
 
@@ -136,7 +149,6 @@ func (h *Hub) subscribeSSE(ctx context.Context, rc *RemoteConn) error {
 	address := rc.info.Address
 	token := rc.token
 	rcScheme := rc.scheme
-	client := rc.httpClient
 	nodeID := rc.info.ID
 	rc.mu.RUnlock()
 
@@ -158,7 +170,10 @@ func (h *Hub) subscribeSSE(ctx context.Context, rc *RemoteConn) error {
 	}
 	req.Header.Set("Accept", "text/event-stream")
 
-	resp, err := client.Do(req)
+	// Use a dedicated SSE client without Timeout — the normal client's
+	// 30s Timeout kills the long-lived SSE stream.
+	sseClient := sseHTTPClient()
+	resp, err := sseClient.Do(req)
 	if err != nil {
 		sseCancel()
 		return fmt.Errorf("SSE connect: %w", err)
@@ -244,17 +259,27 @@ func (h *Hub) handleSSEEvent(rc *RemoteConn, nodeID, eventType, data string) {
 		}
 
 	case "status":
-		// Extract country from status event
+		// Extract country and coordinates from status event
 		var statusResp struct {
 			Node struct {
-				Country string `json:"country"`
+				Country   string  `json:"country"`
+				Latitude  float64 `json:"latitude"`
+				Longitude float64 `json:"longitude"`
 			} `json:"node"`
 		}
-		if err := json.Unmarshal([]byte(data), &statusResp); err == nil && statusResp.Node.Country != "" {
+		if err := json.Unmarshal([]byte(data), &statusResp); err == nil {
 			rc.mu.Lock()
-			rc.info.Country = statusResp.Node.Country
+			if statusResp.Node.Country != "" {
+				rc.info.Country = statusResp.Node.Country
+			}
+			if statusResp.Node.Latitude != 0 || statusResp.Node.Longitude != 0 {
+				rc.latitude = statusResp.Node.Latitude
+				rc.longitude = statusResp.Node.Longitude
+			}
 			rc.mu.Unlock()
-			_ = db.UpdateRemoteNodeLastSeen(h.db, nodeID, statusResp.Node.Country)
+			if statusResp.Node.Country != "" {
+				_ = db.UpdateRemoteNodeLastSeen(h.db, nodeID, statusResp.Node.Country)
+			}
 		}
 
 		if h.broker != nil {

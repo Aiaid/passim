@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback, Fragment } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import { useQuery } from '@tanstack/react-query';
@@ -163,6 +163,52 @@ function countryFlag(code: string): string {
   return [...code.toUpperCase()]
     .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
     .join('');
+}
+
+// ── Node clustering ──────────────────────────────────────────────────
+interface NodeEntry {
+  id: string;
+  lat: number;
+  lon: number;
+  type: 'local' | 'remote';
+  localData?: StatusResponse;
+  remoteData?: RemoteNode;
+}
+
+interface NodeCluster {
+  centroid: [number, number];
+  members: NodeEntry[];
+}
+
+function angularDist(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const dLat = lat2 - lat1;
+  const dLon = lon2 - lon1;
+  return Math.sqrt(dLat * dLat + dLon * dLon);
+}
+
+function buildClusters(entries: NodeEntry[], threshold = 15): NodeCluster[] {
+  const used = new Set<number>();
+  const clusters: NodeCluster[] = [];
+
+  for (let i = 0; i < entries.length; i++) {
+    if (used.has(i)) continue;
+    used.add(i);
+    const members = [entries[i]];
+
+    for (let j = i + 1; j < entries.length; j++) {
+      if (used.has(j)) continue;
+      if (members.some(m => angularDist(m.lat, m.lon, entries[j].lat, entries[j].lon) < threshold)) {
+        members.push(entries[j]);
+        used.add(j);
+      }
+    }
+
+    const avgLat = members.reduce((s, m) => s + m.lat, 0) / members.length;
+    const avgLon = members.reduce((s, m) => s + m.lon, 0) / members.length;
+    clusters.push({ centroid: [avgLat, avgLon], members });
+  }
+
+  return clusters;
 }
 
 // ── Billboard info card (HTML overlay above marker) ──────────────────
@@ -422,11 +468,15 @@ function RemoteNodeMarker({
   lon,
   radius,
   node,
+  showLabel = true,
+  onClick,
 }: {
   lat: number;
   lon: number;
   radius: number;
   node: RemoteNode;
+  showLabel?: boolean;
+  onClick?: () => void;
 }) {
   const ref = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
@@ -462,22 +512,40 @@ function RemoteNodeMarker({
 
   return (
     <group ref={groupRef} position={pos}>
-      {visible && (
+      {visible && showLabel && (
         <Html
           position={[0, 0, 0]}
           center
           distanceFactor={3}
           style={{
-            pointerEvents: 'none',
+            pointerEvents: visible ? 'auto' : 'none',
             opacity: visible ? 1 : 0,
             transition: 'opacity 0.3s ease',
           }}
           zIndexRange={[40, 0]}
         >
-          <div className="text-[10px] text-center whitespace-nowrap px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur-sm">
-            {node.name || node.address}
+          <div
+            className="node-billboard"
+            onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
+            onMouseEnter={onClick ? () => { document.body.style.cursor = 'pointer'; } : undefined}
+            onMouseLeave={onClick ? () => { document.body.style.cursor = 'default'; } : undefined}
+          >
+            <div className="node-billboard-card">
+              <RemoteBillboardCol data={node} />
+              <div className="node-billboard-arrow" />
+            </div>
           </div>
         </Html>
+      )}
+      {onClick && (
+        <mesh
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
+          onPointerOver={() => { document.body.style.cursor = 'pointer'; }}
+          onPointerOut={() => { document.body.style.cursor = 'default'; }}
+        >
+          <sphereGeometry args={[0.06, 16, 16]} />
+          <meshBasicMaterial transparent opacity={0} />
+        </mesh>
       )}
       <mesh ref={ref}>
         <sphereGeometry args={[0.018, 16, 16]} />
@@ -487,6 +555,164 @@ function RemoteNodeMarker({
         <sphereGeometry args={[0.012, 16, 16]} />
         <meshBasicMaterial color={color} transparent />
       </mesh>
+    </group>
+  );
+}
+
+// ── Billboard column for local node in cluster ──────────────────────
+function LocalBillboardCol({ data }: { data: StatusResponse }) {
+  const { node, system, containers } = data;
+  return (
+    <>
+      <div className="cluster-col-header">
+        <span className="node-billboard-ping">
+          <span className="node-billboard-ping-ring" />
+          <span className="node-billboard-ping-dot" />
+        </span>
+        <span className="node-billboard-name">{node.name}</span>
+        {node.country && <span className="node-billboard-flag">{countryFlag(node.country)}</span>}
+      </div>
+      <div className="node-billboard-stats">
+        <div className="node-billboard-stat">
+          <span className="node-billboard-stat-value">{system.cpu.usage_percent.toFixed(0)}%</span>
+          <span className="node-billboard-stat-label">CPU</span>
+        </div>
+        <div className="node-billboard-divider" />
+        <div className="node-billboard-stat">
+          <span className="node-billboard-stat-value">{system.memory.usage_percent.toFixed(0)}%</span>
+          <span className="node-billboard-stat-label">MEM</span>
+        </div>
+        <div className="node-billboard-divider" />
+        <div className="node-billboard-stat">
+          <span className="node-billboard-stat-value">{containers.running}</span>
+          <span className="node-billboard-stat-label">{containers.running === 1 ? 'CTR' : 'CTRs'}</span>
+        </div>
+      </div>
+      <div className="node-billboard-footer">
+        <span>{node.public_ip ?? '—'}</span>
+        <span>up {formatUptime(node.uptime)}</span>
+      </div>
+    </>
+  );
+}
+
+// ── Billboard column for remote node in cluster ─────────────────────
+function RemoteBillboardCol({ data }: { data: RemoteNode }) {
+  const isConnected = data.status === 'connected';
+  const metrics = data.metrics;
+  const dotColor = isConnected ? '#5e5ce6' : '#888888';
+
+  return (
+    <>
+      <div className="cluster-col-header">
+        <span className="node-billboard-ping">
+          <span
+            className="node-billboard-ping-ring"
+            style={{ background: dotColor, animation: isConnected ? undefined : 'none' }}
+          />
+          <span className="node-billboard-ping-dot" style={{ background: dotColor }} />
+        </span>
+        <span className="node-billboard-name">{data.name || data.address}</span>
+        {data.country && <span className="node-billboard-flag">{countryFlag(data.country)}</span>}
+      </div>
+      {isConnected && metrics ? (
+        <>
+          <div className="node-billboard-stats">
+            <div className="node-billboard-stat">
+              <span className="node-billboard-stat-value">{metrics.cpu_percent.toFixed(0)}%</span>
+              <span className="node-billboard-stat-label">CPU</span>
+            </div>
+            <div className="node-billboard-divider" />
+            <div className="node-billboard-stat">
+              <span className="node-billboard-stat-value">{metrics.memory_percent.toFixed(0)}%</span>
+              <span className="node-billboard-stat-label">MEM</span>
+            </div>
+            <div className="node-billboard-divider" />
+            <div className="node-billboard-stat">
+              <span className="node-billboard-stat-value">{metrics.containers.running}</span>
+              <span className="node-billboard-stat-label">CTRs</span>
+            </div>
+          </div>
+          <div className="node-billboard-footer">
+            <span>{data.address}</span>
+          </div>
+        </>
+      ) : (
+        <div className="node-billboard-footer" style={{ justifyContent: 'center', paddingTop: 6 }}>
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9 }}>
+            {data.status === 'connecting' ? 'connecting...' : 'offline'}
+          </span>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Cluster billboard (shared card for nearby nodes) ─────────────────
+function ClusterBillboard({ cluster, radius, onMemberClick }: {
+  cluster: NodeCluster;
+  radius: number;
+  onMemberClick?: (nodeId: string) => void;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const [visible, setVisible] = useState(true);
+  const pos = useMemo(
+    () => latLonToVec3(cluster.centroid[0], cluster.centroid[1], radius),
+    [cluster.centroid, radius],
+  );
+
+  const _worldPos = useMemo(() => new THREE.Vector3(), []);
+  const _camDir = useMemo(() => new THREE.Vector3(), []);
+  const _normal = useMemo(() => new THREE.Vector3(), []);
+  const _center = useMemo(() => new THREE.Vector3(), []);
+
+  useFrame(({ camera }) => {
+    if (!groupRef.current) return;
+    groupRef.current.getWorldPosition(_worldPos);
+    groupRef.current.parent?.getWorldPosition(_center);
+    _normal.subVectors(_worldPos, _center).normalize();
+    _camDir.subVectors(camera.position, _worldPos).normalize();
+    const facing = _normal.dot(_camDir) > 0.05;
+    if (facing !== visible) setVisible(facing);
+  });
+
+  return (
+    <group ref={groupRef} position={pos}>
+      <Html
+        position={[0, 0, 0]}
+        center
+        distanceFactor={3}
+        style={{
+          pointerEvents: visible ? 'auto' : 'none',
+          opacity: visible ? 1 : 0,
+          transition: 'opacity 0.3s ease',
+        }}
+        zIndexRange={[50, 0]}
+      >
+        <div className="cluster-billboard">
+          <div className="cluster-billboard-card">
+            {cluster.members.map((member, i) => (
+              <Fragment key={member.id}>
+                {i > 0 && <div className="cluster-billboard-sep" />}
+                <div
+                  className="cluster-billboard-col"
+                  style={{ cursor: onMemberClick ? 'pointer' : undefined }}
+                  onClick={onMemberClick ? (e) => { e.stopPropagation(); onMemberClick(member.id); } : undefined}
+                  onMouseEnter={onMemberClick ? () => { document.body.style.cursor = 'pointer'; } : undefined}
+                  onMouseLeave={onMemberClick ? () => { document.body.style.cursor = 'default'; } : undefined}
+                >
+                  {member.type === 'local' && member.localData ? (
+                    <LocalBillboardCol data={member.localData} />
+                  ) : member.remoteData ? (
+                    <RemoteBillboardCol data={member.remoteData} />
+                  ) : null}
+                </div>
+              </Fragment>
+            ))}
+            <div className="node-billboard-arrow" />
+          </div>
+        </div>
+      </Html>
     </group>
   );
 }
@@ -506,7 +732,7 @@ function EarthScene({
   lon?: number;
   offsetX?: number;
   scaleFactor?: number;
-  onMarkerClick?: () => void;
+  onMarkerClick?: (nodeId: string) => void;
   isDark: boolean;
   status?: StatusResponse;
   remoteNodes?: RemoteNode[];
@@ -552,6 +778,43 @@ function EarthScene({
     [sunDir, isDark],
   );
 
+  // ── Resolve remote node positions ──────────────────────────────────
+  // Use actual lat/lon from the hub (via status SSE), fall back to COUNTRY_COORDS.
+  const resolveNodeCoords = (node: RemoteNode): [number, number] | null => {
+    if (node.latitude != null && node.longitude != null) return [node.latitude, node.longitude];
+    if (node.country) {
+      const cc = COUNTRY_COORDS[node.country.toUpperCase()];
+      if (cc) return cc;
+    }
+    return null;
+  };
+
+  // ── Node clustering ──────────────────────────────────────────────
+  const clusters = useMemo(() => {
+    if (!remoteNodes?.length) return [];
+
+    const entries: NodeEntry[] = [];
+    if (lat !== undefined && lon !== undefined && status) {
+      entries.push({ id: 'local', lat, lon, type: 'local', localData: status });
+    }
+    remoteNodes?.forEach(node => {
+      const coords = resolveNodeCoords(node);
+      if (coords) {
+        entries.push({ id: node.id, lat: coords[0], lon: coords[1], type: 'remote', remoteData: node });
+      }
+    });
+    return buildClusters(entries, 15);
+  }, [lat, lon, status, remoteNodes]);
+
+  // IDs of nodes that are part of a multi-member cluster
+  const clusteredIds = useMemo(() => {
+    const ids = new Set<string>();
+    clusters.filter(c => c.members.length > 1).forEach(c => {
+      c.members.forEach(m => ids.add(m.id));
+    });
+    return ids;
+  }, [clusters]);
+
   if (!earthUniforms) return <Stars isDark={isDark} />;
 
   return (
@@ -584,19 +847,19 @@ function EarthScene({
             depthWrite={false}
           />
         </mesh>
-        {/* Location marker */}
+        {/* Location marker — suppress billboard when in a cluster */}
         {lat !== undefined && lon !== undefined && (
           <LocationMarker
             lat={lat}
             lon={lon}
             radius={RADIUS * 1.005}
-            onClick={onMarkerClick}
-            status={status}
+            onClick={onMarkerClick ? () => onMarkerClick('local') : undefined}
+            status={clusteredIds.has('local') ? undefined : status}
           />
         )}
-        {/* Remote node markers */}
+        {/* Remote node markers — suppress labels when in a cluster */}
         {remoteNodes?.map((node) => {
-          const coords = node.country ? COUNTRY_COORDS[node.country.toUpperCase()] : null;
+          const coords = resolveNodeCoords(node);
           if (!coords) return null;
           return (
             <RemoteNodeMarker
@@ -605,9 +868,20 @@ function EarthScene({
               lon={coords[1]}
               radius={RADIUS * 1.005}
               node={node}
+              showLabel={!clusteredIds.has(node.id)}
+              onClick={onMarkerClick ? () => onMarkerClick(node.id) : undefined}
             />
           );
         })}
+        {/* Cluster billboards — shared card for nearby nodes */}
+        {clusters.filter(c => c.members.length > 1).map((cluster, i) => (
+          <ClusterBillboard
+            key={`cluster-${i}`}
+            cluster={cluster}
+            radius={RADIUS * 1.005}
+            onMemberClick={onMarkerClick}
+          />
+        ))}
       </group>
     </>
   );
@@ -645,7 +919,7 @@ export function EarthGlobe({
 }: {
   globeOffsetX?: number;
   scaleFactor?: number;
-  onMarkerClick?: () => void;
+  onMarkerClick?: (nodeId: string) => void;
 }) {
   const isDark = useIsDark();
   const { data: status } = useQuery({
