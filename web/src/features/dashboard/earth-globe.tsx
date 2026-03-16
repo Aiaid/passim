@@ -126,15 +126,18 @@ const atmosVert = /* glsl */ `
 const atmosFrag = /* glsl */ `
   uniform vec3 uSunDir;
   uniform float uGlowStrength;
+  uniform float uRimPower;
+  uniform vec3 uAtmosDark;
+  uniform vec3 uAtmosLight;
   varying vec3 vNormal;
   varying vec3 vWorldPos;
   void main() {
     vec3 N = normalize(vNormal);
     vec3 V = normalize(cameraPosition - vWorldPos);
     float rim = 1.0 - max(dot(N, V), 0.0);
-    float glow = pow(rim, 3.0);
+    float glow = pow(rim, uRimPower);
     float sunSide = max(dot(N, uSunDir), 0.0);
-    vec3 color = mix(vec3(0.1, 0.2, 0.5), vec3(0.3, 0.55, 1.0), sunSide);
+    vec3 color = mix(uAtmosDark, uAtmosLight, sunSide);
     gl_FragColor = vec4(color, glow * uGlowStrength * (0.3 + 0.7 * sunSide));
   }
 `;
@@ -449,6 +452,9 @@ function EarthScene({
     () => ({
       uSunDir: { value: sunDir },
       uGlowStrength: { value: isDark ? 0.08 : 0.12 },
+      uRimPower: { value: isDark ? 5.0 : 3.0 },
+      uAtmosDark: { value: isDark ? new THREE.Vector3(0.005, 0.015, 0.06) : new THREE.Vector3(0.1, 0.2, 0.5) },
+      uAtmosLight: { value: isDark ? new THREE.Vector3(0.2, 0.5, 1.0) : new THREE.Vector3(0.3, 0.55, 1.0) },
     }),
     [sunDir, isDark],
   );
