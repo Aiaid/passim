@@ -32,9 +32,11 @@ func makeDeployHandler(deps Deps) task.TaskHandler {
 
 		result, err := docker.Deploy(ctx, deps.Docker, &req)
 		if err != nil {
-			// Update app status to failed
-			_ = db.UpdateApp(deps.DB, appID, "failed", "")
-			publishEvent(deps.SSE, "app:"+appID, "deploy", `{"status":"failed"}`)
+			// Only mark app as failed on final retry (not intermediate retries)
+			if t.Retries+1 >= t.MaxRetries {
+				_ = db.UpdateApp(deps.DB, appID, "failed", "")
+				publishEvent(deps.SSE, "app:"+appID, "deploy", `{"status":"failed"}`)
+			}
 			return fmt.Errorf("deploy: %w", err)
 		}
 

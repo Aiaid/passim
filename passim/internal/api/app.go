@@ -65,6 +65,21 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		// 1.5. Check for existing active deployment of this template
+		existing, err := db.GetActiveAppByTemplate(deps.DB, req.Template)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "check existing: " + err.Error()})
+			return
+		}
+		if existing != nil {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "template already deployed",
+				"app_id": existing.ID,
+				"status": existing.Status,
+			})
+			return
+		}
+
 		// 2. Validate and merge settings
 		if req.Settings == nil {
 			req.Settings = make(map[string]interface{})

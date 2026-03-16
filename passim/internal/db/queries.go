@@ -89,6 +89,23 @@ func ListApps(database *sql.DB) ([]App, error) {
 	return apps, rows.Err()
 }
 
+// GetActiveAppByTemplate returns an app that is running or deploying for the given template.
+// Returns nil if no active app exists for this template.
+func GetActiveAppByTemplate(database *sql.DB, templateName string) (*App, error) {
+	var a App
+	err := database.QueryRow(
+		`SELECT id, template, settings, status, COALESCE(container_id,''), COALESCE(deployed_at,''), COALESCE(updated_at,'')
+		 FROM apps WHERE template = ? AND status IN ('running', 'deploying') LIMIT 1`, templateName,
+	).Scan(&a.ID, &a.Template, &a.Settings, &a.Status, &a.ContainerID, &a.DeployedAt, &a.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get active app by template %s: %w", templateName, err)
+	}
+	return &a, nil
+}
+
 func UpdateApp(database *sql.DB, id string, status string, containerID string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := database.Exec(
