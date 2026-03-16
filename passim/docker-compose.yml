@@ -35,5 +35,28 @@ services:
       #   Only used when SSL_DOMAIN is NOT set
       # - DNS_BASE_DOMAIN=dns.passim.io
 
+  # Second instance for multi-node testing
+  # Usage:
+  #   docker compose up passim                       (single node only)
+  #   docker compose --profile two-nodes up          (both nodes)
+  passim-b:
+    build:
+      context: ..
+      dockerfile: passim/Dockerfile
+    container_name: passim-b
+    restart: unless-stopped
+    ports:
+      - "8444:8443"
+    volumes:
+      - passim-b-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - PORT=8443
+      - API_KEY=test-b
+      - SSL_MODE=off
+    profiles:
+      - two-nodes
+
 volumes:
   passim-data:
+  passim-b-data:

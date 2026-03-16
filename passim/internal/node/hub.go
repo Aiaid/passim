@@ -75,8 +75,20 @@ type RemoteConn struct {
 	metrics    *NodeMetrics
 	containers []NodeContainer
 	token      string // JWT from remote login
+	scheme     string // "https" or "http", auto-detected
 	httpClient *http.Client
 	sseCancel  context.CancelFunc
+}
+
+// baseURL returns the base URL for a remote node (e.g. "https://host:8443").
+func (rc *RemoteConn) baseURL() string {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	scheme := rc.scheme
+	if scheme == "" {
+		scheme = "https"
+	}
+	return scheme + "://" + rc.info.Address
 }
 
 // NewHub creates a new Hub.
@@ -134,20 +146,20 @@ func (h *Hub) Stop() {
 func (h *Hub) AddNode(ctx context.Context, address, apiKey, name string) (*NodeInfo, error) {
 	// Validate by calling GET /api/status on the remote
 	client := h.newHTTPClient()
-	statusURL := fmt.Sprintf("https://%s/api/status", address)
 
-	// First, authenticate to get a token
-	token, err := loginRemote(ctx, client, address, apiKey)
+	// First, authenticate to get a token (auto-detects HTTPS vs HTTP)
+	loginRes, err := loginRemote(ctx, client, address, apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("login to remote: %w", err)
 	}
 
 	// Validate the remote is reachable
+	statusURL := fmt.Sprintf("%s://%s/api/status", loginRes.Scheme, address)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build status request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer "+loginRes.Token)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -192,7 +204,8 @@ func (h *Hub) AddNode(ctx context.Context, address, apiKey, name string) (*NodeI
 	rc := &RemoteConn{
 		info:       *node,
 		status:     "connecting",
-		token:      token,
+		token:      loginRes.Token,
+		scheme:     loginRes.Scheme,
 		httpClient: client,
 	}
 
@@ -290,10 +303,15 @@ func (h *Hub) ProxyRequest(ctx context.Context, nodeID, method, path string, bod
 	rc.mu.RLock()
 	token := rc.token
 	address := rc.info.Address
+	rcScheme := rc.scheme
 	client := rc.httpClient
 	rc.mu.RUnlock()
 
-	url := fmt.Sprintf("https://%s%s", address, path)
+	scheme := rcScheme
+	if scheme == "" {
+		scheme = "https"
+	}
+	url := fmt.Sprintf("%s://%s%s", scheme, address, path)
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return 0, nil, fmt.Errorf("build proxy request: %w", err)

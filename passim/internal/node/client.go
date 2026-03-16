@@ -61,56 +61,72 @@ func (h *Hub) loginToRemote(ctx context.Context, rc *RemoteConn) error {
 	client := rc.httpClient
 	rc.mu.RUnlock()
 
-	token, err := loginRemote(ctx, client, address, apiKey)
+	result, err := loginRemote(ctx, client, address, apiKey)
 	if err != nil {
 		return err
 	}
 
 	rc.mu.Lock()
-	rc.token = token
+	rc.token = result.Token
+	rc.scheme = result.Scheme
 	rc.mu.Unlock()
 
 	return nil
 }
 
-// loginRemote performs the actual HTTP login request. Factored out so AddNode can
-// use it before the RemoteConn is fully constructed.
-func loginRemote(ctx context.Context, client *http.Client, address, apiKey string) (string, error) {
-	loginURL := fmt.Sprintf("https://%s/api/auth/login", address)
+// loginResult holds the token and detected scheme from a remote login.
+type loginResult struct {
+	Token  string
+	Scheme string // "https" or "http"
+}
+
+// loginRemote performs the actual HTTP login request. Tries HTTPS first,
+// falls back to HTTP if the remote is not using TLS.
+func loginRemote(ctx context.Context, client *http.Client, address, apiKey string) (*loginResult, error) {
 	payload, _ := json.Marshal(map[string]string{"api_key": apiKey})
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, bytes.NewReader(payload))
-	if err != nil {
-		return "", fmt.Errorf("build login request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
+	// Try HTTPS first, then HTTP
+	for _, scheme := range []string{"https", "http"} {
+		loginURL := fmt.Sprintf("%s://%s/api/auth/login", scheme, address)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, bytes.NewReader(payload))
+		if err != nil {
+			return nil, fmt.Errorf("build login request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("login request: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := client.Do(req)
+		if err != nil {
+			// If HTTPS fails, try HTTP
+			if scheme == "https" {
+				continue
+			}
+			return nil, fmt.Errorf("login request: %w", err)
+		}
+		defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("read login response: %w", err)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("read login response: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("login failed with status %d: %s", resp.StatusCode, string(body))
+		}
+
+		var loginResp struct {
+			Token string `json:"token"`
+		}
+		if err := json.Unmarshal(body, &loginResp); err != nil {
+			return nil, fmt.Errorf("parse login response: %w", err)
+		}
+		if loginResp.Token == "" {
+			return nil, fmt.Errorf("empty token in login response")
+		}
+
+		return &loginResult{Token: loginResp.Token, Scheme: scheme}, nil
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("login failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var loginResp struct {
-		Token string `json:"token"`
-	}
-	if err := json.Unmarshal(body, &loginResp); err != nil {
-		return "", fmt.Errorf("parse login response: %w", err)
-	}
-	if loginResp.Token == "" {
-		return "", fmt.Errorf("empty token in login response")
-	}
-
-	return loginResp.Token, nil
+	return nil, fmt.Errorf("login failed: could not connect via HTTPS or HTTP")
 }
 
 // subscribeSSE connects to a remote node's /api/stream SSE endpoint
@@ -119,16 +135,22 @@ func (h *Hub) subscribeSSE(ctx context.Context, rc *RemoteConn) error {
 	rc.mu.RLock()
 	address := rc.info.Address
 	token := rc.token
+	rcScheme := rc.scheme
 	client := rc.httpClient
 	nodeID := rc.info.ID
 	rc.mu.RUnlock()
+
+	scheme := rcScheme
+	if scheme == "" {
+		scheme = "https"
+	}
+	streamURL := fmt.Sprintf("%s://%s/api/stream?token=%s", scheme, address, token)
 
 	sseCtx, sseCancel := context.WithCancel(ctx)
 	rc.mu.Lock()
 	rc.sseCancel = sseCancel
 	rc.mu.Unlock()
 
-	streamURL := fmt.Sprintf("https://%s/api/stream?token=%s", address, token)
 	req, err := http.NewRequestWithContext(sseCtx, http.MethodGet, streamURL, nil)
 	if err != nil {
 		sseCancel()
