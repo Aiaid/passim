@@ -128,6 +128,25 @@ export const api = {
   getIperfStatus: () => request<{ status: string }>('/speedtest/iperf/status'),
   startIperf: () => request<{ status: string }>('/speedtest/iperf/start', { method: 'POST' }),
   stopIperf: () => request<{ status: string }>('/speedtest/iperf/stop', { method: 'POST' }),
+
+  // Nodes
+  getNodes: () => request<RemoteNode[]>('/nodes'),
+  addNode: (data: { address: string; api_key: string; name?: string }) =>
+    request<RemoteNode>('/nodes', { method: 'POST', body: JSON.stringify(data) }),
+  removeNode: (id: string) => request<void>(`/nodes/${id}`, { method: 'DELETE' }),
+  updateNode: (id: string, data: { name: string }) =>
+    request<void>(`/nodes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getNodeStatus: (id: string) => request<StatusResponse>(`/nodes/${id}/status`),
+  getNodeContainers: (id: string) => request<Container[]>(`/nodes/${id}/containers`),
+  getNodeApps: (id: string) => request<AppResponse[]>(`/nodes/${id}/apps`),
+  deployNodeApp: (nodeId: string, data: { template: string; settings: Record<string, unknown> }) =>
+    request<AppResponse>(`/nodes/${nodeId}/apps`, { method: 'POST', body: JSON.stringify(data) }),
+  batchDeploy: (data: { template: string; settings: Record<string, unknown>; targets: string[] }) =>
+    request<{ task_id: string }>('/batch/deploy', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Connections
+  getConnections: () => request<ConnectionInfo[]>('/connections'),
+  disconnect: (id: string) => request<void>(`/connections/${id}`, { method: 'DELETE' }),
 };
 
 // Type definitions used by api client
@@ -244,6 +263,29 @@ export interface PublicKeyCredentialRequestOptionsJSON {
   rpId?: string;
   allowCredentials?: { id: string; type: string }[];
   userVerification?: string;
+}
+
+export interface RemoteNode {
+  id: string;
+  name: string;
+  address: string;
+  status: 'connecting' | 'connected' | 'disconnected';
+  country?: string;
+  last_seen?: string;
+  created_at: string;
+  metrics?: {
+    cpu_percent: number;
+    memory_percent: number;
+    disk_percent: number;
+    containers: { running: number; total: number };
+  };
+  containers?: Array<{ name: string; state: string; image: string }>;
+}
+
+export interface ConnectionInfo {
+  id: string;
+  remote_ip: string;
+  connected_at: string;
 }
 
 export interface PublicKeyCredentialCreationOptionsJSON {

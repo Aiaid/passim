@@ -4,6 +4,7 @@
     "dashboard": "Dashboard",
     "containers": "Containers",
     "apps": "Apps",
+    "nodes": "Nodes",
     "settings": "Settings",
     "logout": "Log Out"
   },
@@ -243,5 +244,40 @@
     "step_running": "Running",
     "step_failed": "Failed",
     "connection_info_available": "Connection info will be available on the app detail page"
+  },
+  "node": {
+    "title": "Remote Nodes",
+    "add": "Add Node",
+    "added": "Node added",
+    "removed": "Node removed",
+    "address": "Address",
+    "address_placeholder": "host:port",
+    "api_key": "API Key",
+    "api_key_placeholder": "Remote node API key",
+    "name": "Name",
+    "name_placeholder": "e.g., tokyo-2",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "connecting": "Connecting",
+    "remove": "Remove Node",
+    "remove_confirm": "Are you sure you want to remove this node? You can re-add it later.",
+    "no_nodes": "No remote nodes",
+    "no_nodes_desc": "Add remote Passim instances to manage them from here",
+    "overview": "Overview",
+    "containers": "Containers",
+    "apps": "Apps",
+    "deploy_to": "Deploy To",
+    "select_targets": "Select target nodes",
+    "this_server": "This Server",
+    "batch_deploy": "Deploy to All",
+    "last_seen": "Last Seen"
+  },
+  "connection": {
+    "title": "Inbound Connections",
+    "remote_ip": "Remote IP",
+    "connected_at": "Connected Since",
+    "disconnect": "Disconnect",
+    "disconnected": "Disconnected",
+    "no_connections": "No active connections"
   }
 }

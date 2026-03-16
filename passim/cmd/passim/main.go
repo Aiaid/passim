@@ -17,6 +17,7 @@ import (
 	"github.com/passim/passim/internal/auth"
 	"github.com/passim/passim/internal/db"
 	"github.com/passim/passim/internal/docker"
+	"github.com/passim/passim/internal/node"
 	"github.com/passim/passim/internal/setup"
 	"github.com/passim/passim/internal/speedtest"
 	"github.com/passim/passim/internal/sse"
@@ -125,6 +126,11 @@ func main() {
 		}
 	}
 
+	// Initialize Node Hub for remote node management
+	nodeHub := node.NewHub(database, sseBroker)
+	nodeHub.Start(context.Background())
+	defer nodeHub.Stop()
+
 	deps := api.Deps{
 		DB:         database,
 		JWT:        jwtMgr,
@@ -135,6 +141,7 @@ func main() {
 		Iperf:      iperfSrv,
 		Tasks:      taskQueue,
 		SSE:        sseBroker,
+		NodeHub:    nodeHub,
 		DataDir:    dataDir,
 		DataVolume: dataVolume,
 	}

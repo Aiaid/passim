@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
-import type { StatusResponse, Container, AppResponse } from '@/lib/api-client';
+import type { StatusResponse, Container, AppResponse, RemoteNode } from '@/lib/api-client';
 
 export interface MetricsData {
   cpu_percent: number;
@@ -21,6 +21,7 @@ interface EventStreamValue {
   status: StatusResponse | null;
   containers: Container[] | null;
   apps: AppResponse[] | null;
+  nodes: RemoteNode[] | null;
   isConnected: boolean;
   /** Ref to the live EventSource — used by useResourceEvents */
   sourceRef: React.RefObject<EventSource | null>;
@@ -41,6 +42,7 @@ export function EventStreamProvider({ children }: { children: React.ReactNode })
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [containers, setContainers] = useState<Container[] | null>(null);
   const [apps, setApps] = useState<AppResponse[] | null>(null);
+  const [nodes, setNodes] = useState<RemoteNode[] | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
   const bufferRef = useRef<MetricsData[]>([]);
@@ -90,6 +92,14 @@ export function EventStreamProvider({ children }: { children: React.ReactNode })
         } catch { /* ignore */ }
       }) as EventListener);
 
+      source.addEventListener('nodes', ((e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data) as RemoteNode[];
+          setNodes(data);
+          queryClient.setQueryData(['nodes'], data);
+        } catch { /* ignore */ }
+      }) as EventListener);
+
       source.onerror = () => {
         source.close();
         sourceRef.current = null;
@@ -111,7 +121,7 @@ export function EventStreamProvider({ children }: { children: React.ReactNode })
   }, [token, queryClient]);
 
   return (
-    <EventStreamContext value={{ metrics, metricsHistory, status, containers, apps, isConnected, sourceRef }}>
+    <EventStreamContext value={{ metrics, metricsHistory, status, containers, apps, nodes, isConnected, sourceRef }}>
       {children}
     </EventStreamContext>
   );

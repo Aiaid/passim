@@ -24,6 +24,7 @@ type Deps struct {
 	Iperf     *speedtest.IperfServer
 	Tasks     *task.Queue
 	SSE        *sse.Broker
+	NodeHub    NodeHub
 	DataDir    string
 	DataVolume string // Docker named volume for DataDir (auto-discovered)
 }
@@ -109,6 +110,35 @@ func NewRouter(deps Deps) http.Handler {
 
 			// Unified SSE stream (replaces metrics/stream + polling)
 			protected.GET("/stream", unifiedStreamHandler(deps))
+
+			// Node management
+			protected.POST("/nodes", addNodeHandler(deps))
+			protected.GET("/nodes", listNodesHandler(deps))
+			protected.DELETE("/nodes/:id", deleteNodeHandler(deps))
+			protected.PATCH("/nodes/:id", updateNodeHandler(deps))
+
+			// Node proxy routes
+			protected.GET("/nodes/:id/status", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/status" }))
+			protected.GET("/nodes/:id/containers", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/containers" }))
+			protected.GET("/nodes/:id/apps", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/apps" }))
+			protected.GET("/nodes/:id/templates", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/templates" }))
+			protected.POST("/nodes/:id/apps", nodeProxyHandler(deps, "POST", func(c *gin.Context) string { return "/api/apps" }))
+			protected.DELETE("/nodes/:id/apps/:appId", nodeProxyHandler(deps, "DELETE", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") }))
+			protected.GET("/nodes/:id/apps/:appId/configs", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") + "/configs" }))
+
+			// Batch deploy
+			protected.POST("/batch/deploy", batchDeployHandler(deps))
+
+			// Connections
+			protected.GET("/connections", listConnectionsHandler(deps))
+			protected.DELETE("/connections/:id", disconnectHandler(deps))
+
+			// S3 credentials
+			protected.GET("/s3", listS3Handler(deps))
+			protected.POST("/s3", createS3Handler(deps))
+			protected.PUT("/s3/:id", updateS3Handler(deps))
+			protected.DELETE("/s3/:id", deleteS3Handler(deps))
+			protected.POST("/s3/:id/test", testS3Handler(deps))
 
 			// SSL routes
 			if deps.SSL != nil {

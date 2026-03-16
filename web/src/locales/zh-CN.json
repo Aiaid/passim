@@ -4,6 +4,7 @@
     "dashboard": "仪表盘",
     "containers": "容器",
     "apps": "应用",
+    "nodes": "节点",
     "settings": "设置",
     "logout": "退出登录"
   },
@@ -243,5 +244,40 @@
     "step_running": "运行中",
     "step_failed": "失败",
     "connection_info_available": "连接信息将在应用详情页显示"
+  },
+  "node": {
+    "title": "远程节点",
+    "add": "添加节点",
+    "added": "节点已添加",
+    "removed": "节点已移除",
+    "address": "地址",
+    "address_placeholder": "host:port",
+    "api_key": "API Key",
+    "api_key_placeholder": "远程节点的 API Key",
+    "name": "名称",
+    "name_placeholder": "例如 tokyo-2",
+    "connected": "已连接",
+    "disconnected": "未连接",
+    "connecting": "连接中",
+    "remove": "移除节点",
+    "remove_confirm": "确定移除此节点？之后可以重新添加。",
+    "no_nodes": "没有远程节点",
+    "no_nodes_desc": "添加远程 Passim 实例，在这里统一管理",
+    "overview": "概览",
+    "containers": "容器",
+    "apps": "应用",
+    "deploy_to": "部署到",
+    "select_targets": "选择目标节点",
+    "this_server": "本机",
+    "batch_deploy": "部署到所有",
+    "last_seen": "上次连接"
+  },
+  "connection": {
+    "title": "入站连接",
+    "remote_ip": "远程 IP",
+    "connected_at": "连接时间",
+    "disconnect": "断开",
+    "disconnected": "已断开连接",
+    "no_connections": "没有活动连接"
   }
 }

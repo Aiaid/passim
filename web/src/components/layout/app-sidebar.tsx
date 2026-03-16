@@ -1,6 +1,6 @@
 import { useLocation, Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Container, AppWindow, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Container, AppWindow, Globe, Settings, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   Sidebar,
@@ -20,6 +20,7 @@ const navItems = [
   { key: 'dashboard', path: '/', icon: LayoutDashboard },
   { key: 'containers', path: '/containers', icon: Container },
   { key: 'apps', path: '/apps', icon: AppWindow },
+  { key: 'nodes', path: '/nodes', icon: Globe },
 ];
 
 const bottomItems = [

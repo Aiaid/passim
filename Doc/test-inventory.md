@@ -1,6 +1,6 @@
 # Test Inventory
 
-> 最后更新: 2026-03-14 | 总测试: **333** (Go 203 + Frontend 130) | 全部通过
+> 最后更新: 2026-03-16 | 总测试: **367** (Go 237 + Frontend 130) | 全部通过
 
 ## 运行命令
 
@@ -28,7 +28,7 @@ cd web && pnpm test:coverage
 
 ## Go 后端 (passim/)
 
-**35 test files, 203 top-level test functions, 291 test runs (含子测试)**
+**~40 test files, 237 top-level test functions (含子测试)**
 
 ### internal/api/ — API 层 (13 files)
 
@@ -180,6 +180,7 @@ cd web && pnpm test:coverage
 |------|---------|---------|---------|---------|------|
 | Phase 1 (后端核心) | 28 | 177 | — | — | ✅ 完成 |
 | Phase 2 (WebAuthn + Web UI) | 5 | 15 | 20 | 130 | ✅ 完成 |
+| Phase 2.5 (打磨+修复) | ~7 | 45 | — | — | ✅ 完成 |
 | Phase 3 (远程节点) | — | — | — | — | 📋 计划中 |
 | Phase 4 (DNS 集成) | — | — | — | — | 📋 计划中 |
 | Phase 5 (移动端) | — | — | — | — | 📋 计划中 |
@@ -240,6 +241,7 @@ cd web && pnpm test:coverage
 |------|---------|---------|---------|---------|------|
 | Phase 1 (后端核心) | 28 | 177 | — | — | ✅ 完成 |
 | Phase 2 (WebAuthn + Web UI) | 5 | 15 | 20 | 130 | ✅ 完成 |
+| Phase 2.5 (打磨+修复) | ~7 | 45 | — | — | ✅ 完成 |
 | 集成 + E2E 测试 | 6 | 23 | 5 | 16 | ✅ 完成 |
 | Phase 3 (远程节点) | — | — | — | — | 📋 计划中 |
 | Phase 4 (DNS 集成) | — | — | — | — | 📋 计划中 |

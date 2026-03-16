@@ -1,6 +1,6 @@
 # AC (Passim) 系统重写计划书
 
-> 版本: 3.0 | 日期: 2026-03-12
+> 版本: 3.1 | 日期: 2026-03-16
 
 ## 产品定位
 
@@ -174,7 +174,7 @@ FROM golang:1.25-alpine AS builder
 COPY . .
 RUN go build -o /passim ./cmd/passim/
 
-FROM alpine:3.20
+FROM alpine:3.21
 RUN apk add --no-cache ca-certificates iperf3
 COPY --from=builder /passim /usr/local/bin/passim
 COPY templates/ /etc/passim/templates/
@@ -716,28 +716,80 @@ GET  /api/speedtest/iperf/status
 - [x] 国际化 (en-US / zh-CN)
 - [x] 响应式布局 (use-mobile hook)
 - [x] Passkey (WebAuthn) 后端 API + 前端注册/登录
-- [x] 单元测试 (Go 192 + Frontend 130 = 322 tests)
+- [x] 单元测试 (Go 203 + Frontend 130 = 333 tests)
 - [x] Go embed 嵌入 + Dockerfile (3 阶段: Node→Go→Alpine)
 - [x] 集成测试 + E2E 测试 (12 Go integration + 8 Go E2E + 16 Playwright E2E)
 
 **交付物**: 功能完整的单机 Passim (API + Web UI)
 
+**注**: Phase 2 结束后进入密集打磨期 (Phase 2.5)，见下文。
+
+### Phase 2.5: UI/UX 打磨 + 部署修复 ✅ (已完成 2026-03-16)
+
+**目标**: 生产级 UI 质量和部署稳定性
+
+Phase 2 完成后的密集打磨期（~30 commits），包含重大 UI 重设计和关键 bug 修复。
+
+- [x] Dashboard 视觉重设计: 3D 地球仪 (Three.js) + 服务器位置标记 + 信息面板
+- [x] "Orbital Glass" 设计语言 — 全站统一的太空/玻璃质感美学
+- [x] 亮色/暗色模式地球仪各自独立视觉方案
+- [x] 统一 SSE 流: 单一 `/api/stream` 替代多个 SSE 连接 + HTTP 轮询
+- [x] 应用管理页重设计: Orbital Glass 风格卡片 + 详情面板
+- [x] 侧边栏: Passim logo、尺寸优化、Sheet UX、Safari backdrop-filter 修复、退出登录按钮
+- [x] 部署管线完善: 端口映射、容器参数 (args/sysctls)、卷挂载
+- [x] 防重复部署 + 重试状态修复
+- [x] Docker 容器清理: 启动失败时移除残留容器、卸载时按名称移除
+- [x] 应用设置更新触发重新部署 + 生成值解析
+- [x] VPN 配置文件路径修复 + 下载修复
+- [x] Hysteria TLS 配置修复 + 表单验证
+- [x] WebAuthn 凭证标志存储修复 (backup eligible mismatch)
+- [x] Passkey 认证、Select 设置、容器面板、SSL 设置修复
+- [x] i18n 缺失翻译键补全 (dashboard/metrics/settings)
+- [x] 移动端侧边栏交互修复
+- [x] `GET /api/status` 增加经纬度 (latitude/longitude) 字段
+- [x] `GET /api/templates/:name` 单模板查询端点
+
+**测试**: Go 237 + Frontend 130 = 367 tests (全部通过)
+
+**交付物**: 生产级 UI 质量的单机 Passim，部署流程稳定可靠
+
 ### Phase 3: 多节点管理 (3 周)
 
 **目标**: 对等互联，管理远程节点
 
+**后端 (Go):**
+- [ ] `internal/node/` 包: hub.go / client.go / server.go / proxy.go / sync.go
 - [ ] WebSocket 节点通信协议
-  - 连接/认证/心跳/重连
+  - 连接/认证/心跳 (10s)/重连 (指数退避，上限 60s)
+  - JSON 消息格式: heartbeat / request / response / event
   - 任务下发 + 结果回传
   - 指标实时推送
 - [ ] Node Hub (管理端): 连接管理、状态聚合、请求代理
-- [ ] Node Server (被管端): 接受连接、执行远程任务
-- [ ] 远程节点 API (`/api/nodes/*`)
-- [ ] 前端: 添加/移除远程节点
-- [ ] 前端: 统一面板显示本地 + 远程节点
-- [ ] 前端: 远程部署/操作
-- [ ] 前端: 批量部署到多节点
-- [ ] 安全: 连接授权管理 (查看/断开连接)
+- [ ] Node Server (被管端): 接受连接、执行远程任务、连接可见性
+- [ ] WebSocket 端点: `GET /ws/node?key=<api_key>`
+- [ ] 远程节点 CRUD API (`POST/GET/DELETE/PATCH /api/nodes`)
+- [ ] 远程代理 API (`GET /api/nodes/:id/status|containers|apps|...`)
+- [ ] 远程部署 API (`POST /api/nodes/:id/apps`)
+- [ ] 批量部署 API (`POST /api/batch/deploy`)
+- [ ] 连接管理 API (`GET /api/connections`, `DELETE /api/connections/:id`)
+- [ ] S3 凭证管理 API (`/api/s3/*`) — 从 Phase 2 移入
+
+**前端 (Web):**
+- [ ] 新路由: `/nodes`, `/nodes/:id`
+- [ ] 添加/移除远程节点 UI
+- [ ] 统一面板显示本地 + 远程节点
+- [ ] 远程部署/操作 (start/stop/restart/remove)
+- [ ] "Deploy to" 目标选择器
+- [ ] 批量部署到多节点
+- [ ] 连接授权管理 (查看/断开连接)
+
+**测试:**
+- [ ] Node Hub/Client/Server 单元测试
+- [ ] WebSocket 协议集成测试
+- [ ] 远程代理 API 测试
+- [ ] 前端节点管理组件测试
+
+**数据库**: `remote_nodes` 和 `remote_deployments` 表已在 Phase 1 建好，`s3_credentials` 表已建好
 
 **交付物**: 完整的多节点 Passim
 

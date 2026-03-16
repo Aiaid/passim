@@ -155,7 +155,9 @@ golang.org/x/crypto/acme/autocert -- ACME 客户端 (Let's Encrypt) ✅
     "uptime": 864000,
     "public_ip": "203.0.113.10",
     "public_ip6": "2001:db8::1",
-    "country": "JP"
+    "country": "JP",
+    "latitude": 35.6762,
+    "longitude": 139.6503
   },
   "system": {
     "cpu": { "usage_percent": 23.5, "cores": 4, "model": "Intel Xeon E5-2680" },
@@ -386,6 +388,22 @@ Content-Length: 104857600  (100MB, 可通过 ?size= 调整，支持 mb 后缀)
 
 ```json
 { "status": "ready" }
+```
+
+#### `POST /api/speedtest/iperf/start` (需认证) ✅ Phase 2
+
+启动 iperf3 服务端进程。
+
+```json
+{ "status": "started" }
+```
+
+#### `POST /api/speedtest/iperf/stop` (需认证) ✅ Phase 2
+
+停止 iperf3 服务端进程。
+
+```json
+{ "status": "stopped" }
 ```
 
 #### `POST /api/speedtest/iperf` — Phase 3 (远程节点)

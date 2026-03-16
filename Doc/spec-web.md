@@ -10,6 +10,8 @@
 
 设计上追求**干净克制**：不堆功能、不外露技术概念（用户看到的是"部署 VPN"而不是"创建容器"）、视觉上有品位（不用默认蓝，不像后台管理系统）。更接近一个精心设计的消费级产品，而不是 Portainer 那样的开发者工具。
 
+**设计语言: Orbital Glass** — Phase 2.5 确立的视觉体系。融合太空指挥中心的科技感与玻璃质感的透明优雅，Dashboard 以 3D 地球仪为核心视觉锚点，应用页使用毛玻璃卡片，整体营造深邃但不沉重的品质感。
+
 技术上使用 Vite + React 19 + shadcn/ui + Tailwind CSS v4 构建，编译为纯静态文件，通过 Go embed 嵌入 Passim 二进制。所有数据通过同源 `/api/*` 获取，无跨域问题。
 
 ---
@@ -64,8 +66,9 @@ web/src/
 │   │   ├── login-form.tsx
 │   │   └── passkey-login.tsx
 │   ├── dashboard/                        # 仪表盘
-│   │   ├── dashboard-page.tsx            # 单屏布局 (gauges + chart + sidebar)
+│   │   ├── dashboard-page.tsx            # 单屏布局 (gauges + globe + sidebar)
 │   │   ├── system-metrics.tsx            # SVG 环形仪表盘 (CPU/内存/磁盘/网络)
+│   │   ├── earth-globe.tsx               # 3D 地球仪 (Three.js/R3F, 服务器位置标记 + billboard)
 │   │   ├── metrics-chart.tsx             # CPU & 内存折线图 (固定 X 轴域)
 │   │   ├── app-overview.tsx              # 应用概览 (可缩小 + 内部滚动)
 │   │   └── queries.ts                    # useStatus, useAppsSummary 等查询
@@ -195,6 +198,8 @@ Header 显示节点信息 (名称/版本/运行时间/公网 IPv4/IPv6+国家/SS
 
 单屏布局 (`h-[calc(100vh-6.5rem)] overflow-hidden`)，不需要上下滚动。
 
+**设计语言**: "Orbital Command" 太空指挥中心美学。核心元素是一个 3D 交互地球仪 (Three.js/React Three Fiber)，标记服务器物理位置，上方悬浮信息面板 (billboard) 显示节点状态摘要。
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Dashboard                                                  │
@@ -207,22 +212,24 @@ Header 显示节点信息 (名称/版本/运行时间/公网 IPv4/IPv6+国家/SS
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
 │                                                             │
 │  ┌──────────────────────────┐ ┌──────────────────────────┐  │
-│  │ CPU & Memory (5 min)     │ │ Speed Test               │  │
+│  │  🌍 3D Globe              │ │ Speed Test               │  │
 │  │                          │ │  ↓120 Mbps  ↑95 Mbps    │  │
-│  │  CPU ──────────────      │ │  ⏱ 12ms     ~ 2ms       │  │
-│  │  MEM ──────────────      │ ├──────────────────────────┤  │
-│  │                          │ │ Apps                  3  │  │
-│  │  -5m  -4m  -3m ... now  │ │  wireguard        🟢     │  │
-│  │                          │ │  hysteria2        🟢     │  │
+│  │   [Server Location Pin]  │ │  ⏱ 12ms     ~ 2ms       │  │
+│  │   ┌──────────────┐      │ ├──────────────────────────┤  │
+│  │   │ Billboard    │      │ │ Apps                  3  │  │
+│  │   │ IP/Country/  │      │ │  wireguard        🟢     │  │
+│  │   │ Uptime       │      │ │  hysteria2        🟢     │  │
+│  │   └──────────────┘      │ │                          │  │
 │  └──────────────────────────┘ └──────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 - Row 1: 标题
 - Row 2: SVG 环形仪表盘 (CPU/Memory/Disk 带颜色阈值: >75% 橙色, >90% 红色; Network 独立布局显示收发)
-- Row 3: MetricsChart (lg:col-span-3, 固定 X 轴域 [0,59], 绝对时间标签) + 右侧 (lg:col-span-2, SpeedTest + AppOverview, AppOverview 可缩小+内部滚动)
+- Row 3: 3D 地球仪 (lg:col-span-3, 通过 `/api/status` 的 latitude/longitude 定位服务器，带 billboard 信息卡和遮挡检测) + 右侧 (lg:col-span-2, SpeedTest + AppOverview, AppOverview 可缩小+内部滚动)
+- 亮色/暗色模式各有独立的地球仪视觉方案（暗色: 太空大气层; 亮色: 柔和宇宙）
 
-> 远程节点区域将在 Phase 3 加入。
+> 远程节点区域将在 Phase 3 加入——地球仪上显示多个服务器位置标记。
 
 ### 容器列表 `/containers`
 
@@ -461,7 +468,7 @@ COPY web/ .
 RUN pnpm build
 
 # Stage 2: Go 编译
-FROM golang:1.23-alpine AS backend
+FROM golang:1.25-alpine AS backend
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
@@ -470,7 +477,7 @@ COPY --from=frontend /web/dist ./web/dist
 RUN CGO_ENABLED=1 go build -o /passim ./cmd/passim/
 
 # Stage 3: 最终镜像
-FROM alpine:3.20
+FROM alpine:3.21
 RUN apk add --no-cache ca-certificates iperf3
 COPY --from=backend /passim /usr/local/bin/passim
 COPY templates/ /etc/passim/templates/

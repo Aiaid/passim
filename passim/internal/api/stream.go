@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/db"
 	"github.com/passim/passim/internal/metrics"
+	"github.com/passim/passim/internal/node"
 	"github.com/passim/passim/internal/sse"
 )
 
@@ -151,6 +152,37 @@ func unifiedStreamHandler(deps Deps) gin.HandlerFunc {
 			}
 		}()
 
+		// Goroutine: Nodes (10s) — only if NodeHub is available
+		if deps.NodeHub != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				// Send initial snapshot
+				nodes := deps.NodeHub.ListNodes()
+				if nodes == nil {
+					nodes = []node.NodeInfo{}
+				}
+				data, _ := json.Marshal(nodes)
+				writeEvent(sse.Event{Type: "nodes", Data: string(data)})
+
+				ticker := time.NewTicker(10 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-done:
+						return
+					case <-ticker.C:
+						nodes := deps.NodeHub.ListNodes()
+						if nodes == nil {
+							nodes = []node.NodeInfo{}
+						}
+						data, _ := json.Marshal(nodes)
+						writeEvent(sse.Event{Type: "nodes", Data: string(data)})
+					}
+				}
+			}()
+		}
+
 		// Goroutine: Broker forwarder
 		if brokerSub != nil {
 			wg.Add(1)
@@ -208,6 +240,16 @@ func sendInitialSnapshot(ctx context.Context, deps Deps, cache *metricsCache, wr
 	// Apps
 	if aData := collectAppsJSON(deps.DB); aData != nil {
 		writeEvent(sse.Event{Type: "apps", Data: string(aData)})
+	}
+
+	// Nodes
+	if deps.NodeHub != nil {
+		nodes := deps.NodeHub.ListNodes()
+		if nodes == nil {
+			nodes = []node.NodeInfo{}
+		}
+		nData, _ := json.Marshal(nodes)
+		writeEvent(sse.Event{Type: "nodes", Data: string(nData)})
 	}
 }
 

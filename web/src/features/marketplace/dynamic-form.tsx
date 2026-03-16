@@ -32,6 +32,7 @@ interface DynamicFormProps {
   onSubmit: (values: Record<string, unknown>) => void;
   isSubmitting?: boolean;
   submitLabel?: string;
+  children?: React.ReactNode;
 }
 
 function isGenerated(defaultValue: unknown): boolean {
@@ -84,7 +85,7 @@ function buildDefaults(settings: SettingInfo[]): Record<string, unknown> {
   return defaults;
 }
 
-export function DynamicForm({ settings, onSubmit, isSubmitting, submitLabel }: DynamicFormProps) {
+export function DynamicForm({ settings, onSubmit, isSubmitting, submitLabel, children }: DynamicFormProps) {
   const { t, i18n } = useTranslation();
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
@@ -142,6 +143,8 @@ export function DynamicForm({ settings, onSubmit, isSubmitting, submitLabel }: D
             )}
           </>
         )}
+
+        {children}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isSubmitting ? t('marketplace.deploying') : submitLabel ?? t('marketplace.deploy')}
