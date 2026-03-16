@@ -54,10 +54,11 @@ container:
   ports:
     - "3389:3389"
   volumes:
-    - "/data/configs/rdesktop:/config"
+    - "{{node.data_dir}}/configs/rdesktop:/config"
   environment:
     PUID: "1000"
     PGID: "1000"
+    CUSTOM_RES: "{{settings.resolution}}"
   labels:
     io.passim: tools
     io.passim.app: rdesktop

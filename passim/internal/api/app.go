@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -81,7 +82,21 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		// 4. Render template
-		nodeInfo := tmpl.NodeInfo{} // TODO: populate from metrics
+		dataDir := deps.DataDir
+		if dataDir == "" {
+			dataDir = defaultDataDir
+		}
+		hostname, _ := os.Hostname()
+		tz := os.Getenv("TZ")
+		if tz == "" {
+			tz = time.Now().Location().String()
+		}
+		nodeInfo := tmpl.NodeInfo{
+			PublicIP:  cachedIP,
+			Timezone:  tz,
+			Hostname:  hostname,
+			DataDir:   dataDir,
+		}
 		rendered, err := tmpl.Render(t, tmpl.RenderData{
 			Settings:  merged,
 			Node:      nodeInfo,
@@ -94,10 +109,6 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 
 		// 5. Build deploy request
 		appID := uuid.New().String()
-		dataDir := defaultDataDir
-		if d := os.Getenv("DATA_DIR"); d != "" {
-			dataDir = d
-		}
 
 		var configFiles []docker.DeployConfigFile
 		for _, cf := range rendered.ConfigFiles {
@@ -116,8 +127,11 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			Volumes:     rendered.Volumes,
 			Labels:      rendered.Labels,
 			CapAdd:      rendered.CapAdd,
+			Sysctls:     rendered.Sysctls,
+			Args:        rendered.Args,
 			ConfigFiles: configFiles,
 			DataDir:     dataDir,
+			DataVolume:  deps.DataVolume,
 		}
 
 		// Async path: enqueue deploy task
@@ -262,9 +276,9 @@ func deleteAppHandler(deps Deps) gin.HandlerFunc {
 
 		// Async path: enqueue undeploy task
 		if deps.Tasks != nil {
-			dataDir := defaultDataDir
-			if d := os.Getenv("DATA_DIR"); d != "" {
-				dataDir = d
+			dataDir := deps.DataDir
+			if dataDir == "" {
+				dataDir = defaultDataDir
 			}
 
 			payload, _ := json.Marshal(undeployPayload{
@@ -289,9 +303,9 @@ func deleteAppHandler(deps Deps) gin.HandlerFunc {
 
 		// Sync path: undeploy immediately
 		if deps.Docker != nil {
-			dataDir := defaultDataDir
-			if d := os.Getenv("DATA_DIR"); d != "" {
-				dataDir = d
+			dataDir := deps.DataDir
+			if dataDir == "" {
+				dataDir = defaultDataDir
 			}
 			docker.Undeploy(context.Background(), deps.Docker, app.ContainerID, app.Template, app.ID, dataDir)
 		}
@@ -378,9 +392,9 @@ func appConfigsHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		dataDir := defaultDataDir
-		if d := os.Getenv("DATA_DIR"); d != "" {
-			dataDir = d
+		dataDir := deps.DataDir
+		if dataDir == "" {
+			dataDir = defaultDataDir
 		}
 
 		configDir := filepath.Join(dataDir, "apps", app.Template+"-"+app.ID[:8], "configs")
@@ -422,9 +436,9 @@ func appConfigFileHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		dataDir := defaultDataDir
-		if d := os.Getenv("DATA_DIR"); d != "" {
-			dataDir = d
+		dataDir := deps.DataDir
+		if dataDir == "" {
+			dataDir = defaultDataDir
 		}
 
 		configPath := filepath.Join(dataDir, "apps", app.Template+"-"+app.ID[:8], "configs", filename)

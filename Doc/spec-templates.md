@@ -26,6 +26,9 @@
 | `description` (双语) | ✅ 已实现 |
 | `source`, `guide`, `limitations` | ✅ 解析，前端展示 Phase 2 |
 | `container` (image, ports, volumes, cap_add) | ✅ 已实现 |
+| `container.sysctls` | ✅ 已实现 (was missing from pipeline, now fixed) |
+| `container.args` | ✅ 已实现 (was missing from pipeline, now fixed) |
+| `container.restart` | ✅ 已实现 (was declared but not passed, now fixed) |
 | `settings` (类型验证, 范围, 默认值) | ✅ 已实现 |
 | `config.env`, `config.files`, `config.args` | ✅ 已实现 (Go template 渲染) |
 | `generated` (random_string, uuid_v4, random_port) | ✅ 已实现 |
@@ -34,6 +37,8 @@
 | `users` (增删管理) | ⬜ Phase 2 |
 | `metrics.per_user` | ⬜ Phase 2 |
 | `share` | ⬜ Phase 2 |
+
+> **端口映射修复**: 端口映射已修复，ExposedPorts + PortBindings 正确传递到 Docker API。
 
 **已有模板 (7 个)：** wireguard, l2tp, hysteria, v2ray, webdav, samba, rdesktop
 

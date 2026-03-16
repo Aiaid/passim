@@ -23,7 +23,9 @@ type Deps struct {
 	SSL       *ssl.SSLManager
 	Iperf     *speedtest.IperfServer
 	Tasks     *task.Queue
-	SSE       *sse.Broker
+	SSE        *sse.Broker
+	DataDir    string
+	DataVolume string // Docker named volume for DataDir (auto-discovered)
 }
 
 func NewRouter(deps Deps) http.Handler {

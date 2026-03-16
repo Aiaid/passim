@@ -46,7 +46,7 @@ container:
   ports:
     - "8080:80"
   volumes:
-    - "/data/files/webdav:/var/lib/dav"
+    - "{{node.data_dir}}/files/webdav:/var/lib/dav"
   environment:
     AUTH_TYPE: "Digest"
     USERNAME: "{{settings.username}}"

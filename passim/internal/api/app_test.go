@@ -15,7 +15,7 @@ import (
 	tmpl "github.com/passim/passim/internal/template"
 )
 
-func setupAppTest(t *testing.T) (http.Handler, string, *docker.MockClient) {
+func setupAppTest(t *testing.T) (http.Handler, string, *docker.MockClient, string) {
 	t.Helper()
 
 	reg := tmpl.NewRegistry()
@@ -56,16 +56,14 @@ container:
 		CreateID:   "mock-ctr-001",
 	}
 
-	// Set DATA_DIR to temp so config files don't go to /data
 	dataDir := t.TempDir()
-	t.Setenv("DATA_DIR", dataDir)
 
-	router, _, apiKey := testServerFull(t, mock, reg)
-	return router, apiKey, mock
+	router, _, apiKey := testServerFullWithDataDir(t, mock, reg, dataDir)
+	return router, apiKey, mock, dataDir
 }
 
 func TestDeployApp(t *testing.T) {
-	router, apiKey, mock := setupAppTest(t)
+	router, apiKey, mock, _ := setupAppTest(t)
 	token := getToken(t, router, apiKey)
 
 	body, _ := json.Marshal(map[string]interface{}{
@@ -122,7 +120,7 @@ func TestDeployApp(t *testing.T) {
 }
 
 func TestDeployApp_TemplateNotFound(t *testing.T) {
-	router, apiKey, _ := setupAppTest(t)
+	router, apiKey, _, _ := setupAppTest(t)
 	token := getToken(t, router, apiKey)
 
 	body, _ := json.Marshal(map[string]interface{}{
@@ -140,7 +138,7 @@ func TestDeployApp_TemplateNotFound(t *testing.T) {
 }
 
 func TestDeployApp_InvalidSettings(t *testing.T) {
-	router, apiKey, _ := setupAppTest(t)
+	router, apiKey, _, _ := setupAppTest(t)
 	token := getToken(t, router, apiKey)
 
 	body, _ := json.Marshal(map[string]interface{}{
@@ -159,7 +157,7 @@ func TestDeployApp_InvalidSettings(t *testing.T) {
 }
 
 func TestDeployApp_DefaultSettings(t *testing.T) {
-	router, apiKey, _ := setupAppTest(t)
+	router, apiKey, _, _ := setupAppTest(t)
 	token := getToken(t, router, apiKey)
 
 	body, _ := json.Marshal(map[string]interface{}{
@@ -184,7 +182,7 @@ func TestDeployApp_DefaultSettings(t *testing.T) {
 }
 
 func TestListApps_Empty(t *testing.T) {
-	router, apiKey, _ := setupAppTest(t)
+	router, apiKey, _, _ := setupAppTest(t)
 	token := getToken(t, router, apiKey)
 
 	req := httptest.NewRequest("GET", "/api/apps", nil)
@@ -204,7 +202,7 @@ func TestListApps_Empty(t *testing.T) {
 }
 
 func TestAppLifecycle(t *testing.T) {
-	router, apiKey, _ := setupAppTest(t)
+	router, apiKey, _, _ := setupAppTest(t)
 	token := getToken(t, router, apiKey)
 
 	// Deploy
@@ -290,7 +288,7 @@ func TestAppLifecycle(t *testing.T) {
 }
 
 func TestGetApp_NotFound(t *testing.T) {
-	router, apiKey, _ := setupAppTest(t)
+	router, apiKey, _, _ := setupAppTest(t)
 	token := getToken(t, router, apiKey)
 
 	req := httptest.NewRequest("GET", "/api/apps/nonexistent-id", nil)
@@ -304,7 +302,7 @@ func TestGetApp_NotFound(t *testing.T) {
 }
 
 func TestAppConfigs(t *testing.T) {
-	router, apiKey, _ := setupAppTest(t)
+	router, apiKey, _, dataDir := setupAppTest(t)
 	token := getToken(t, router, apiKey)
 
 	// Deploy an app first
@@ -321,7 +319,6 @@ func TestAppConfigs(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &deployed)
 
 	// Write a config file manually
-	dataDir := os.Getenv("DATA_DIR")
 	configDir := filepath.Join(dataDir, "apps", "testapp-"+deployed.ID[:8], "configs")
 	os.MkdirAll(configDir, 0755)
 	os.WriteFile(filepath.Join(configDir, "test.conf"), []byte("config content"), 0644)
@@ -356,7 +353,7 @@ func TestAppConfigs(t *testing.T) {
 }
 
 func TestAppConfigs_NoConfigs(t *testing.T) {
-	router, apiKey, _ := setupAppTest(t)
+	router, apiKey, _, _ := setupAppTest(t)
 	token := getToken(t, router, apiKey)
 
 	// Deploy an app
@@ -384,7 +381,7 @@ func TestAppConfigs_NoConfigs(t *testing.T) {
 }
 
 func TestDeployApp_NoAuth(t *testing.T) {
-	router, _, _ := setupAppTest(t)
+	router, _, _, _ := setupAppTest(t)
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"template": "testapp",
@@ -400,7 +397,7 @@ func TestDeployApp_NoAuth(t *testing.T) {
 }
 
 func TestDeleteApp_NotFound(t *testing.T) {
-	router, apiKey, _ := setupAppTest(t)
+	router, apiKey, _, _ := setupAppTest(t)
 	token := getToken(t, router, apiKey)
 
 	req := httptest.NewRequest("DELETE", "/api/apps/nonexistent", nil)

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -28,7 +29,10 @@ import (
 var webDist embed.FS
 
 func main() {
-	database, err := db.Open("/data/passim.db")
+	dataDir := getEnvDefault("DATA_DIR", "/data")
+	templateDir := getEnvDefault("TEMPLATE_DIR", "/etc/passim/templates")
+
+	database, err := db.Open(filepath.Join(dataDir, "passim.db"))
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
 	}
@@ -58,7 +62,7 @@ func main() {
 
 	// Template registry
 	registry := template.NewRegistry()
-	if err := registry.LoadDir("/etc/passim/templates"); err != nil {
+	if err := registry.LoadDir(templateDir); err != nil {
 		log.Printf("warning: failed to load templates: %v", err)
 	}
 
@@ -72,7 +76,7 @@ func main() {
 	if sslMode != "off" {
 		sslMgr = ssl.NewSSLManager(ssl.SSLManagerConfig{
 			Mode:       sslMode,
-			DataDir:    "/data",
+			DataDir:    dataDir,
 			Domain:     sslDomain,
 			BaseDomain: sslBaseDomain,
 			Email:      sslEmail,
@@ -112,16 +116,27 @@ func main() {
 		log.Printf("warning: WebAuthn init failed: %v", err)
 	}
 
+	// Auto-discover Docker volume backing dataDir (for Docker-in-Docker deploys)
+	dataVolume := os.Getenv("DATA_VOLUME") // explicit override
+	if dataVolume == "" && dockerClient != nil {
+		dataVolume = discoverDataVolume(dockerClient, dataDir)
+		if dataVolume != "" {
+			log.Printf("auto-discovered data volume: %s", dataVolume)
+		}
+	}
+
 	deps := api.Deps{
-		DB:        database,
-		JWT:       jwtMgr,
-		WebAuthn:  webauthnMgr,
-		Docker:    dockerClient,
-		Templates: registry,
-		SSL:       sslMgr,
-		Iperf:     iperfSrv,
-		Tasks:     taskQueue,
-		SSE:       sseBroker,
+		DB:         database,
+		JWT:        jwtMgr,
+		WebAuthn:   webauthnMgr,
+		Docker:     dockerClient,
+		Templates:  registry,
+		SSL:        sslMgr,
+		Iperf:      iperfSrv,
+		Tasks:      taskQueue,
+		SSE:        sseBroker,
+		DataDir:    dataDir,
+		DataVolume: dataVolume,
 	}
 
 	// Register task handlers (deploy/undeploy) — after deps assembled
@@ -204,4 +219,26 @@ func getEnvDefault(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// discoverDataVolume inspects the current container to find the Docker named
+// volume mounted at dataDir. Returns empty string if not running in Docker
+// or no volume is found.
+func discoverDataVolume(dockerClient docker.DockerClient, dataDir string) string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	info, err := dockerClient.InspectContainer(ctx, hostname)
+	if err != nil {
+		return "" // not in Docker or can't inspect self
+	}
+	for _, m := range info.Mounts {
+		if m.Destination == dataDir && string(m.Type) == "volume" {
+			return m.Name
+		}
+	}
+	return ""
 }

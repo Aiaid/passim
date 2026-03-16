@@ -12,6 +12,7 @@ type NodeInfo struct {
 	PublicIP string
 	Timezone string
 	Hostname string
+	DataDir  string
 }
 
 // RenderData carries all data available during template rendering.
@@ -50,6 +51,7 @@ func buildFlatMap(data RenderData) map[string]interface{} {
 	m["node_PublicIP"] = data.Node.PublicIP
 	m["node_Timezone"] = data.Node.Timezone
 	m["node_Hostname"] = data.Node.Hostname
+	m["node_data_dir"] = data.Node.DataDir
 	for k, v := range data.Generated {
 		m["generated_"+k] = v
 	}

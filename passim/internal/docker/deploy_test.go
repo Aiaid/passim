@@ -147,6 +147,120 @@ func TestUndeploy(t *testing.T) {
 	}
 }
 
+func TestDeploy_WithArgs(t *testing.T) {
+	mock := &MockClient{
+		PullReader: io.NopCloser(strings.NewReader("")),
+		CreateID:   "container-args-001",
+	}
+
+	req := &DeployRequest{
+		AppID:   "11111111-2222-3333-4444-555555555555",
+		AppName: "testapp",
+		Image:   "test/image:latest",
+		Args:    []string{"server", "-c", "/etc/app/config.yaml"},
+		DataDir: t.TempDir(),
+	}
+
+	result, err := Deploy(context.Background(), mock, req)
+	if err != nil {
+		t.Fatalf("Deploy() error: %v", err)
+	}
+	if result.ContainerID != "container-args-001" {
+		t.Errorf("ContainerID = %q", result.ContainerID)
+	}
+
+	found := false
+	for _, call := range mock.Calls {
+		if call.Method == "CreateAndStartContainer" {
+			found = true
+			cfg := call.Args[0].(*ContainerConfig)
+			if len(cfg.Cmd) != 3 {
+				t.Fatalf("Cmd length = %d, want 3", len(cfg.Cmd))
+			}
+			if cfg.Cmd[0] != "server" || cfg.Cmd[1] != "-c" || cfg.Cmd[2] != "/etc/app/config.yaml" {
+				t.Errorf("Cmd = %v, want [server -c /etc/app/config.yaml]", cfg.Cmd)
+			}
+		}
+	}
+	if !found {
+		t.Error("CreateAndStartContainer not called")
+	}
+}
+
+func TestDeploy_WithSysctls(t *testing.T) {
+	mock := &MockClient{
+		PullReader: io.NopCloser(strings.NewReader("")),
+		CreateID:   "container-sysctl-001",
+	}
+
+	req := &DeployRequest{
+		AppID:   "11111111-2222-3333-4444-555555555555",
+		AppName: "testapp",
+		Image:   "test/image:latest",
+		Sysctls: map[string]string{"net.ipv4.conf.all.src_valid_mark": "1"},
+		DataDir: t.TempDir(),
+	}
+
+	_, err := Deploy(context.Background(), mock, req)
+	if err != nil {
+		t.Fatalf("Deploy() error: %v", err)
+	}
+
+	found := false
+	for _, call := range mock.Calls {
+		if call.Method == "CreateAndStartContainer" {
+			found = true
+			cfg := call.Args[0].(*ContainerConfig)
+			if cfg.Sysctls == nil {
+				t.Fatal("Sysctls is nil")
+			}
+			v, ok := cfg.Sysctls["net.ipv4.conf.all.src_valid_mark"]
+			if !ok {
+				t.Error("missing sysctl net.ipv4.conf.all.src_valid_mark")
+			}
+			if v != "1" {
+				t.Errorf("sysctl value = %q, want %q", v, "1")
+			}
+		}
+	}
+	if !found {
+		t.Error("CreateAndStartContainer not called")
+	}
+}
+
+func TestDeploy_RestartPolicyApplied(t *testing.T) {
+	mock := &MockClient{
+		PullReader: io.NopCloser(strings.NewReader("")),
+		CreateID:   "container-restart-001",
+	}
+
+	req := &DeployRequest{
+		AppID:   "11111111-2222-3333-4444-555555555555",
+		AppName: "testapp",
+		Image:   "test/image:latest",
+		DataDir: t.TempDir(),
+	}
+
+	_, err := Deploy(context.Background(), mock, req)
+	if err != nil {
+		t.Fatalf("Deploy() error: %v", err)
+	}
+
+	found := false
+	for _, call := range mock.Calls {
+		if call.Method == "CreateAndStartContainer" {
+			found = true
+			cfg := call.Args[0].(*ContainerConfig)
+			if cfg.RestartPolicy != "unless-stopped" {
+				t.Errorf("RestartPolicy = %q, want %q", cfg.RestartPolicy, "unless-stopped")
+			}
+		}
+	}
+	if !found {
+		t.Error("CreateAndStartContainer not called")
+	}
+}
+
 func TestWriteConfigFiles(t *testing.T) {
 	dataDir := t.TempDir()
 	req := &DeployRequest{

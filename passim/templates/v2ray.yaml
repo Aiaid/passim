@@ -47,7 +47,7 @@ container:
   ports:
     - "{{settings.port}}:10086"
   volumes:
-    - "/data/configs/v2ray:/etc/v2ray"
+    - "{{node.data_dir}}/configs/v2ray:/etc/v2ray"
   environment: {}
   labels:
     io.passim: vpn
@@ -58,7 +58,7 @@ container:
     - "/etc/v2ray/config.json"
 config:
   files:
-    - path: /data/configs/v2ray/config.json
+    - path: "{{node.data_dir}}/configs/v2ray/config.json"
       template: |
         {
           "inbounds": [

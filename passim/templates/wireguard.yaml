@@ -36,7 +36,7 @@ container:
   ports:
     - "51820:51820/udp"
   volumes:
-    - "/data/configs/wireguard:/config"
+    - "{{node.data_dir}}/configs/wireguard:/config"
   environment:
     PEERS: "{{settings.peers}}"
   labels:
@@ -64,5 +64,5 @@ clients:
       zh-CN: "从 wireguard.com 下载 WireGuard 并导入生成的节点 .conf 文件。"
 config_export:
   format: conf
-  path: /data/configs/wireguard/wg_confs/
+  path: "{{node.data_dir}}/configs/wireguard/wg_confs/"
   pattern: "peer*.conf"

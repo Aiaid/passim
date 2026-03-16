@@ -33,6 +33,8 @@ type MockClient struct {
 	PullErr         error
 	CreateID        string
 	CreateErr       error
+	ExecOutput      string
+	ExecErr         error
 	PingErr         error
 }
 
@@ -83,6 +85,11 @@ func (m *MockClient) PullImage(ctx context.Context, ref string) (io.ReadCloser, 
 func (m *MockClient) CreateAndStartContainer(ctx context.Context, cfg *ContainerConfig) (string, error) {
 	m.record("CreateAndStartContainer", cfg)
 	return m.CreateID, m.CreateErr
+}
+
+func (m *MockClient) ExecContainer(ctx context.Context, id string, cmd []string) (string, error) {
+	m.record("ExecContainer", id, cmd)
+	return m.ExecOutput, m.ExecErr
 }
 
 func (m *MockClient) Ping(ctx context.Context) error {

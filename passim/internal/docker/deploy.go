@@ -20,8 +20,10 @@ type DeployRequest struct {
 	Labels      map[string]string
 	CapAdd      []string
 	Sysctls     map[string]string
+	Args        []string
 	ConfigFiles []DeployConfigFile
 	DataDir     string // base data directory (e.g. /data)
+	DataVolume  string // Docker named volume for DataDir (e.g. "passim_passim-data")
 }
 
 // DeployConfigFile is a config file to write before starting the container.
@@ -42,7 +44,10 @@ func Deploy(ctx context.Context, client DockerClient, req *DeployRequest) (*Depl
 		return nil, fmt.Errorf("docker client is nil")
 	}
 
-	// 1. Write config files
+	// 1. Pre-create volume directories and write config files
+	if err := ensureVolumeDirs(req); err != nil {
+		return nil, fmt.Errorf("create volume dirs: %w", err)
+	}
 	if err := writeConfigFiles(req); err != nil {
 		return nil, fmt.Errorf("write configs: %w", err)
 	}
@@ -84,7 +89,11 @@ func Deploy(ctx context.Context, client DockerClient, req *DeployRequest) (*Depl
 		Volumes:       req.Volumes,
 		Labels:        req.Labels,
 		CapAdd:        req.CapAdd,
+		Sysctls:       req.Sysctls,
+		Cmd:           req.Args,
 		RestartPolicy: "unless-stopped",
+		DataDir:       req.DataDir,
+		DataVolume:    req.DataVolume,
 	}
 
 	id, err := client.CreateAndStartContainer(ctx, cfg)
@@ -113,6 +122,26 @@ func Undeploy(ctx context.Context, client DockerClient, containerID string, appN
 		os.RemoveAll(configDir)
 	}
 
+	return nil
+}
+
+// ensureVolumeDirs pre-creates host-side directories for all volume mounts
+// under DataDir. This is required for Docker volume subpath mounts which
+// expect the subpath directory to already exist.
+func ensureVolumeDirs(req *DeployRequest) error {
+	if req.DataDir == "" {
+		return nil
+	}
+	prefix := strings.TrimSuffix(req.DataDir, "/") + "/"
+	for _, v := range req.Volumes {
+		parts := strings.SplitN(v, ":", 2)
+		hostPath := parts[0]
+		if strings.HasPrefix(hostPath, prefix) {
+			if err := os.MkdirAll(hostPath, 0755); err != nil {
+				return fmt.Errorf("mkdir %s: %w", hostPath, err)
+			}
+		}
+	}
 	return nil
 }
 

@@ -70,6 +70,38 @@ func testServerWithDeps(t *testing.T, dockerClient docker.DockerClient) (http.Ha
 	return router, database, plain, mock
 }
 
+// testServerFullWithDataDir creates a test server with mock Docker, template registry, and custom DataDir.
+func testServerFullWithDataDir(t *testing.T, mock *docker.MockClient, reg *template.Registry, dataDir string) (http.Handler, *sql.DB, string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "test.db")
+	database, err := db.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrate(database); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		database.Close()
+		os.Remove(path)
+	})
+
+	plain, hash, err := auth.GenerateAPIKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetConfig(database, "api_key_hash", hash)
+	db.SetConfig(database, "auth_version", "1")
+
+	secret, _ := auth.GenerateSecret()
+	db.SetConfig(database, "jwt_secret", secret)
+
+	jwtMgr := auth.NewJWTManager(secret, 1*time.Hour)
+
+	router := NewRouter(Deps{DB: database, JWT: jwtMgr, Docker: mock, Templates: reg, DataDir: dataDir})
+	return router, database, plain
+}
+
 // testServerFull creates a test server with mock Docker and a template registry.
 func testServerFull(t *testing.T, mock *docker.MockClient, reg *template.Registry) (http.Handler, *sql.DB, string) {
 	t.Helper()

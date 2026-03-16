@@ -56,7 +56,7 @@ container:
     - "139:139"
     - "445:445"
   volumes:
-    - "/data/files/samba:/mount"
+    - "{{node.data_dir}}/files/samba:/mount"
   environment: {}
   labels:
     io.passim: storage
