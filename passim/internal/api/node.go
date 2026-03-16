@@ -3,9 +3,12 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/node"
@@ -254,5 +257,97 @@ func listConnectionsHandler(deps Deps) gin.HandlerFunc {
 func disconnectHandler(deps Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented"})
+	}
+}
+
+// ── Server-side speed test to a remote node ──────────────
+
+type nodeSpeedtestResult struct {
+	Download  float64 `json:"download"`  // Mbps
+	Upload    float64 `json:"upload"`    // Mbps
+	Latency   float64 `json:"latency"`   // ms
+	Jitter    float64 `json:"jitter"`    // ms
+	Timestamp string  `json:"timestamp"`
+}
+
+func nodeSpeedtestHandler(deps Deps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if deps.NodeHub == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node management not available"})
+			return
+		}
+
+		nodeID := c.Param("id")
+		ctx := c.Request.Context()
+
+		// Phase 1: Download — fetch 10MB from remote, measure locally
+		dlStart := time.Now()
+		_, dlBody, err := deps.NodeHub.ProxyRequest(ctx, nodeID, "GET", "/api/speedtest/download?size=10mb", nil)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "download failed: " + err.Error()})
+			return
+		}
+		dlDuration := time.Since(dlStart).Seconds()
+		if dlDuration == 0 {
+			dlDuration = 0.001
+		}
+		dlSpeed := float64(len(dlBody)*8) / (dlDuration * 1_000_000)
+
+		// Phase 2: Upload — send 5MB to remote, measure locally
+		uploadData := make([]byte, 5*1024*1024)
+		rand.Read(uploadData)
+		ulStart := time.Now()
+		_, ulBody, err := deps.NodeHub.ProxyRequest(ctx, nodeID, "POST", "/api/speedtest/upload", bytes.NewReader(uploadData))
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "upload failed: " + err.Error()})
+			return
+		}
+		ulDuration := time.Since(ulStart).Seconds()
+		if ulDuration == 0 {
+			ulDuration = 0.001
+		}
+		ulSpeed := float64(len(uploadData)*8) / (ulDuration * 1_000_000)
+		// Also check remote's measurement, use the lower value
+		var remoteUL struct {
+			SpeedMbps float64 `json:"speed_mbps"`
+		}
+		if json.Unmarshal(ulBody, &remoteUL) == nil && remoteUL.SpeedMbps > 0 && remoteUL.SpeedMbps < ulSpeed {
+			ulSpeed = remoteUL.SpeedMbps
+		}
+
+		// Phase 3: Latency & Jitter — 10 pings
+		const pingCount = 10
+		pings := make([]float64, 0, pingCount)
+		for i := 0; i < pingCount; i++ {
+			t0 := time.Now()
+			_, _, err := deps.NodeHub.ProxyRequest(ctx, nodeID, "GET", "/api/speedtest/ping", nil)
+			if err != nil {
+				continue
+			}
+			pings = append(pings, float64(time.Since(t0).Microseconds()) / 1000.0)
+		}
+
+		var avgLatency, jitter float64
+		if len(pings) > 0 {
+			sum := 0.0
+			for _, p := range pings {
+				sum += p
+			}
+			avgLatency = sum / float64(len(pings))
+
+			variance := 0.0
+			for _, p := range pings {
+				variance += (p - avgLatency) * (p - avgLatency)
+			}
+			jitter = math.Sqrt(variance / float64(len(pings)))
+		}
+
+		c.JSON(http.StatusOK, nodeSpeedtestResult{
+			Download:  math.Round(dlSpeed*100) / 100,
+			Upload:    math.Round(ulSpeed*100) / 100,
+			Latency:   math.Round(avgLatency*10) / 10,
+			Jitter:    math.Round(jitter*10) / 10,
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+		})
 	}
 }

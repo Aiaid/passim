@@ -37,11 +37,13 @@ function loadHistory(): SpeedTestResult[] {
 export function useSpeedTest() {
   const [phase, setPhase] = useState<TestPhase>('idle');
   const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<SpeedTestResult | null>(loadResult);
+  const [result, setResult] = useState<SpeedTestResult | null>(() => loadResult());
   const [partial, setPartial] = useState<Partial<SpeedTestResult>>({});
   const [history, setHistory] = useState<SpeedTestResult[]>(loadHistory);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const prefix = '/api/speedtest';
 
   const runTest = useCallback(async () => {
     abortRef.current = new AbortController();
@@ -49,12 +51,15 @@ export function useSpeedTest() {
     setError(null);
     setPartial({});
 
+    const authHeaders: HeadersInit = {};
+
     try {
       // Phase 1: Download
       setPhase('download');
       setProgress(0);
+      const dlSize = DOWNLOAD_SIZE;
       const dlStart = performance.now();
-      const dlRes = await fetch(`/api/speedtest/download?size=${DOWNLOAD_SIZE}`, { signal });
+      const dlRes = await fetch(`${prefix}/download?size=${dlSize}`, { signal, headers: authHeaders });
       const reader = dlRes.body!.getReader();
       const contentLength = parseInt(dlRes.headers.get('Content-Length') || '0');
       let dlBytes = 0;
@@ -74,13 +79,14 @@ export function useSpeedTest() {
       setPhase('upload');
       setProgress(0);
       const uploadData = new ArrayBuffer(UPLOAD_SIZE);
-      const ulRes = await fetch('/api/speedtest/upload', {
+      const ulRes = await fetch(`${prefix}/upload`, {
         method: 'POST',
         body: uploadData,
         signal,
+        headers: authHeaders,
       });
       const ulJson = await ulRes.json();
-      const ulSpeed = Math.round(ulJson.speed_mbps * 100) / 100;
+      const ulSpeed = Math.round((ulJson.speed_mbps ?? 0) * 100) / 100;
       setPartial((prev) => ({ ...prev, upload: ulSpeed }));
       setProgress(100);
 
@@ -90,7 +96,7 @@ export function useSpeedTest() {
       const pings: number[] = [];
       for (let i = 0; i < PING_COUNT; i++) {
         const t0 = performance.now();
-        await fetch('/api/speedtest/ping', { signal });
+        await fetch(`${prefix}/ping`, { signal, headers: authHeaders });
         pings.push(performance.now() - t0);
         setProgress(Math.round(((i + 1) / PING_COUNT) * 100));
       }
@@ -113,9 +119,9 @@ export function useSpeedTest() {
       setPartial({});
       setPhase('idle');
 
+      localStorage.setItem(STORAGE_KEY_LAST, JSON.stringify(testResult));
       const newHistory = [testResult, ...loadHistory()].slice(0, 10);
       setHistory(newHistory);
-      localStorage.setItem(STORAGE_KEY_LAST, JSON.stringify(testResult));
       localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(newHistory));
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {

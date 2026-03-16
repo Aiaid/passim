@@ -126,6 +126,9 @@ func NewRouter(deps Deps) http.Handler {
 			protected.DELETE("/nodes/:id/apps/:appId", nodeProxyHandler(deps, "DELETE", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") }))
 			protected.GET("/nodes/:id/apps/:appId/configs", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") + "/configs" }))
 
+			// Node server-side speed test (local → remote, no browser middleman)
+			protected.POST("/nodes/:id/speedtest", nodeSpeedtestHandler(deps))
+
 			// Batch deploy
 			protected.POST("/batch/deploy", batchDeployHandler(deps))
 

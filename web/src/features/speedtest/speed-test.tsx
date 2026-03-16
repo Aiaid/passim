@@ -202,9 +202,9 @@ function ResultBox({
         <>
           <div className="mt-2 flex items-baseline gap-1">
             <span className="text-2xl font-bold tabular-nums">
-              {value !== undefined ? formatValue(value) : '--'}
+              {value != null ? formatValue(value) : '--'}
             </span>
-            {value !== undefined && (
+            {value != null && (
               <span className="text-sm text-muted-foreground">{unit}</span>
             )}
           </div>

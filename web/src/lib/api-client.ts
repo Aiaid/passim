@@ -143,6 +143,10 @@ export const api = {
     request<AppResponse>(`/nodes/${nodeId}/apps`, { method: 'POST', body: JSON.stringify(data) }),
   batchDeploy: (data: { template: string; settings: Record<string, unknown>; targets: string[] }) =>
     request<{ task_id: string }>('/batch/deploy', { method: 'POST', body: JSON.stringify(data) }),
+  runNodeSpeedTest: (nodeId: string) =>
+    request<{ download: number; upload: number; latency: number; jitter: number; timestamp: string }>(
+      `/nodes/${nodeId}/speedtest`, { method: 'POST' },
+    ),
 
   // Connections
   getConnections: () => request<ConnectionInfo[]>('/connections'),

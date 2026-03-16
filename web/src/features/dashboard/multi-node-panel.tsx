@@ -34,16 +34,16 @@ function MetricBar({ label, percent, color }: {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground/50 w-7 shrink-0 font-medium">
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground w-7 shrink-0 font-medium">
         {label}
       </span>
-      <div className="flex-1 h-1 rounded-full bg-foreground/[0.06] overflow-hidden">
+      <div className="flex-1 h-1 rounded-full bg-muted/30 overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-700 ease-out"
           style={{ width: `${clamped}%`, backgroundColor: barColor }}
         />
       </div>
-      <span className="text-[10px] font-semibold tabular-nums text-foreground/50 w-7 text-right">
+      <span className="text-[10px] font-semibold tabular-nums text-muted-foreground w-7 text-right">
         {Math.round(clamped)}%
       </span>
     </div>
@@ -75,7 +75,7 @@ function LocalNodeCard({ onClick }: { onClick?: () => void }) {
         </span>
         <span className="text-sm font-semibold truncate">{node.name}</span>
         {node.country && <span className="text-sm">{countryFlag(node.country)}</span>}
-        <span className="ml-auto text-[9px] text-muted-foreground/40 uppercase tracking-widest font-medium">
+        <span className="ml-auto text-[9px] text-muted-foreground uppercase tracking-widest font-medium">
           {t('node.this_server')}
         </span>
       </div>
@@ -86,7 +86,7 @@ function LocalNodeCard({ onClick }: { onClick?: () => void }) {
         <MetricBar label="DSK" percent={diskPercent} color="var(--color-chart-4)" />
       </div>
 
-      <div className="flex items-center justify-between text-[10px] text-muted-foreground/40 font-mono">
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
         <span>{node.public_ip ?? '—'}</span>
         <span>up {formatUptime(node.uptime)}</span>
         <span>{containers.running}/{containers.total} ctrs</span>
@@ -118,12 +118,12 @@ function RemoteNodeRow({ node, expanded, onToggle, onDetail }: {
         </span>
         {node.country && <span className="text-[11px]">{countryFlag(node.country)}</span>}
         {isConnected && node.metrics && (
-          <span className="text-[10px] tabular-nums text-muted-foreground/40 font-mono">
+          <span className="text-[10px] tabular-nums text-muted-foreground font-mono">
             {node.metrics.cpu_percent.toFixed(0)}%
           </span>
         )}
         <ChevronRight className={cn(
-          'size-3 text-muted-foreground/25 transition-transform duration-200 shrink-0',
+          'size-3 text-muted-foreground transition-transform duration-200 shrink-0',
           expanded && 'rotate-90'
         )} />
       </button>
@@ -135,7 +135,7 @@ function RemoteNodeRow({ node, expanded, onToggle, onDetail }: {
               <MetricBar label="CPU" percent={node.metrics.cpu_percent} color="var(--color-chart-1)" />
               <MetricBar label="MEM" percent={node.metrics.memory_percent} color="var(--color-chart-2)" />
               <MetricBar label="DSK" percent={node.metrics.disk_percent} color="var(--color-chart-4)" />
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground/35 mt-1.5 pt-1.5 border-t border-border/20">
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5 pt-1.5 border-t border-border">
                 <span className="font-mono">{node.address}</span>
                 {onDetail && (
                   <button
@@ -150,7 +150,7 @@ function RemoteNodeRow({ node, expanded, onToggle, onDetail }: {
               </div>
             </div>
           ) : (
-            <p className="text-[10px] text-muted-foreground/25 italic py-1">
+            <p className="text-[10px] text-muted-foreground italic py-1">
               {node.status === 'connecting' ? t('node.connecting') : t('node.disconnected')}
             </p>
           )}
@@ -212,12 +212,12 @@ function AppsMatrix({ localApps, nodes, onAppClick }: {
   if (entries.length === 0) {
     return (
       <div className="text-center py-3">
-        <AppWindow className="size-4 text-muted-foreground/15 mx-auto mb-1.5" />
-        <p className="text-[10px] text-muted-foreground/25">{t('dashboard.no_apps')}</p>
+        <AppWindow className="size-4 text-muted-foreground mx-auto mb-1.5" />
+        <p className="text-[10px] text-muted-foreground">{t('dashboard.no_apps')}</p>
         <Button
           variant="ghost"
           size="sm"
-          className="mt-1.5 h-6 text-[10px] text-muted-foreground/35 hover:text-muted-foreground/60"
+          className="mt-1.5 h-6 text-[10px] text-muted-foreground hover:text-foreground"
           onClick={() => navigate('/apps/new')}
         >
           <Plus className="size-2.5 mr-0.5" />
@@ -265,7 +265,7 @@ function AppsMatrix({ localApps, nodes, onAppClick }: {
                       'size-1 rounded-full shrink-0',
                       isDeployed
                         ? isRunning ? 'bg-status-running' : 'bg-status-warning'
-                        : 'bg-muted-foreground/15'
+                        : 'bg-muted-foreground/30'
                     )} />
                     {node.name}
                   </span>
@@ -303,8 +303,8 @@ export function MultiNodePanel({ onNodeClick, onAppClick }: MultiNodePanelProps)
         {/* Remote Nodes */}
         <div className="mn-section">
           <div className="mn-section-header">
-            <Globe className="size-3 text-muted-foreground/35" />
-            <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/35">
+            <Globe className="size-3 text-muted-foreground" />
+            <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
               {t('node.title')}
             </span>
             <span className="mn-count-badge">{nodes?.length ?? 0}</span>
@@ -325,8 +325,8 @@ export function MultiNodePanel({ onNodeClick, onAppClick }: MultiNodePanelProps)
         {/* Apps Matrix */}
         <div className="mn-section">
           <div className="mn-section-header">
-            <AppWindow className="size-3 text-muted-foreground/35" />
-            <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/35">
+            <AppWindow className="size-3 text-muted-foreground" />
+            <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
               {t('dashboard.apps')}
             </span>
           </div>
