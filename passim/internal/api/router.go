@@ -12,6 +12,7 @@ import (
 	"github.com/passim/passim/internal/ssl"
 	"github.com/passim/passim/internal/task"
 	"github.com/passim/passim/internal/template"
+	"github.com/passim/passim/internal/version"
 )
 
 type Deps struct {
@@ -41,6 +42,14 @@ func NewRouter(deps Deps) http.Handler {
 	api := r.Group("/api")
 	{
 		// Public — no auth required
+		api.GET("/version", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"version":    version.Version,
+				"commit":     version.Commit,
+				"build_time": version.BuildTime,
+			})
+		})
+
 		authGroup := api.Group("/auth")
 		{
 			authGroup.POST("/login", ah.login)

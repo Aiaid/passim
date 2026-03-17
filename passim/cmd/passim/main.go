@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -24,12 +25,18 @@ import (
 	"github.com/passim/passim/internal/ssl"
 	"github.com/passim/passim/internal/task"
 	"github.com/passim/passim/internal/template"
+	"github.com/passim/passim/internal/version"
 )
 
 //go:embed all:dist
 var webDist embed.FS
 
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		fmt.Printf("passim %s (%s) built %s\n", version.Version, version.Commit, version.BuildTime)
+		os.Exit(0)
+	}
+
 	dataDir := getEnvDefault("DATA_DIR", "/data")
 	templateDir := getEnvDefault("TEMPLATE_DIR", "/etc/passim/templates")
 

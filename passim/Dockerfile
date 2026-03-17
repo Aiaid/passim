@@ -9,6 +9,8 @@ RUN pnpm build
 
 # Stage 2: Go build
 FROM golang:1.25-alpine AS backend
+ARG VERSION=dev
+ARG COMMIT=unknown
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /app
 COPY passim/go.mod passim/go.sum ./passim/
@@ -19,7 +21,11 @@ COPY passim/ ./passim/
 COPY --from=frontend /web/dist ./passim/cmd/passim/dist/
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    cd passim && CGO_ENABLED=1 go build -o /passim ./cmd/passim/
+    cd passim && CGO_ENABLED=1 go build \
+      -ldflags "-X github.com/passim/passim/internal/version.Version=${VERSION} \
+                -X github.com/passim/passim/internal/version.Commit=${COMMIT} \
+                -X github.com/passim/passim/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      -o /passim ./cmd/passim/
 
 # Stage 3: Final image
 FROM alpine:3.21

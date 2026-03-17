@@ -33,8 +33,8 @@ func TestStatus_ReturnsFullStructure(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if resp.Node.Version != "0.1.0" {
-		t.Errorf("expected version 0.1.0, got %s", resp.Node.Version)
+	if resp.Node.Version == "" {
+		t.Error("expected non-empty version")
 	}
 	if resp.System.Memory.TotalBytes == 0 {
 		t.Error("expected non-zero memory total")

@@ -14,6 +14,7 @@ import (
 	"github.com/passim/passim/internal/metrics"
 	"github.com/passim/passim/internal/node"
 	"github.com/passim/passim/internal/sse"
+	"github.com/passim/passim/internal/version"
 )
 
 // metricsCache stores the latest metrics to avoid redundant collection.
@@ -294,7 +295,7 @@ func buildStatusResponse(ctx context.Context, deps Deps, cache *metricsCache) st
 		Node: nodeInfo{
 			ID:         nodeID,
 			Name:       nodeName,
-			Version:    "0.1.0",
+			Version:    version.Version,
 			Uptime:     m.Uptime,
 			PublicIP:   cachedIP,
 			PublicIPv6: cachedIPv6,

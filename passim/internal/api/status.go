@@ -13,6 +13,7 @@ import (
 	"github.com/passim/passim/internal/db"
 	"github.com/passim/passim/internal/metrics"
 	"github.com/passim/passim/internal/ssl"
+	"github.com/passim/passim/internal/version"
 )
 
 type statusResponse struct {
@@ -170,7 +171,7 @@ func statusHandler(deps Deps) gin.HandlerFunc {
 			Node: nodeInfo{
 				ID:         nodeID,
 				Name:       nodeName,
-				Version:    "0.1.0",
+				Version:    version.Version,
 				Uptime:     m.Uptime,
 				PublicIP:   cachedIP,
 				PublicIPv6: cachedIPv6,
