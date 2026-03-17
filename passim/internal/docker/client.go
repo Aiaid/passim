@@ -26,6 +26,7 @@ type DockerClient interface {
 	ContainerLogs(ctx context.Context, id string, lines int) (io.ReadCloser, error)
 	PullImage(ctx context.Context, ref string) (io.ReadCloser, error)
 	CreateAndStartContainer(ctx context.Context, cfg *ContainerConfig) (string, error)
+	RenameContainer(ctx context.Context, id string, newName string) error
 	ExecContainer(ctx context.Context, id string, cmd []string) (string, error)
 	Ping(ctx context.Context) error
 	Close() error
@@ -194,6 +195,10 @@ func parseVolumeSpec(spec string) (hostPath, target string, readOnly bool) {
 	default: // 3+
 		return parts[0], parts[1], parts[2] == "ro"
 	}
+}
+
+func (c *Client) RenameContainer(ctx context.Context, id string, newName string) error {
+	return c.cli.ContainerRename(ctx, id, newName)
 }
 
 func (c *Client) ExecContainer(ctx context.Context, id string, cmd []string) (string, error) {
