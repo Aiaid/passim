@@ -12,8 +12,9 @@ Full rewrite in progress: legacy multi-component architecture → single Go bina
 
 | Directory | Description | Status |
 |-----------|-------------|--------|
-| `passim/` | Go backend (Gin + SQLite + Docker SDK) | Active — Phase 1 |
+| `passim/` | Go backend (Gin + SQLite + Docker SDK) | Active — Phase 4 |
 | `web/` | Vite + React 19 + shadcn/ui frontend | Complete — Phase 2 |
+| `.github/` | GitHub Actions CI/CD workflows | Active |
 | `app/` | Expo mobile app (iOS + Android) | Planned — Phase 5 |
 | `DNS/` | Python nserver DNS server (kept as-is) | Maintained |
 | `Doc/` | Design docs, specs, user stories | Active |
@@ -70,6 +71,7 @@ go run ./cmd/passim/             # Dev server on :8443
 go build ./cmd/passim/           # Build binary
 go test ./...                    # All tests
 go test -cover ./...             # Coverage
+./passim --version               # Show version info
 ```
 
 ### DNS Server
@@ -99,6 +101,8 @@ python app/app.py                # Runs nserver DNS on port 153
 | `SSL_EMAIL` | — | Contact email for Let's Encrypt |
 | `DNS_BASE_DOMAIN` | — | DNS reflector base domain; auto-discovers public IP when `SSL_DOMAIN` is not set |
 | `DATA_DIR` | `/data` | Data directory (SQLite, configs, certs) |
+| `GITHUB_REPO` | `passim/passim` | GitHub repo for update checks |
+| `IMAGE_NAME` | `ghcr.io/passim/passim` | Docker image name for self-update |
 
 ### DNS
 | Variable | Default | Description |

@@ -151,7 +151,7 @@ golang.org/x/crypto/acme/autocert -- ACME 客户端 (Let's Encrypt) ✅
   "node": {
     "id": "uuid",
     "name": "my-vps-tokyo",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "uptime": 864000,
     "public_ip": "203.0.113.10",
     "public_ip6": "2001:db8::1",
@@ -693,10 +693,11 @@ CLI 子命令:
 
 ```
 passim                     # 正常启动
+passim --version           # 版本信息 (e.g. "passim v1.0.0 (abc1234) built 2026-03-17")
+passim update-exec         # 更新切换 (helper 容器内部使用，用户不直接调用)
 passim reset-api-key       # 重置节点 API Key
 passim reset-passkeys      # 清除所有 Passkey
 passim reset-all           # 全部重置 (API Key + Passkey + JWT)
-passim version             # 版本信息
 ```
 
 ---
@@ -750,26 +751,90 @@ docker run passim/passim
 
 ---
 
-## 自我更新 — Phase 4
+## 版本与自我更新 ✅ Phase 4
 
-```bash
-# 容器内检查更新
-GET https://releases.passim.io/latest → { "version": "1.1.0", "image": "passim/passim:1.1.0" }
+### 版本信息
 
-# 如果有新版本:
-1. Pull 新镜像: docker pull passim/passim:1.1.0
-2. 创建新容器 (相同 volume 挂载)
-3. 停止旧容器
-4. 启动新容器
-5. 健康检查通过 → 删除旧容器
-   健康检查失败 → 回滚到旧容器
+版本号通过 Go `-ldflags` 在编译时注入 (`internal/version` 包)。
+
+#### `GET /api/version` (公开，无需认证)
+
+```json
+{
+  "version": "v1.0.0",
+  "commit": "abc1234",
+  "build_time": "2026-03-17T10:00:00Z"
+}
+```
+
+### 更新检查
+
+#### `GET /api/version/check` (需认证)
+
+查询 GitHub Releases API (`https://api.github.com/repos/{GITHUB_REPO}/releases/latest`)，结果有缓存。加 `?force=true` 强制刷新。
+
+```json
+{
+  "current": "v1.0.0",
+  "latest": "v1.1.0",
+  "available": true,
+  "changelog": "- Bug fixes\n- New feature",
+  "published_at": "2026-03-17T10:00:00Z"
+}
+```
+
+后台自动检查: 启动后 10 秒首次检查，之后每 24 小时检查一次。
+
+### 触发更新
+
+#### `POST /api/update` (需认证)
+
+```json
+// Request
+{ "version": "v1.1.0" }
+
+// Response — 200
+{ "status": "updating", "message": "Update in progress. You will be disconnected briefly." }
+```
+
+### 更新执行流程
+
+```
+用户点击 [更新到 v1.1.0]
+    │
+    ▼
+[1] Pull 新镜像: docker pull ghcr.io/passim/passim:v1.1.0
+    │
+    ▼
+[2] Inspect 当前容器，提取 env/volumes/ports/labels 配置
+    │
+    ▼
+[3] 启动 helper 容器 (使用新镜像):
+    docker create --name passim-updater \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      ghcr.io/passim/passim:v1.1.0 \
+      passim update-exec --target=<self-id> --name=passim --config=<base64>
+    │
+    ▼
+[4] Helper 容器执行切换:
+    a. docker stop passim
+    b. docker rename passim → passim-old
+    c. docker create --name passim (新镜像 + 原配置)
+    d. docker start passim
+    e. 健康检查 (GET /api/version，最多 60s)
+    │
+    ├── 成功 → docker rm passim-old
+    └── 失败 → 回滚:
+        docker stop passim (新) → docker rm passim (新)
+        docker rename passim-old → passim
+        docker start passim (旧)
 ```
 
 用户也可手动更新:
 ```bash
-docker pull passim/passim:latest
+docker pull ghcr.io/passim/passim:latest
 docker stop passim && docker rm passim
-docker run -d ... passim/passim:latest  # 相同参数
+docker run -d ... ghcr.io/passim/passim:latest  # 相同参数
 ```
 
 ---
