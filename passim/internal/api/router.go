@@ -12,6 +12,7 @@ import (
 	"github.com/passim/passim/internal/ssl"
 	"github.com/passim/passim/internal/task"
 	"github.com/passim/passim/internal/template"
+	"github.com/passim/passim/internal/update"
 	"github.com/passim/passim/internal/version"
 )
 
@@ -28,6 +29,8 @@ type Deps struct {
 	NodeHub    NodeHub
 	DataDir    string
 	DataVolume string // Docker named volume for DataDir (auto-discovered)
+	Checker    *update.Checker
+	Updater    *update.Updater
 }
 
 func NewRouter(deps Deps) http.Handler {
@@ -155,6 +158,14 @@ func NewRouter(deps Deps) http.Handler {
 			// SSL routes
 			if deps.SSL != nil {
 				registerSSLRoutes(protected, deps.SSL)
+			}
+
+			// Update routes
+			if deps.Checker != nil {
+				protected.GET("/version/check", versionCheckHandler(deps.Checker))
+			}
+			if deps.Updater != nil {
+				protected.POST("/update", updateHandler(deps.Updater))
 			}
 
 			// Protected speedtest routes

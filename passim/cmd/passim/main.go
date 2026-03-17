@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/passim/passim/internal/ssl"
 	"github.com/passim/passim/internal/task"
 	"github.com/passim/passim/internal/template"
+	"github.com/passim/passim/internal/update"
 	"github.com/passim/passim/internal/version"
 )
 
@@ -32,9 +34,15 @@ import (
 var webDist embed.FS
 
 func main() {
-	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
-		fmt.Printf("passim %s (%s) built %s\n", version.Version, version.Commit, version.BuildTime)
-		os.Exit(0)
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--version", "-v":
+			fmt.Printf("passim %s (%s) built %s\n", version.Version, version.Commit, version.BuildTime)
+			os.Exit(0)
+		case "update-exec":
+			runUpdateExec(os.Args[2:])
+			os.Exit(0)
+		}
 	}
 
 	dataDir := getEnvDefault("DATA_DIR", "/data")
@@ -138,6 +146,15 @@ func main() {
 	nodeHub.Start(context.Background())
 	defer nodeHub.Stop()
 
+	// Update checker + updater
+	githubRepo := getEnvDefault("GITHUB_REPO", "passim/passim")
+	imageName := getEnvDefault("IMAGE_NAME", "ghcr.io/passim/passim")
+	checker := update.NewChecker(githubRepo)
+	var updater *update.Updater
+	if dockerClient != nil {
+		updater = update.NewUpdater(dockerClient, imageName)
+	}
+
 	deps := api.Deps{
 		DB:         database,
 		JWT:        jwtMgr,
@@ -151,6 +168,8 @@ func main() {
 		NodeHub:    nodeHub,
 		DataDir:    dataDir,
 		DataVolume: dataVolume,
+		Checker:    checker,
+		Updater:    updater,
 	}
 
 	// Register task handlers (deploy/undeploy) — after deps assembled
@@ -215,6 +234,11 @@ func main() {
 		}()
 	}
 
+	// Start background update checker (every 24h)
+	updateCtx, updateCancel := context.WithCancel(context.Background())
+	defer updateCancel()
+	checker.StartBackground(updateCtx, 24*time.Hour)
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -226,6 +250,42 @@ func main() {
 		log.Fatalf("forced shutdown: %v", err)
 	}
 	log.Println("bye")
+}
+
+// runUpdateExec handles the "passim update-exec" subcommand.
+// This runs inside the helper container to orchestrate the container switch.
+func runUpdateExec(args []string) {
+	var targetID, name, config string
+
+	for _, arg := range args {
+		switch {
+		case strings.HasPrefix(arg, "--target="):
+			targetID = strings.TrimPrefix(arg, "--target=")
+		case strings.HasPrefix(arg, "--name="):
+			name = strings.TrimPrefix(arg, "--name=")
+		case strings.HasPrefix(arg, "--config="):
+			config = strings.TrimPrefix(arg, "--config=")
+		}
+	}
+
+	if targetID == "" || name == "" || config == "" {
+		log.Fatal("update-exec: --target, --name, and --config are required")
+	}
+
+	dockerClient, err := docker.NewClient()
+	if err != nil {
+		log.Fatalf("update-exec: docker client: %v", err)
+	}
+	defer dockerClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	if err := update.ExecSwitch(ctx, dockerClient, targetID, name, config); err != nil {
+		log.Fatalf("update-exec: %v", err)
+	}
+
+	log.Println("update-exec: switch completed successfully")
 }
 
 func getEnvDefault(key, fallback string) string {
