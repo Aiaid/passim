@@ -802,7 +802,7 @@ Phase 2 完成后的密集打磨期（~30 commits），包含重大 UI 重设计
 - [x] 版本基础设施 (`internal/version` + ldflags 注入 + `GET /api/version` + `--version` flag)
 - [x] CI 流水线 (`.github/workflows/ci.yml` — Go test + 前端 lint/test + Docker build)
 - [x] Release 流水线 (`.github/workflows/release.yml` — 多架构 Docker 镜像 + GitHub Release)
-- [ ] 自我更新机制 (拉取新镜像 + 重启)
+- [x] 自我更新机制 (`internal/update` — 版本检查 + 镜像拉取 + helper 容器切换 + 回滚)
 - [ ] 容器日志 (Sheet + 实时尾随 + 搜索)
 - [ ] 监控历史图表 (最近 1h/6h/24h)
 - [ ] 性能优化 + 安全审查
