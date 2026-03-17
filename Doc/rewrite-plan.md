@@ -799,7 +799,9 @@ Phase 2 完成后的密集打磨期（~30 commits），包含重大 UI 重设计
 
 - [ ] MongoDB → SQLite 数据迁移脚本
 - [ ] 旧 Passim → 新 Passim 替换脚本
-- [ ] Docker Hub 自动构建 (GitHub Actions)
+- [x] 版本基础设施 (`internal/version` + ldflags 注入 + `GET /api/version` + `--version` flag)
+- [x] CI 流水线 (`.github/workflows/ci.yml` — Go test + 前端 lint/test + Docker build)
+- [x] Release 流水线 (`.github/workflows/release.yml` — 多架构 Docker 镜像 + GitHub Release)
 - [ ] 自我更新机制 (拉取新镜像 + 重启)
 - [ ] 容器日志 (Sheet + 实时尾随 + 搜索)
 - [ ] 监控历史图表 (最近 1h/6h/24h)
