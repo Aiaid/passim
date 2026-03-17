@@ -109,3 +109,94 @@ python app/app.py                # Runs nserver DNS on port 153
 |----------|---------|-------------|
 | `BASE_DOMAIN` | — | Base domain for DNS queries |
 | `IP` | — | IP address for NS/A records |
+
+## CI/CD & Versioning
+
+Full design: `Doc/spec-cicd.md`
+
+### Version System
+
+Version is injected at build time via `-ldflags`, never hardcoded. Source of truth: `passim/internal/version/version.go`.
+
+```go
+var (
+    Version   = "dev"       // Set by -ldflags: -X ...version.Version=v1.2.3
+    Commit    = "unknown"   // -X ...version.Commit=$(git rev-parse --short HEAD)
+    BuildTime = "unknown"   // -X ...version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+)
+```
+
+All code that needs the version MUST use `version.Version` — never hardcode a version string. The Dockerfile accepts `VERSION` and `COMMIT` build args and passes them to ldflags.
+
+Public endpoint `GET /api/version` returns version/commit/build_time (no auth). `GET /api/status` also includes version in the `node.version` field.
+
+### Commit Convention
+
+[Conventional Commits](https://www.conventionalcommits.org/zh-hans/): `<type>(<scope>): <subject>`
+
+| Type | When | Version impact |
+|------|------|----------------|
+| `feat` | New feature | minor bump |
+| `fix` | Bug fix | patch bump |
+| `docs` | Documentation only | none |
+| `test` | Tests only | none |
+| `refactor` | Code change, no behavior change | none |
+| `chore` | Build/CI/deps | none |
+
+### CI Pipeline (`.github/workflows/ci.yml`)
+
+Triggers on push to `main` and all PRs. Three jobs:
+
+1. **go-test** — `go test -race -cover ./...` + integration tests
+2. **web-test** — `pnpm lint` + `pnpm tsc -b` + `pnpm vitest run`
+3. **docker-build** — Build Dockerfile (no push), depends on jobs 1+2
+
+### Release Pipeline (`.github/workflows/release.yml`)
+
+Triggers on `v*` tag push. Builds multi-arch Docker images (amd64 + arm64), pushes to GHCR, creates GitHub Release with changelog.
+
+**How to release:**
+```bash
+git tag -a v1.0.0 -m "release: v1.0.0"
+git push origin v1.0.0
+# CI builds + pushes ghcr.io/passim/passim:v1.0.0 (+ v1.0, v1, sha tags)
+```
+
+### Self-Update Architecture
+
+The running Passim container can update itself. Key packages:
+
+- `internal/update/checker.go` — Queries GitHub Releases API, caches result, runs every 24h in background
+- `internal/update/updater.go` — Pulls new image, inspects current container config, launches helper container
+- `internal/update/exec.go` — `ExecSwitch()` logic that the helper container runs
+
+**Update flow:** Passim can't stop itself (deadlock), so it launches a **helper container** from the new image:
+
+```
+POST /api/update {"version":"v1.1.0"}
+  → Pull ghcr.io/passim/passim:v1.1.0
+  → Inspect self (hostname = container ID) → extract env/volumes/ports
+  → docker create passim-updater (new image, with docker.sock)
+       runs: passim update-exec --target=<id> --name=passim --config=<base64>
+  → Helper does: stop old → rename old → create new → start new → health check
+  → On failure: rollback (rename old back, restart old)
+```
+
+The `update-exec` subcommand is handled in `cmd/passim/main.go` before normal startup. It needs Docker socket access and is only called inside the helper container.
+
+### Docker Build
+
+3-stage Dockerfile (`passim/Dockerfile`):
+
+1. **frontend** (node:22-alpine) — `pnpm build` → `web/dist/`
+2. **backend** (golang:1.25-alpine) — embeds frontend via `go:embed`, builds with ldflags. Accepts `VERSION` and `COMMIT` build args.
+3. **final** (alpine:3.21) — copies binary + templates, adds iperf3, runs as non-root `passim` user
+
+```bash
+# Local build
+docker compose -f passim/docker-compose.yml build
+
+# Build with version
+docker build --build-arg VERSION=v1.0.0 --build-arg COMMIT=$(git rev-parse --short HEAD) \
+  -f passim/Dockerfile .
+```
