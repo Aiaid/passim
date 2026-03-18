@@ -8,21 +8,21 @@ import (
 )
 
 type Template struct {
-	Name         string            `yaml:"name"`
-	Category     string            `yaml:"category"`
-	Version      string            `yaml:"version"`
-	Icon         string            `yaml:"icon"`
-	Description  map[string]string `yaml:"description"`
-	Source       *Source           `yaml:"source,omitempty"`
-	Guide        *Guide            `yaml:"guide,omitempty"`
-	Limitations  []string          `yaml:"limitations,omitempty"`
-	Settings     []Setting         `yaml:"settings"`
-	Container    ContainerSpec     `yaml:"container"`
-	Config       *ConfigMapping    `yaml:"config,omitempty"`
-	Hooks        *Hooks            `yaml:"hooks,omitempty"`
-	Clients      *ClientConfig     `yaml:"clients,omitempty"`
-	ConfigExport *ConfigExport     `yaml:"config_export,omitempty"`
-	Generated    []GeneratedSpec   `yaml:"generated,omitempty"`
+	Name        string            `yaml:"name"`
+	Category    string            `yaml:"category"`
+	Version     string            `yaml:"version"`
+	Icon        string            `yaml:"icon"`
+	Description map[string]string `yaml:"description"`
+	Source      *Source           `yaml:"source,omitempty"`
+	Guide       *Guide           `yaml:"guide,omitempty"`
+	Limitations []string          `yaml:"limitations,omitempty"`
+	Settings    []Setting         `yaml:"settings"`
+	Container   ContainerSpec     `yaml:"container"`
+	Config      *ConfigMapping    `yaml:"config,omitempty"`
+	Hooks       *Hooks           `yaml:"hooks,omitempty"`
+	Clients     *ClientConfig    `yaml:"clients,omitempty"`
+	Share       *ShareConfig     `yaml:"share,omitempty"`
+	Generated   []GeneratedSpec  `yaml:"generated,omitempty"`
 }
 
 type Source struct {
@@ -31,8 +31,16 @@ type Source struct {
 }
 
 type Guide struct {
-	Setup   map[string]string `yaml:"setup,omitempty"`
-	Usage   map[string]string `yaml:"usage,omitempty"`
+	Setup     map[string]string `yaml:"setup,omitempty"`
+	Usage     map[string]string `yaml:"usage,omitempty"`
+	Platforms []GuidePlatform   `yaml:"platforms,omitempty"`
+}
+
+type GuidePlatform struct {
+	Name        string   `yaml:"name"`
+	StoreURL    string   `yaml:"store_url,omitempty"`
+	DownloadURL string   `yaml:"download_url,omitempty"`
+	Steps       []string `yaml:"steps"`
 }
 
 type Setting struct {
@@ -85,22 +93,44 @@ type HookCommand struct {
 	Timeout int    `yaml:"timeout,omitempty"`
 }
 
+// ClientConfig defines how end-users obtain their connection configuration.
+// Three types: "file_per_user" (WireGuard), "credentials" (L2TP/WebDAV), "url" (Hysteria/V2Ray).
 type ClientConfig struct {
-	Web     *ClientEntry `yaml:"web,omitempty"`
-	Mobile  *ClientEntry `yaml:"mobile,omitempty"`
-	Desktop *ClientEntry `yaml:"desktop,omitempty"`
+	Type string `yaml:"type"` // "file_per_user" | "credentials" | "url"
+
+	// file_per_user: per-user config file inside the container volume
+	Source string `yaml:"source,omitempty"` // e.g. "/config/wg_confs/peer{n}.conf"
+	Format string `yaml:"format,omitempty"` // conf | json | yaml | txt
+	QR     bool   `yaml:"qr,omitempty"`
+
+	// credentials: key-value fields rendered from template variables
+	Fields []CredentialField `yaml:"fields,omitempty"`
+
+	// url: URI schemes for proxy clients
+	URLs       []ClientURL       `yaml:"urls,omitempty"`
+	ImportURLs map[string]string `yaml:"import_urls,omitempty"` // e.g. stash: "stash://..."
 }
 
-type ClientEntry struct {
-	URL         string            `yaml:"url,omitempty"`
-	Label       map[string]string `yaml:"label,omitempty"`
-	Description map[string]string `yaml:"description,omitempty"`
+// CredentialField is a single credential entry (server, username, password, etc.).
+type CredentialField struct {
+	Key    string            `yaml:"key"`
+	Label  map[string]string `yaml:"label"`
+	Value  string            `yaml:"value"`           // Go template string
+	Secret bool              `yaml:"secret,omitempty"`
 }
 
-type ConfigExport struct {
-	Format  string `yaml:"format"`
-	Path    string `yaml:"path"`
-	Pattern string `yaml:"pattern"`
+// ClientURL is a URI scheme for proxy client import.
+type ClientURL struct {
+	Name   string `yaml:"name"`
+	Scheme string `yaml:"scheme"` // URI template with {{settings.*}} / {{node.*}} placeholders
+	QR     bool   `yaml:"qr,omitempty"`
+}
+
+// ShareConfig controls whether the app supports public sharing of client configs.
+type ShareConfig struct {
+	Supports     bool     `yaml:"supports"`
+	PerUser      bool     `yaml:"per_user,omitempty"`
+	ShareContent []string `yaml:"share_content,omitempty"` // e.g. ["client_config", "guide"]
 }
 
 type GeneratedSpec struct {

@@ -310,19 +310,22 @@ func TestWireguardTemplateExpanded(t *testing.T) {
 	if wg.Clients == nil {
 		t.Fatal("wireguard: clients is nil")
 	}
-	if wg.Clients.Mobile == nil {
-		t.Error("wireguard: clients.mobile is nil")
+	if wg.Clients.Type != "file_per_user" {
+		t.Errorf("wireguard: clients.type = %q, want file_per_user", wg.Clients.Type)
 	}
-	if wg.Clients.Desktop == nil {
-		t.Error("wireguard: clients.desktop is nil")
+	if wg.Clients.Format != "conf" {
+		t.Errorf("wireguard: clients.format = %q, want conf", wg.Clients.Format)
+	}
+	if !wg.Clients.QR {
+		t.Error("wireguard: clients.qr should be true")
 	}
 
-	// ConfigExport should still be present
-	if wg.ConfigExport == nil {
-		t.Fatal("wireguard: config_export is nil")
+	// Share
+	if wg.Share == nil {
+		t.Fatal("wireguard: share is nil")
 	}
-	if wg.ConfigExport.Format != "conf" {
-		t.Errorf("wireguard: config_export format = %q", wg.ConfigExport.Format)
+	if !wg.Share.Supports {
+		t.Error("wireguard: share.supports should be true")
 	}
 }
 
@@ -675,6 +678,145 @@ func TestSambaArgs(t *testing.T) {
 	}
 	if !strings.Contains(args[3], "{{settings.share_name}}") {
 		t.Error("samba args[3] does not reference settings.share_name")
+	}
+}
+
+func TestAllTemplatesHaveValidClientsType(t *testing.T) {
+	templates := loadAllTemplates(t)
+
+	validTypes := map[string]bool{
+		"file_per_user": true,
+		"credentials":   true,
+		"url":           true,
+	}
+
+	expectedTypes := map[string]string{
+		"wireguard": "file_per_user",
+		"l2tp":      "credentials",
+		"hysteria":  "url",
+		"v2ray":     "url",
+		"webdav":    "credentials",
+		"samba":     "credentials",
+		"rdesktop":  "credentials",
+	}
+
+	for name, tmpl := range templates {
+		t.Run(name, func(t *testing.T) {
+			if tmpl.Clients == nil {
+				t.Fatal("clients is nil")
+			}
+			if !validTypes[tmpl.Clients.Type] {
+				t.Errorf("clients.type = %q, not a valid type", tmpl.Clients.Type)
+			}
+			if expected, ok := expectedTypes[name]; ok {
+				if tmpl.Clients.Type != expected {
+					t.Errorf("clients.type = %q, expected %q", tmpl.Clients.Type, expected)
+				}
+			}
+		})
+	}
+}
+
+func TestCredentialTemplatesHaveFields(t *testing.T) {
+	templates := loadAllTemplates(t)
+
+	credentialTemplates := []string{"l2tp", "webdav", "samba", "rdesktop"}
+	for _, name := range credentialTemplates {
+		tmpl, ok := templates[name]
+		if !ok {
+			t.Errorf("template %q not found", name)
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			if tmpl.Clients.Type != "credentials" {
+				t.Skipf("not a credentials template")
+			}
+			if len(tmpl.Clients.Fields) == 0 {
+				t.Error("credentials template has no fields")
+			}
+			for i, f := range tmpl.Clients.Fields {
+				if f.Key == "" {
+					t.Errorf("field[%d]: key is empty", i)
+				}
+				if f.Value == "" {
+					t.Errorf("field[%d] (%s): value is empty", i, f.Key)
+				}
+				if len(f.Label) == 0 {
+					t.Errorf("field[%d] (%s): label is empty", i, f.Key)
+				}
+			}
+		})
+	}
+}
+
+func TestURLTemplatesHaveScheme(t *testing.T) {
+	templates := loadAllTemplates(t)
+
+	urlTemplates := []string{"hysteria", "v2ray"}
+	for _, name := range urlTemplates {
+		tmpl, ok := templates[name]
+		if !ok {
+			t.Errorf("template %q not found", name)
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			if tmpl.Clients.Type != "url" {
+				t.Skipf("not a url template")
+			}
+			if len(tmpl.Clients.URLs) == 0 {
+				t.Error("url template has no urls")
+			}
+			for i, u := range tmpl.Clients.URLs {
+				if u.Name == "" {
+					t.Errorf("urls[%d]: name is empty", i)
+				}
+				if u.Scheme == "" {
+					t.Errorf("urls[%d] (%s): scheme is empty", i, u.Name)
+				}
+			}
+		})
+	}
+}
+
+func TestVPNTemplatesHaveShare(t *testing.T) {
+	templates := loadAllTemplates(t)
+
+	vpnTemplates := []string{"wireguard", "hysteria", "v2ray", "l2tp"}
+	for _, name := range vpnTemplates {
+		tmpl, ok := templates[name]
+		if !ok {
+			t.Errorf("template %q not found", name)
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			if tmpl.Share == nil {
+				t.Error("share is nil")
+			} else if !tmpl.Share.Supports {
+				t.Error("share.supports should be true")
+			}
+		})
+	}
+}
+
+func TestTemplatesWithPlatformGuides(t *testing.T) {
+	templates := loadAllTemplates(t)
+
+	for name, tmpl := range templates {
+		t.Run(name, func(t *testing.T) {
+			if tmpl.Guide == nil {
+				t.Skip("no guide")
+			}
+			if len(tmpl.Guide.Platforms) > 0 {
+				for i, p := range tmpl.Guide.Platforms {
+					if p.Name == "" {
+						t.Errorf("platforms[%d]: name is empty", i)
+					}
+					if len(p.Steps) == 0 {
+						t.Errorf("platforms[%d] (%s): steps is empty", i, p.Name)
+					}
+				}
+			}
+		})
 	}
 }
 

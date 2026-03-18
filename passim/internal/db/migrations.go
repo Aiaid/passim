@@ -77,6 +77,15 @@ var migrations = []string{
 		secret_key TEXT,
 		created_at TEXT DEFAULT (datetime('now'))
 	)`,
+
+	`CREATE TABLE IF NOT EXISTS share_tokens (
+		id         TEXT PRIMARY KEY,
+		app_id     TEXT NOT NULL,
+		user_index INTEGER DEFAULT 0,
+		token      TEXT NOT NULL UNIQUE,
+		created_at TEXT DEFAULT (datetime('now')),
+		revoked    INTEGER DEFAULT 0
+	)`,
 }
 
 // alterColumns are idempotent column additions for existing tables.
@@ -84,6 +93,7 @@ var migrations = []string{
 var alterColumns = []string{
 	`ALTER TABLE passkeys ADD COLUMN backup_eligible INTEGER DEFAULT 0`,
 	`ALTER TABLE passkeys ADD COLUMN backup_state INTEGER DEFAULT 0`,
+	`ALTER TABLE apps ADD COLUMN generated TEXT DEFAULT '{}'`,
 }
 
 func Migrate(database *sql.DB) error {

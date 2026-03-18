@@ -155,11 +155,13 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 		// Async path: enqueue deploy task
 		if deps.Tasks != nil {
 			settingsJSON, _ := json.Marshal(merged)
+			generatedJSON, _ := json.Marshal(generated)
 			app := &db.App{
-				ID:       appID,
-				Template: t.Name,
-				Settings: string(settingsJSON),
-				Status:   "deploying",
+				ID:        appID,
+				Template:  t.Name,
+				Settings:  string(settingsJSON),
+				Generated: string(generatedJSON),
+				Status:    "deploying",
 			}
 			if err := db.CreateApp(deps.DB, app); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "save app: " + err.Error()})
@@ -191,10 +193,12 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		settingsJSON, _ := json.Marshal(merged)
+		generatedJSON, _ := json.Marshal(generated)
 		app := &db.App{
 			ID:          appID,
 			Template:    t.Name,
 			Settings:    string(settingsJSON),
+			Generated:   string(generatedJSON),
 			Status:      "running",
 			ContainerID: result.ContainerID,
 		}

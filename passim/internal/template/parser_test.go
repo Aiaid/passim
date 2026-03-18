@@ -86,14 +86,14 @@ hooks:
   pre_stop:
     - exec: "echo stopping"
 clients:
-  web:
-    url: "http://localhost:51821"
-    label:
-      en-US: "WireGuard UI"
-config_export:
+  type: file_per_user
+  source: "/config/wg_confs/peer{n}.conf"
   format: conf
-  path: /data/configs/wireguard/wg_confs/
-  pattern: "peer*.conf"
+  qr: true
+share:
+  supports: true
+  per_user: true
+  share_content: [client_config, guide]
 `
 
 	tmpl, err := Parse([]byte(yaml))
@@ -216,19 +216,28 @@ config_export:
 	if tmpl.Clients == nil {
 		t.Fatal("Clients is nil")
 	}
-	if tmpl.Clients.Web == nil {
-		t.Fatal("Clients.Web is nil")
+	if tmpl.Clients.Type != "file_per_user" {
+		t.Errorf("Clients.Type = %q, want file_per_user", tmpl.Clients.Type)
 	}
-	if tmpl.Clients.Web.URL != "http://localhost:51821" {
-		t.Errorf("Clients.Web.URL = %q", tmpl.Clients.Web.URL)
+	if tmpl.Clients.Source != "/config/wg_confs/peer{n}.conf" {
+		t.Errorf("Clients.Source = %q", tmpl.Clients.Source)
+	}
+	if tmpl.Clients.Format != "conf" {
+		t.Errorf("Clients.Format = %q", tmpl.Clients.Format)
+	}
+	if !tmpl.Clients.QR {
+		t.Error("Clients.QR should be true")
 	}
 
-	// ConfigExport
-	if tmpl.ConfigExport == nil {
-		t.Fatal("ConfigExport is nil")
+	// Share
+	if tmpl.Share == nil {
+		t.Fatal("Share is nil")
 	}
-	if tmpl.ConfigExport.Format != "conf" {
-		t.Errorf("ConfigExport.Format = %q", tmpl.ConfigExport.Format)
+	if !tmpl.Share.Supports {
+		t.Error("Share.Supports should be true")
+	}
+	if !tmpl.Share.PerUser {
+		t.Error("Share.PerUser should be true")
 	}
 }
 
@@ -278,8 +287,8 @@ container:
 	if tmpl.Clients != nil {
 		t.Error("Clients should be nil")
 	}
-	if tmpl.ConfigExport != nil {
-		t.Error("ConfigExport should be nil")
+	if tmpl.Share != nil {
+		t.Error("Share should be nil")
 	}
 }
 

@@ -8,13 +8,6 @@ description:
 source:
   url: https://github.com/hwdsl2/docker-ipsec-vpn-server
   license: MIT
-guide:
-  setup:
-    en-US: "Set your VPN credentials and start the server. The pre-shared key (PSK), username, and password are required to connect."
-    zh-CN: "设置 VPN 凭据并启动服务器。连接时需要预共享密钥 (PSK)、用户名和密码。"
-  usage:
-    en-US: "Configure your device's built-in L2TP/IPSec VPN client with the server IP, PSK, username, and password."
-    zh-CN: "使用服务器 IP、PSK、用户名和密码配置设备自带的 L2TP/IPSec VPN 客户端。"
 limitations:
   - "Requires NET_ADMIN capability"
   - "Requires access to /lib/modules on the host for kernel modules"
@@ -72,17 +65,58 @@ container:
   cap_add:
     - NET_ADMIN
 clients:
-  mobile:
-    label:
-      en-US: "Built-in VPN Client"
-      zh-CN: "系统自带 VPN 客户端"
-    description:
-      en-US: "Use your device's built-in L2TP/IPSec VPN settings with the server IP, username, password, and PSK."
-      zh-CN: "使用设备自带的 L2TP/IPSec VPN 设置，填入服务器 IP、用户名、密码和 PSK。"
-  desktop:
-    label:
-      en-US: "Built-in VPN Client"
-      zh-CN: "系统自带 VPN 客户端"
-    description:
-      en-US: "Open network settings and add an L2TP/IPSec VPN connection with the server credentials."
-      zh-CN: "打开网络设置，添加 L2TP/IPSec VPN 连接并填入服务器凭据。"
+  type: credentials
+  fields:
+    - key: server
+      label:
+        en-US: "Server"
+        zh-CN: "服务器"
+      value: "{{node.public_ip}}"
+    - key: username
+      label:
+        en-US: "Username"
+        zh-CN: "用户名"
+      value: "{{settings.vpn_user}}"
+    - key: password
+      label:
+        en-US: "Password"
+        zh-CN: "密码"
+      value: "{{settings.vpn_password}}"
+      secret: true
+    - key: psk
+      label:
+        en-US: "Pre-Shared Key"
+        zh-CN: "预共享密钥"
+      value: "{{settings.vpn_psk}}"
+      secret: true
+share:
+  supports: true
+  share_content: [client_config, guide]
+guide:
+  setup:
+    en-US: "Set your VPN credentials and start the server. The pre-shared key (PSK), username, and password are required to connect."
+    zh-CN: "设置 VPN 凭据并启动服务器。连接时需要预共享密钥 (PSK)、用户名和密码。"
+  usage:
+    en-US: "Configure your device's built-in L2TP/IPSec VPN client with the server IP, PSK, username, and password."
+    zh-CN: "使用服务器 IP、PSK、用户名和密码配置设备自带的 L2TP/IPSec VPN 客户端。"
+  platforms:
+    - name: iOS
+      steps:
+        - "Settings → General → VPN → Add VPN Configuration"
+        - "Type: L2TP, Server: your server IP"
+        - "Enter username, password, and pre-shared key"
+    - name: Android
+      steps:
+        - "Settings → Network → VPN → Add VPN"
+        - "Type: L2TP/IPSec PSK"
+        - "Enter server, username, password, and PSK"
+    - name: Windows
+      steps:
+        - "Settings → Network → VPN → Add VPN connection"
+        - "VPN type: L2TP/IPSec with pre-shared key"
+        - "Enter server, username, password, and PSK"
+    - name: macOS
+      steps:
+        - "System Settings → Network → + → VPN → L2TP over IPSec"
+        - "Enter server address, account name"
+        - "Authentication Settings: enter password and shared secret"

@@ -8,13 +8,6 @@ description:
 source:
   url: https://github.com/BytemarkHosting/docker-webdav
   license: MIT
-guide:
-  setup:
-    en-US: "Set a username and password. Files are stored in the mounted data volume."
-    zh-CN: "设置用户名和密码。文件存储在挂载的数据卷中。"
-  usage:
-    en-US: "Connect using any WebDAV client (Windows Explorer, macOS Finder, Cyberduck) with the server URL, username, and password."
-    zh-CN: "使用任意 WebDAV 客户端（Windows 资源管理器、macOS Finder、Cyberduck）通过服务器 URL、用户名和密码连接。"
 limitations:
   - "No built-in TLS; use a reverse proxy for HTTPS in production"
   - "Digest authentication only; does not support OAuth or token-based auth"
@@ -55,18 +48,43 @@ container:
     io.passim: storage
     io.passim.app: webdav
 clients:
-  web:
-    url: "http://localhost:8080"
-    label:
-      en-US: "WebDAV Server"
-      zh-CN: "WebDAV 服务器"
-    description:
-      en-US: "Access files via WebDAV at this URL."
-      zh-CN: "通过此 URL 使用 WebDAV 访问文件。"
-  desktop:
-    label:
-      en-US: "File Manager / Cyberduck"
-      zh-CN: "文件管理器 / Cyberduck"
-    description:
-      en-US: "Map a network drive or use a WebDAV client with the server URL and credentials."
-      zh-CN: "映射网络驱动器或使用 WebDAV 客户端，填入服务器 URL 和凭据。"
+  type: credentials
+  fields:
+    - key: url
+      label:
+        en-US: "WebDAV URL"
+        zh-CN: "WebDAV 地址"
+      value: "http://{{node.public_ip}}:8080"
+    - key: username
+      label:
+        en-US: "Username"
+        zh-CN: "用户名"
+      value: "{{settings.username}}"
+    - key: password
+      label:
+        en-US: "Password"
+        zh-CN: "密码"
+      value: "{{settings.password}}"
+      secret: true
+guide:
+  setup:
+    en-US: "Set a username and password. Files are stored in the mounted data volume."
+    zh-CN: "设置用户名和密码。文件存储在挂载的数据卷中。"
+  usage:
+    en-US: "Connect using any WebDAV client (Windows Explorer, macOS Finder, Cyberduck) with the server URL, username, and password."
+    zh-CN: "使用任意 WebDAV 客户端（Windows 资源管理器、macOS Finder、Cyberduck）通过服务器 URL、用户名和密码连接。"
+  platforms:
+    - name: iOS
+      steps:
+        - "Open the Files app"
+        - "Tap ... → Connect to Server"
+        - "Enter the WebDAV URL and credentials"
+    - name: macOS
+      steps:
+        - "Finder → Go → Connect to Server"
+        - "Enter the WebDAV URL"
+    - name: Windows
+      steps:
+        - "Open File Explorer"
+        - "Right-click This PC → Map Network Drive"
+        - "Enter the WebDAV URL"

@@ -8,13 +8,6 @@ description:
 source:
   url: https://github.com/linuxserver/docker-rdesktop
   license: GPL-3.0
-guide:
-  setup:
-    en-US: "Choose a screen resolution and start the container. Connect using any RDP client."
-    zh-CN: "选择屏幕分辨率并启动容器。使用任意 RDP 客户端连接。"
-  usage:
-    en-US: "Open an RDP client (Windows: Remote Desktop Connection, macOS: Microsoft Remote Desktop, Linux: Remmina) and connect to the server IP on port 3389."
-    zh-CN: "打开 RDP 客户端（Windows：远程桌面连接，macOS：Microsoft Remote Desktop，Linux：Remmina）并连接到服务器 IP 的 3389 端口。"
 limitations:
   - "Performance depends on network bandwidth and server resources"
   - "No GPU acceleration by default"
@@ -63,17 +56,37 @@ container:
     io.passim: tools
     io.passim.app: rdesktop
 clients:
-  desktop:
-    label:
-      en-US: "RDP Client"
-      zh-CN: "RDP 客户端"
-    description:
-      en-US: "Use any RDP client to connect to the server IP on port 3389."
-      zh-CN: "使用任意 RDP 客户端连接到服务器 IP 的 3389 端口。"
-  mobile:
-    label:
-      en-US: "Microsoft Remote Desktop"
-      zh-CN: "Microsoft 远程桌面"
-    description:
-      en-US: "Install Microsoft Remote Desktop from your app store and connect to the server IP."
-      zh-CN: "从应用商店安装 Microsoft 远程桌面并连接到服务器 IP。"
+  type: credentials
+  fields:
+    - key: server
+      label:
+        en-US: "Server"
+        zh-CN: "服务器"
+      value: "{{node.public_ip}}:3389"
+guide:
+  setup:
+    en-US: "Choose a screen resolution and start the container. Connect using any RDP client."
+    zh-CN: "选择屏幕分辨率并启动容器。使用任意 RDP 客户端连接。"
+  usage:
+    en-US: "Open an RDP client (Windows: Remote Desktop Connection, macOS: Microsoft Remote Desktop, Linux: Remmina) and connect to the server IP on port 3389."
+    zh-CN: "打开 RDP 客户端（Windows：远程桌面连接，macOS：Microsoft Remote Desktop，Linux：Remmina）并连接到服务器 IP 的 3389 端口。"
+  platforms:
+    - name: iOS
+      store_url: "https://apps.apple.com/app/remote-desktop-mobile/id714464092"
+      steps:
+        - "Install Microsoft Remote Desktop"
+        - "Add PC with the server IP"
+    - name: Android
+      store_url: "https://play.google.com/store/apps/details?id=com.microsoft.rdc.androidx"
+      steps:
+        - "Install Microsoft Remote Desktop"
+        - "Add PC with the server IP"
+    - name: Windows
+      steps:
+        - "Open Remote Desktop Connection (mstsc)"
+        - "Enter the server IP"
+    - name: macOS
+      store_url: "https://apps.apple.com/app/microsoft-remote-desktop/id1295203466"
+      steps:
+        - "Install Microsoft Remote Desktop"
+        - "Add PC with the server IP"

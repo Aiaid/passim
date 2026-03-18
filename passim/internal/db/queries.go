@@ -34,6 +34,7 @@ type App struct {
 	ID          string `json:"id"`
 	Template    string `json:"template"`
 	Settings    string `json:"settings"`
+	Generated   string `json:"generated"`
 	Status      string `json:"status"`
 	ContainerID string `json:"container_id"`
 	DeployedAt  string `json:"deployed_at"`
@@ -42,10 +43,14 @@ type App struct {
 
 func CreateApp(database *sql.DB, app *App) error {
 	now := time.Now().UTC().Format(time.RFC3339)
+	generated := app.Generated
+	if generated == "" {
+		generated = "{}"
+	}
 	_, err := database.Exec(
-		`INSERT INTO apps (id, template, settings, status, container_id, deployed_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		app.ID, app.Template, app.Settings, app.Status, app.ContainerID, now, now,
+		`INSERT INTO apps (id, template, settings, generated, status, container_id, deployed_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		app.ID, app.Template, app.Settings, generated, app.Status, app.ContainerID, now, now,
 	)
 	if err != nil {
 		return fmt.Errorf("create app: %w", err)
@@ -56,9 +61,9 @@ func CreateApp(database *sql.DB, app *App) error {
 func GetApp(database *sql.DB, id string) (*App, error) {
 	var a App
 	err := database.QueryRow(
-		`SELECT id, template, settings, status, COALESCE(container_id,''), COALESCE(deployed_at,''), COALESCE(updated_at,'')
+		`SELECT id, template, settings, COALESCE(generated,'{}'), status, COALESCE(container_id,''), COALESCE(deployed_at,''), COALESCE(updated_at,'')
 		 FROM apps WHERE id = ?`, id,
-	).Scan(&a.ID, &a.Template, &a.Settings, &a.Status, &a.ContainerID, &a.DeployedAt, &a.UpdatedAt)
+	).Scan(&a.ID, &a.Template, &a.Settings, &a.Generated, &a.Status, &a.ContainerID, &a.DeployedAt, &a.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -70,7 +75,7 @@ func GetApp(database *sql.DB, id string) (*App, error) {
 
 func ListApps(database *sql.DB) ([]App, error) {
 	rows, err := database.Query(
-		`SELECT id, template, settings, status, COALESCE(container_id,''), COALESCE(deployed_at,''), COALESCE(updated_at,'')
+		`SELECT id, template, settings, COALESCE(generated,'{}'), status, COALESCE(container_id,''), COALESCE(deployed_at,''), COALESCE(updated_at,'')
 		 FROM apps ORDER BY updated_at DESC`,
 	)
 	if err != nil {
@@ -81,7 +86,7 @@ func ListApps(database *sql.DB) ([]App, error) {
 	var apps []App
 	for rows.Next() {
 		var a App
-		if err := rows.Scan(&a.ID, &a.Template, &a.Settings, &a.Status, &a.ContainerID, &a.DeployedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Template, &a.Settings, &a.Generated, &a.Status, &a.ContainerID, &a.DeployedAt, &a.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan app: %w", err)
 		}
 		apps = append(apps, a)
@@ -94,9 +99,9 @@ func ListApps(database *sql.DB) ([]App, error) {
 func GetActiveAppByTemplate(database *sql.DB, templateName string) (*App, error) {
 	var a App
 	err := database.QueryRow(
-		`SELECT id, template, settings, status, COALESCE(container_id,''), COALESCE(deployed_at,''), COALESCE(updated_at,'')
+		`SELECT id, template, settings, COALESCE(generated,'{}'), status, COALESCE(container_id,''), COALESCE(deployed_at,''), COALESCE(updated_at,'')
 		 FROM apps WHERE template = ? AND status IN ('running', 'deploying') LIMIT 1`, templateName,
-	).Scan(&a.ID, &a.Template, &a.Settings, &a.Status, &a.ContainerID, &a.DeployedAt, &a.UpdatedAt)
+	).Scan(&a.ID, &a.Template, &a.Settings, &a.Generated, &a.Status, &a.ContainerID, &a.DeployedAt, &a.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -146,6 +151,67 @@ func DeleteApp(database *sql.DB, id string) error {
 	n, _ := res.RowsAffected()
 	if n == 0 {
 		return fmt.Errorf("app %s not found", id)
+	}
+	return nil
+}
+
+// ShareToken represents a share token for public config access.
+type ShareToken struct {
+	ID        string `json:"id"`
+	AppID     string `json:"app_id"`
+	UserIndex int    `json:"user_index"`
+	Token     string `json:"token"`
+	CreatedAt string `json:"created_at"`
+	Revoked   bool   `json:"revoked"`
+}
+
+func CreateShareToken(database *sql.DB, st *ShareToken) error {
+	_, err := database.Exec(
+		`INSERT INTO share_tokens (id, app_id, user_index, token) VALUES (?, ?, ?, ?)`,
+		st.ID, st.AppID, st.UserIndex, st.Token,
+	)
+	if err != nil {
+		return fmt.Errorf("create share token: %w", err)
+	}
+	return nil
+}
+
+func GetShareToken(database *sql.DB, token string) (*ShareToken, error) {
+	var st ShareToken
+	err := database.QueryRow(
+		`SELECT id, app_id, user_index, token, COALESCE(created_at,''), revoked
+		 FROM share_tokens WHERE token = ? AND revoked = 0`, token,
+	).Scan(&st.ID, &st.AppID, &st.UserIndex, &st.Token, &st.CreatedAt, &st.Revoked)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get share token: %w", err)
+	}
+	return &st, nil
+}
+
+func GetShareTokenByApp(database *sql.DB, appID string) (*ShareToken, error) {
+	var st ShareToken
+	err := database.QueryRow(
+		`SELECT id, app_id, user_index, token, COALESCE(created_at,''), revoked
+		 FROM share_tokens WHERE app_id = ? AND revoked = 0 ORDER BY created_at DESC LIMIT 1`, appID,
+	).Scan(&st.ID, &st.AppID, &st.UserIndex, &st.Token, &st.CreatedAt, &st.Revoked)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get share token by app: %w", err)
+	}
+	return &st, nil
+}
+
+func RevokeShareTokens(database *sql.DB, appID string) error {
+	_, err := database.Exec(
+		`UPDATE share_tokens SET revoked = 1 WHERE app_id = ? AND revoked = 0`, appID,
+	)
+	if err != nil {
+		return fmt.Errorf("revoke share tokens: %w", err)
 	}
 	return nil
 }

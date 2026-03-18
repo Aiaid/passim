@@ -8,13 +8,6 @@ description:
 source:
   url: https://github.com/dperson/samba
   license: ISC
-guide:
-  setup:
-    en-US: "Set a username, password, and share name. The share will be accessible on your local network."
-    zh-CN: "设置用户名、密码和共享名称。共享将在局域网内可访问。"
-  usage:
-    en-US: "Connect from Windows (\\\\server-ip\\share), macOS (Finder > Connect to Server > smb://server-ip/share), or Linux (mount -t cifs)."
-    zh-CN: "从 Windows (\\\\服务器IP\\共享名)、macOS (Finder > 连接服务器 > smb://服务器IP/共享名) 或 Linux (mount -t cifs) 连接。"
 limitations:
   - "Best suited for local network use; not recommended over the internet without a VPN"
   - "SMB ports (139, 445) may be blocked by ISPs or firewalls"
@@ -67,10 +60,41 @@ container:
     - "-s"
     - "{{settings.share_name}};/mount;yes;no;no;{{settings.username}}"
 clients:
-  desktop:
-    label:
-      en-US: "File Manager"
-      zh-CN: "文件管理器"
-    description:
-      en-US: "Open your file manager and connect to smb://server-ip/share with the configured credentials."
-      zh-CN: "打开文件管理器，使用配置的凭据连接到 smb://服务器IP/共享名。"
+  type: credentials
+  fields:
+    - key: server
+      label:
+        en-US: "Server"
+        zh-CN: "服务器"
+      value: "smb://{{node.public_ip}}/{{settings.share_name}}"
+    - key: username
+      label:
+        en-US: "Username"
+        zh-CN: "用户名"
+      value: "{{settings.username}}"
+    - key: password
+      label:
+        en-US: "Password"
+        zh-CN: "密码"
+      value: "{{settings.password}}"
+      secret: true
+guide:
+  setup:
+    en-US: "Set a username, password, and share name. The share will be accessible on your local network."
+    zh-CN: "设置用户名、密码和共享名称。共享将在局域网内可访问。"
+  usage:
+    en-US: "Connect from Windows (\\\\server-ip\\share), macOS (Finder > Connect to Server > smb://server-ip/share), or Linux (mount -t cifs)."
+    zh-CN: "从 Windows (\\\\服务器IP\\共享名)、macOS (Finder > 连接服务器 > smb://服务器IP/共享名) 或 Linux (mount -t cifs) 连接。"
+  platforms:
+    - name: Windows
+      steps:
+        - "Open File Explorer"
+        - "Enter \\\\server-ip\\share in the address bar"
+        - "Enter username and password"
+    - name: macOS
+      steps:
+        - "Finder → Go → Connect to Server"
+        - "Enter smb://server-ip/share"
+    - name: Linux
+      steps:
+        - "Run: mount -t cifs //server-ip/share /mnt -o username=user"

@@ -8,13 +8,6 @@ description:
 source:
   url: https://github.com/v2fly/v2ray-core
   license: MIT
-guide:
-  setup:
-    en-US: "A UUID is generated automatically. Set the listen port and start the server. Use the UUID in your V2Ray client config."
-    zh-CN: "UUID 会自动生成。设置监听端口并启动服务器。在 V2Ray 客户端配置中使用该 UUID。"
-  usage:
-    en-US: "Configure your V2Ray client with the server address, port, and UUID. Protocol: VMess, alterId: 0."
-    zh-CN: "使用服务器地址、端口和 UUID 配置 V2Ray 客户端。协议：VMess，alterId：0。"
 limitations:
   - "VMess traffic may be detected by deep packet inspection without additional obfuscation"
   - "Requires a V2Ray-compatible client (v2rayN, v2rayNG, Qv2ray, etc.)"
@@ -83,17 +76,37 @@ config:
           ]
         }
 clients:
-  mobile:
-    label:
-      en-US: "v2rayNG (Android) / Shadowrocket (iOS)"
-      zh-CN: "v2rayNG (Android) / Shadowrocket (iOS)"
-    description:
-      en-US: "Import VMess config or manually add server with address, port, UUID, and alterId 0."
-      zh-CN: "导入 VMess 配置或手动添加服务器，填入地址、端口、UUID 和 alterId 0。"
-  desktop:
-    label:
-      en-US: "v2rayN / Qv2ray"
-      zh-CN: "v2rayN / Qv2ray"
-    description:
-      en-US: "Add a VMess server with the server address, port, UUID, and alterId 0."
-      zh-CN: "添加 VMess 服务器，填入服务器地址、端口、UUID 和 alterId 0。"
+  type: url
+  urls:
+    - name: "VMess"
+      scheme: "vmess://{{settings.uuid}}@{{node.public_ip}}:{{settings.port}}?alterId=0#{{node.hostname}}"
+      qr: true
+  import_urls:
+    shadowrocket: "sub://{{base64_subscribe_url}}"
+share:
+  supports: true
+  share_content: [client_config, guide]
+guide:
+  setup:
+    en-US: "A UUID is generated automatically. Set the listen port and start the server. Use the UUID in your V2Ray client config."
+    zh-CN: "UUID 会自动生成。设置监听端口并启动服务器。在 V2Ray 客户端配置中使用该 UUID。"
+  usage:
+    en-US: "Configure your V2Ray client with the server address, port, and UUID. Protocol: VMess, alterId: 0."
+    zh-CN: "使用服务器地址、端口和 UUID 配置 V2Ray 客户端。协议：VMess，alterId：0。"
+  platforms:
+    - name: iOS
+      steps:
+        - "Install Shadowrocket"
+        - "Scan the QR code to import"
+    - name: Android
+      steps:
+        - "Install v2rayNG"
+        - "Scan the QR code or paste the link"
+    - name: Windows
+      steps:
+        - "Download v2rayN"
+        - "Add VMess server with address, port, UUID, alterId 0"
+    - name: macOS
+      steps:
+        - "Download V2RayXS or Qv2ray"
+        - "Add VMess server with address, port, UUID, alterId 0"

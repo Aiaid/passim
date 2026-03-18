@@ -48,18 +48,35 @@ type sourceInfo struct {
 	License string `json:"license,omitempty"`
 }
 
-// clientEntryInfo is the JSON shape for a single client entry.
-type clientEntryInfo struct {
-	URL         string            `json:"url,omitempty"`
-	Label       map[string]string `json:"label,omitempty"`
-	Description map[string]string `json:"description,omitempty"`
+// clientsInfo is the JSON shape for the template's client config definition.
+type clientsInfo struct {
+	Type       string             `json:"type"`                      // "file_per_user" | "credentials" | "url"
+	Source     string             `json:"source,omitempty"`          // file_per_user
+	Format     string             `json:"format,omitempty"`          // file_per_user
+	QR         bool               `json:"qr,omitempty"`             // file_per_user / url
+	Fields     []credentialInfo   `json:"fields,omitempty"`          // credentials
+	URLs       []clientURLInfo    `json:"urls,omitempty"`            // url
+	ImportURLs map[string]string  `json:"import_urls,omitempty"`     // url
 }
 
-// clientsInfo is the JSON shape for all client platforms.
-type clientsInfo struct {
-	Web     *clientEntryInfo `json:"web,omitempty"`
-	Mobile  *clientEntryInfo `json:"mobile,omitempty"`
-	Desktop *clientEntryInfo `json:"desktop,omitempty"`
+type credentialInfo struct {
+	Key    string            `json:"key"`
+	Label  map[string]string `json:"label"`
+	Value  string            `json:"value"`
+	Secret bool              `json:"secret,omitempty"`
+}
+
+type clientURLInfo struct {
+	Name   string `json:"name"`
+	Scheme string `json:"scheme"`
+	QR     bool   `json:"qr,omitempty"`
+}
+
+// shareInfo is the JSON shape for the template's share config.
+type shareInfo struct {
+	Supports     bool     `json:"supports"`
+	PerUser      bool     `json:"per_user,omitempty"`
+	ShareContent []string `json:"share_content,omitempty"`
 }
 
 // templateDetail is the JSON shape returned by GET /api/templates/:name.
@@ -72,6 +89,7 @@ type templateDetail struct {
 	Settings    []settingInfo     `json:"settings"`
 	Guide       *guideInfo        `json:"guide,omitempty"`
 	Clients     *clientsInfo      `json:"clients,omitempty"`
+	Share       *shareInfo        `json:"share,omitempty"`
 	Source      *sourceInfo       `json:"source,omitempty"`
 	Limitations []string          `json:"limitations,omitempty"`
 }
@@ -99,14 +117,43 @@ func convertSettings(src []tmpl.Setting) []settingInfo {
 	return settings
 }
 
-func convertClientEntry(e *tmpl.ClientEntry) *clientEntryInfo {
-	if e == nil {
+func convertClients(c *tmpl.ClientConfig) *clientsInfo {
+	if c == nil {
 		return nil
 	}
-	return &clientEntryInfo{
-		URL:         e.URL,
-		Label:       e.Label,
-		Description: e.Description,
+	ci := &clientsInfo{
+		Type:       c.Type,
+		Source:     c.Source,
+		Format:     c.Format,
+		QR:         c.QR,
+		ImportURLs: c.ImportURLs,
+	}
+	for _, f := range c.Fields {
+		ci.Fields = append(ci.Fields, credentialInfo{
+			Key:    f.Key,
+			Label:  f.Label,
+			Value:  f.Value,
+			Secret: f.Secret,
+		})
+	}
+	for _, u := range c.URLs {
+		ci.URLs = append(ci.URLs, clientURLInfo{
+			Name:   u.Name,
+			Scheme: u.Scheme,
+			QR:     u.QR,
+		})
+	}
+	return ci
+}
+
+func convertShare(s *tmpl.ShareConfig) *shareInfo {
+	if s == nil {
+		return nil
+	}
+	return &shareInfo{
+		Supports:     s.Supports,
+		PerUser:      s.PerUser,
+		ShareContent: s.ShareContent,
 	}
 }
 
@@ -143,13 +190,8 @@ func getTemplateHandler(deps Deps) gin.HandlerFunc {
 			}
 		}
 
-		if t.Clients != nil {
-			detail.Clients = &clientsInfo{
-				Web:     convertClientEntry(t.Clients.Web),
-				Mobile:  convertClientEntry(t.Clients.Mobile),
-				Desktop: convertClientEntry(t.Clients.Desktop),
-			}
-		}
+		detail.Clients = convertClients(t.Clients)
+		detail.Share = convertShare(t.Share)
 
 		c.JSON(http.StatusOK, detail)
 	}
