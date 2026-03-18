@@ -265,7 +265,7 @@ limitations:
 
 ---
 
-## US-3.4 客户端配置 `P0` `Phase 2`
+## US-3.4 客户端配置 `P0` `Phase 2` ✅
 
 **作为** 用户
 **我想** 获取已部署应用的客户端配置
@@ -315,7 +315,7 @@ limitations:
 
 ---
 
-## US-3.5 分享给朋友 `P1` `Phase 2`
+## US-3.5 分享给朋友 `P1` `Phase 2` ✅
 
 **作为** 用户
 **我想** 把 VPN 配置和使用方法分享给朋友
@@ -352,12 +352,13 @@ limitations:
 - [ ] 分享链接使用随机 token，不可猜测
 - [ ] 过期后页面显示 "链接已过期"
 - [ ] 设置了密码时，先输入密码才能查看
-- [ ] 后端 API:
+- [x] 后端 API (实际实现):
   ```
-  POST /api/shares              → { url, token, expires_at }
-  GET  /api/shares/:token       → 分享页面内容 (无需认证)
-  GET  /api/shares              → 我创建的分享列表
-  DELETE /api/shares/:token     → 撤销分享
+  POST   /api/apps/:id/share    → { token, url }        (创建分享)
+  DELETE /api/apps/:id/share    →                        (撤销分享)
+  GET    /api/s/:token          → 配置 + guide (公开)
+  GET    /api/s/:token/subscribe → Clash YAML (公开)
+  GET    /api/s/:token/file/:n  → 下载文件 (公开)
   ```
 
 **前端交互:**

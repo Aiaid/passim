@@ -512,7 +512,19 @@ CREATE TABLE s3_credentials (
     secret_key TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- 分享 token
+CREATE TABLE share_tokens (
+    id         TEXT PRIMARY KEY,
+    app_id     TEXT NOT NULL,
+    user_index INTEGER DEFAULT 0,
+    token      TEXT NOT NULL UNIQUE,
+    created_at TEXT DEFAULT (datetime('now')),
+    revoked    INTEGER DEFAULT 0
+);
 ```
+
+> **注**: `apps` 表还有 `generated TEXT DEFAULT '{}'` 列（idempotent ALTER），存储部署时的自动生成值供客户端配置渲染使用。
 
 ### 多节点通信
 
@@ -603,9 +615,23 @@ POST   /api/apps                    # 部署新应用 { template, settings }
 GET    /api/apps/:id
 DELETE /api/apps/:id                # 卸载
 PATCH  /api/apps/:id               # 更新配置
-GET    /api/apps/:id/configs        # 客户端配置文件列表
-GET    /api/apps/:id/configs/:file  # 下载配置文件
+GET    /api/apps/:id/configs        # 原始配置文件列表
+GET    /api/apps/:id/configs/:file  # 下载原始配置文件
+GET    /api/apps/:id/client-config  # 模板驱动的客户端配置 (三种类型)
+GET    /api/apps/:id/client-config/file/:n  # 下载 peer 配置文件
+GET    /api/apps/:id/client-config/zip      # ZIP 打包下载
+GET    /api/apps/:id/subscribe      # Clash/Stash 订阅 YAML
+POST   /api/apps/:id/share          # 创建分享 token
+DELETE /api/apps/:id/share          # 撤销分享
 GET    /api/apps/:id/events         # SSE 部署进度
+```
+
+### 公开分享端点 (无需认证)
+
+```
+GET    /api/s/:token                # 分享配置数据
+GET    /api/s/:token/subscribe      # 分享订阅 YAML
+GET    /api/s/:token/file/:n        # 分享文件下载
 ```
 
 ### 远程节点管理
@@ -703,8 +729,11 @@ GET  /api/apps                    # 应用列表
 GET  /api/apps/:id
 PATCH /api/apps/:id               # 更新设置
 DELETE /api/apps/:id              # 卸载
-GET  /api/apps/:id/configs        # 配置文件列表
-GET  /api/apps/:id/configs/:file  # 下载配置
+GET  /api/apps/:id/configs        # 原始配置文件列表
+GET  /api/apps/:id/configs/:file  # 下载原始配置
+GET  /api/apps/:id/client-config  # 客户端配置 (模板驱动)
+GET  /api/apps/:id/subscribe      # Clash 订阅
+POST /api/apps/:id/share          # 创建分享
 GET  /api/apps/:id/events         # SSE 应用事件
 GET  /api/tasks                   # 任务列表
 GET  /api/tasks/:id
@@ -819,6 +848,11 @@ Phase 2 完成后的密集打磨期（~30 commits），包含重大 UI 重设计
 - [x] CI 流水线 (`.github/workflows/ci.yml` — Go test + 前端 lint/test + Docker build)
 - [x] Release 流水线 (`.github/workflows/release.yml` — 多架构 Docker 镜像 + GitHub Release)
 - [x] 自我更新机制 (`internal/update` — 版本检查 + 镜像拉取 + helper 容器切换 + 回滚)
+- [x] 模板驱动客户端配置导出 (`clients` 三种类型: file_per_user/credentials/url + 解析引擎 + API + 前端)
+- [x] 分享机制 (share token 创建/撤销 + 公开访问端点 `/api/s/:token`)
+- [x] Clash/Stash 订阅生成 (`/api/apps/:id/subscribe` + URI 解析 + 跨节点聚合)
+- [x] 配置 ZIP 打包下载 (支持多节点国旗前缀)
+- [x] 模板 YAML 迁移 (7 个模板: clients + share + guide.platforms)
 - [ ] 容器日志 (Sheet + 实时尾随 + 搜索)
 - [ ] 监控历史图表 (最近 1h/6h/24h)
 - [ ] 性能优化 + 安全审查

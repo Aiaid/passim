@@ -33,9 +33,9 @@
 | `config.env`, `config.files`, `config.args` | ✅ 已实现 (Go template 渲染) |
 | `generated` (random_string, uuid_v4, random_port) | ✅ 已实现 |
 | `hooks` | ⬜ 解析但未执行，Phase 2 |
-| `clients` (三种类型: file_per_user/credentials/url) | ✅ 解析已实现，渲染/导出 Phase 2 |
-| `share` (分享配置) | ✅ 解析已实现，API/前端 Phase 2 |
-| `guide.platforms` (结构化平台指引) | ✅ 解析已实现，前端展示 Phase 2 |
+| `clients` (三种类型: file_per_user/credentials/url) | ✅ 解析 + 渲染 + API + 前端 |
+| `share` (分享配置) | ✅ 解析 + API + 前端 (token 创建/撤销/公开访问) |
+| `guide.platforms` (结构化平台指引) | ✅ 解析 + 前端展示 |
 | `users` (增删管理) | ⬜ Phase 2 |
 | `metrics.per_user` | ⬜ Phase 2 |
 

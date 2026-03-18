@@ -331,7 +331,7 @@ data: {"status":"running"}
 
 #### `GET /api/apps/:id/configs`
 
-返回配置文件名数组。
+返回容器配置目录下的原始文件名数组（低级接口，前端通常使用 `client-config` 端点）。
 
 ```json
 ["config.yaml", "peer1.conf"]
@@ -339,7 +339,115 @@ data: {"status":"running"}
 
 #### `GET /api/apps/:id/configs/:filename`
 
-返回文件内容 (`Content-Type: text/plain; charset=utf-8`)。包含路径穿越保护。
+返回原始文件内容 (`Content-Type: text/plain; charset=utf-8`)。包含路径穿越保护。
+
+### 客户端配置导出 ✅ Phase 2
+
+模板驱动的客户端配置解析。根据模板 `clients.type` 返回不同结构。
+
+#### `GET /api/apps/:id/client-config`
+
+返回解析后的客户端配置。三种类型：
+
+**file_per_user** (WireGuard):
+```json
+{
+  "type": "file_per_user",
+  "qr": true,
+  "files": [
+    { "index": 1, "name": "peer1.conf" },
+    { "index": 2, "name": "peer2.conf" }
+  ],
+  "share_supported": true
+}
+```
+
+**credentials** (L2TP, WebDAV, Samba, RDesktop):
+```json
+{
+  "type": "credentials",
+  "fields": [
+    { "key": "server", "label": {"en-US":"Server"}, "value": "203.0.113.10", "secret": false },
+    { "key": "password", "label": {"en-US":"Password"}, "value": "abc123", "secret": true }
+  ],
+  "share_supported": true
+}
+```
+
+**url** (Hysteria, V2Ray):
+```json
+{
+  "type": "url",
+  "urls": [
+    { "name": "Hysteria 2", "scheme": "hysteria2://pass@1.2.3.4:443/?insecure=1#node", "qr": true }
+  ],
+  "import_urls": { "stash": "stash://...", "shadowrocket": "sub://..." },
+  "share_supported": true,
+  "share_token": "existing-token-if-any"
+}
+```
+
+#### `GET /api/apps/:id/client-config/file/:index`
+
+下载单个配置文件（仅 `file_per_user` 类型）。返回 `application/octet-stream`。
+
+#### `GET /api/apps/:id/client-config/zip`
+
+打包所有配置文件为 ZIP 下载（仅 `file_per_user` 类型）。返回 `application/zip`。
+
+#### `GET /api/apps/:id/subscribe`
+
+生成 Clash/Stash 兼容的订阅 YAML（仅 `url` 类型）。聚合本地及远程节点的同模板应用。
+
+```yaml
+proxies:
+  - name: "tokyo-1"
+    type: hysteria2
+    server: 1.2.3.4
+    port: 443
+    password: "xxx"
+proxy-groups:
+  - name: auto
+    type: url-test
+    proxies: ["tokyo-1"]
+```
+
+返回 `Content-Type: text/yaml; charset=utf-8`。
+
+### 分享 ✅ Phase 2
+
+#### `POST /api/apps/:id/share`
+
+创建分享 token。如已存在未撤销的 token，返回现有 token。
+
+```json
+// Request
+{ "user_index": 0 }
+// Response (201 Created)
+{ "token": "uuid", "url": "https://host:8443/api/s/uuid" }
+```
+
+#### `DELETE /api/apps/:id/share`
+
+撤销该应用的所有分享 token。
+
+#### `GET /api/s/:token` (公开，无需认证)
+
+返回分享的客户端配置 + guide + limitations。Token 无效或已撤销返回 404。
+
+#### `GET /api/s/:token/subscribe` (公开，无需认证)
+
+返回 Clash 订阅 YAML。供 Stash/Clash 等客户端轮询。
+
+#### `GET /api/s/:token/file/:index` (公开，无需认证)
+
+下载分享的配置文件（仅 `file_per_user` 类型）。
+
+### 节点代理 — 客户端配置
+
+#### `GET /api/nodes/:id/apps/:appId/client-config`
+
+代理到远程节点的 `GET /api/apps/:appId/client-config`。
 
 ### 任务管理 ✅ Phase 1
 
