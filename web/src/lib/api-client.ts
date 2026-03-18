@@ -110,6 +110,14 @@ export const api = {
   getAppConfigs: (id: string) => request<string[]>(`/apps/${id}/configs`),
   getAppConfigFile: (id: string, file: string) =>
     request<{ content: string }>(`/apps/${id}/configs/${file}`),
+  getAppClientConfig: (id: string) => request<ClientConfigResponse>(`/apps/${id}/client-config`),
+  createShare: (id: string, userIndex?: number) =>
+    request<{ token: string; url: string }>(`/apps/${id}/share`, {
+      method: 'POST',
+      body: JSON.stringify({ user_index: userIndex ?? 0 }),
+    }),
+  revokeShare: (id: string) =>
+    request<{ ok: boolean }>(`/apps/${id}/share`, { method: 'DELETE' }),
 
   // Tasks
   getTasks: () => request<Task[]>('/tasks'),
@@ -199,18 +207,53 @@ export interface TemplateSummary {
   settings: SettingInfo[];
 }
 
-export interface ClientEntry {
-  url?: string;
-  label?: Record<string, string>;
-  description?: Record<string, string>;
+export interface TemplateClients {
+  type: 'file_per_user' | 'credentials' | 'url';
+  source?: string;
+  format?: string;
+  qr?: boolean;
+  fields?: { key: string; label: Record<string, string>; value: string; secret?: boolean }[];
+  urls?: { name: string; scheme: string; qr?: boolean }[];
+  import_urls?: Record<string, string>;
+}
+
+export interface GuidePlatform {
+  name: string;
+  store_url?: string;
+  download_url?: string;
+  steps: string[];
+}
+
+export interface TemplateGuide {
+  setup?: Record<string, string>;
+  usage?: Record<string, string>;
+  platforms?: GuidePlatform[];
+}
+
+export interface TemplateShare {
+  supports: boolean;
+  per_user?: boolean;
+  share_content?: string[];
 }
 
 export interface TemplateDetail extends TemplateSummary {
   version: string;
-  guide?: { setup?: Record<string, string>; usage?: Record<string, string> };
-  clients?: { web?: ClientEntry; mobile?: ClientEntry; desktop?: ClientEntry };
+  guide?: TemplateGuide;
+  clients?: TemplateClients;
+  share?: TemplateShare;
   source?: { url?: string; license?: string };
   limitations?: string[];
+}
+
+export interface ClientConfigResponse {
+  type: 'file_per_user' | 'credentials' | 'url';
+  qr?: boolean;
+  files?: { index: number; name: string }[];
+  fields?: { key: string; label: Record<string, string>; value: string; secret?: boolean }[];
+  urls?: { name: string; scheme: string; qr?: boolean }[];
+  import_urls?: Record<string, string>;
+  share_supported: boolean;
+  share_token?: string;
 }
 
 export interface SettingOptionInfo {

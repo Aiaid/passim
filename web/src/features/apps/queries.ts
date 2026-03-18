@@ -65,6 +65,39 @@ export function useDeleteApp() {
   });
 }
 
+export function useAppClientConfig(id: string) {
+  return useQuery({
+    queryKey: ['app-client-config', id],
+    queryFn: () => api.getAppClientConfig(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateShare() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, userIndex }: { id: string; userIndex?: number }) =>
+      api.createShare(id, userIndex),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['app-client-config', variables.id] });
+      toast.success('Share link created');
+    },
+  });
+}
+
+export function useRevokeShare() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => api.revokeShare(id),
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: ['app-client-config', id] });
+      toast.success('Share link revoked');
+    },
+  });
+}
+
 export function useTemplateForApp(templateName: string | undefined) {
   const { data: templates } = useQuery({
     queryKey: ['templates'],

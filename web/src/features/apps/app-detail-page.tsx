@@ -14,6 +14,7 @@ import { CATEGORY_COLORS } from '@/lib/constants';
 import { localized } from '@/lib/utils';
 import { useApp, useTemplateForApp, useTemplateDetail } from './queries';
 import { AppConfigs } from './app-configs';
+import { ClientConfig } from './client-config';
 import { AppEvents } from './app-events';
 import { AppSettingsForm } from './app-settings-form';
 import { ConnectionGuide } from './connection-guide';
@@ -106,6 +107,7 @@ export function AppDetailPage() {
         <TabsList>
           <TabsTrigger value="overview">{t('app.overview')}</TabsTrigger>
           <TabsTrigger value="settings">{t('app.settings_tab')}</TabsTrigger>
+          <TabsTrigger value="client-config">{t('app.client_config', 'Client Config')}</TabsTrigger>
           <TabsTrigger value="configs">{t('app.configs')}</TabsTrigger>
           <TabsTrigger value="events">{t('app.events')}</TabsTrigger>
         </TabsList>
@@ -186,7 +188,12 @@ export function AppDetailPage() {
           </Card>
         </TabsContent>
 
-        {/* Configs tab */}
+        {/* Client Config tab */}
+        <TabsContent value="client-config" className="mt-6">
+          <ClientConfig appId={app.id} />
+        </TabsContent>
+
+        {/* Configs tab (raw files) */}
         <TabsContent value="configs" className="mt-6">
           <AppConfigs appId={app.id} />
         </TabsContent>
