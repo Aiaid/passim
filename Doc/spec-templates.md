@@ -33,10 +33,11 @@
 | `config.env`, `config.files`, `config.args` | ✅ 已实现 (Go template 渲染) |
 | `generated` (random_string, uuid_v4, random_port) | ✅ 已实现 |
 | `hooks` | ⬜ 解析但未执行，Phase 2 |
-| `clients` | ⬜ 解析但未处理，Phase 2 |
+| `clients` (三种类型: file_per_user/credentials/url) | ✅ 解析已实现，渲染/导出 Phase 2 |
+| `share` (分享配置) | ✅ 解析已实现，API/前端 Phase 2 |
+| `guide.platforms` (结构化平台指引) | ✅ 解析已实现，前端展示 Phase 2 |
 | `users` (增删管理) | ⬜ Phase 2 |
 | `metrics.per_user` | ⬜ Phase 2 |
-| `share` | ⬜ Phase 2 |
 
 > **端口映射修复**: 端口映射已修复，ExposedPorts + PortBindings 正确传递到 Docker API。
 
