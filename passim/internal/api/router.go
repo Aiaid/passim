@@ -67,6 +67,14 @@ func NewRouter(deps Deps) http.Handler {
 			}
 		}
 
+		// Public share routes (no auth)
+		shareGroup := api.Group("/s")
+		{
+			shareGroup.GET("/:token", shareConfigHandler(deps))
+			shareGroup.GET("/:token/subscribe", shareSubscribeHandler(deps))
+			shareGroup.GET("/:token/file/:index", shareFileHandler(deps))
+		}
+
 		// Public speedtest routes (no auth)
 		registerSpeedtestPublicRoutes(api)
 
@@ -108,6 +116,12 @@ func NewRouter(deps Deps) http.Handler {
 			protected.DELETE("/apps/:id", deleteAppHandler(deps))
 			protected.GET("/apps/:id/configs", appConfigsHandler(deps))
 			protected.GET("/apps/:id/configs/*filepath", appConfigFileHandler(deps))
+			protected.GET("/apps/:id/client-config", appClientConfigHandler(deps))
+			protected.GET("/apps/:id/client-config/file/:index", appClientConfigFileHandler(deps))
+			protected.GET("/apps/:id/client-config/zip", appClientConfigZIPHandler(deps))
+			protected.GET("/apps/:id/subscribe", appSubscribeHandler(deps))
+			protected.POST("/apps/:id/share", createShareHandler(deps))
+			protected.DELETE("/apps/:id/share", revokeShareHandler(deps))
 
 			// Task routes
 			protected.GET("/tasks", listTasksHandler(deps))
@@ -137,6 +151,7 @@ func NewRouter(deps Deps) http.Handler {
 			protected.POST("/nodes/:id/apps", nodeProxyHandler(deps, "POST", func(c *gin.Context) string { return "/api/apps" }))
 			protected.DELETE("/nodes/:id/apps/:appId", nodeProxyHandler(deps, "DELETE", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") }))
 			protected.GET("/nodes/:id/apps/:appId/configs", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") + "/configs" }))
+			protected.GET("/nodes/:id/apps/:appId/client-config", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") + "/client-config" }))
 
 			// Node server-side speed test (local → remote, no browser middleman)
 			protected.POST("/nodes/:id/speedtest", nodeSpeedtestHandler(deps))
