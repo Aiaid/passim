@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"io"
+	"sync"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -16,6 +17,7 @@ type MockCall struct {
 
 // MockClient implements DockerClient for testing.
 type MockClient struct {
+	mu    sync.Mutex
 	Calls []MockCall
 
 	// Configurable return values
@@ -43,7 +45,18 @@ type MockClient struct {
 }
 
 func (m *MockClient) record(method string, args ...interface{}) {
+	m.mu.Lock()
 	m.Calls = append(m.Calls, MockCall{Method: method, Args: args})
+	m.mu.Unlock()
+}
+
+// GetCalls returns a snapshot of recorded calls (thread-safe).
+func (m *MockClient) GetCalls() []MockCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := make([]MockCall, len(m.Calls))
+	copy(cp, m.Calls)
+	return cp
 }
 
 func (m *MockClient) ListContainers(ctx context.Context) ([]container.Summary, error) {

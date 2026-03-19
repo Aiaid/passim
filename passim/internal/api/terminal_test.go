@@ -140,7 +140,7 @@ func TestTerminal_DataFlow(t *testing.T) {
 
 	// Verify ResizeExec was called
 	found := false
-	for _, call := range mockDocker.Calls {
+	for _, call := range mockDocker.GetCalls() {
 		if call.Method == "ResizeExec" {
 			found = true
 			if call.Args[0] != "exec-123" {
