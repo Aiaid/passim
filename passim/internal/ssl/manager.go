@@ -1,7 +1,10 @@
 package ssl
 
 import (
+	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -291,39 +294,39 @@ func (m *SSLManager) GetDomain() string {
 }
 
 // ExportCertPEM returns the current TLS certificate and key as PEM strings.
-// Works for all modes: self-signed, auto (reads from autocert cache), custom.
+// Works for all modes: self-signed, auto (via autocert Manager), custom.
 func (m *SSLManager) ExportCertPEM() (certPEM, keyPEM string, err error) {
 	switch m.mode {
 	case "auto":
-		if m.domain == "" {
-			return "", "", fmt.Errorf("no domain configured")
+		if m.autocertMgr == nil || m.domain == "" {
+			return "", "", fmt.Errorf("autocert not initialized")
 		}
-		// autocert stores cert+key in a single file named after the domain
-		cacheDir := filepath.Join(m.dataDir, "ssl", "autocert")
-		data, err := os.ReadFile(filepath.Join(cacheDir, m.domain))
+		// Get the cert from autocert Manager (memory + cache, triggers ACME if needed)
+		hello := &tls.ClientHelloInfo{ServerName: m.domain}
+		tlsCert, err := m.autocertMgr.GetCertificate(hello)
 		if err != nil {
-			return "", "", fmt.Errorf("read autocert cache: %w", err)
+			return "", "", fmt.Errorf("get autocert certificate: %w", err)
 		}
-		// autocert cache file contains PEM blocks: cert(s) + key
-		var certs, key []byte
-		rest := data
-		for {
-			var block *pem.Block
-			block, rest = pem.Decode(rest)
-			if block == nil {
-				break
+		// Encode cert chain as PEM
+		var certBuf, keyBuf bytes.Buffer
+		for _, der := range tlsCert.Certificate {
+			pem.Encode(&certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: der})
+		}
+		// Encode private key
+		switch key := tlsCert.PrivateKey.(type) {
+		case *ecdsa.PrivateKey:
+			b, err := x509.MarshalECPrivateKey(key)
+			if err != nil {
+				return "", "", fmt.Errorf("marshal EC key: %w", err)
 			}
-			encoded := pem.EncodeToMemory(block)
-			if block.Type == "EC PRIVATE KEY" || block.Type == "RSA PRIVATE KEY" || block.Type == "PRIVATE KEY" {
-				key = append(key, encoded...)
-			} else {
-				certs = append(certs, encoded...)
-			}
+			pem.Encode(&keyBuf, &pem.Block{Type: "EC PRIVATE KEY", Bytes: b})
+		case *rsa.PrivateKey:
+			b := x509.MarshalPKCS1PrivateKey(key)
+			pem.Encode(&keyBuf, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: b})
+		default:
+			return "", "", fmt.Errorf("unsupported key type: %T", tlsCert.PrivateKey)
 		}
-		if len(certs) == 0 || len(key) == 0 {
-			return "", "", fmt.Errorf("incomplete cert data in autocert cache")
-		}
-		return string(certs), string(key), nil
+		return certBuf.String(), keyBuf.String(), nil
 
 	default: // self-signed, custom
 		if m.certPath == "" || m.keyPath == "" {
