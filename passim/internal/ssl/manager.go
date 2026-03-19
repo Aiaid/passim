@@ -290,6 +290,95 @@ func (m *SSLManager) GetDomain() string {
 	return m.domain
 }
 
+// ExportCertPEM returns the current TLS certificate and key as PEM strings.
+// Works for all modes: self-signed, auto (reads from autocert cache), custom.
+func (m *SSLManager) ExportCertPEM() (certPEM, keyPEM string, err error) {
+	switch m.mode {
+	case "auto":
+		if m.domain == "" {
+			return "", "", fmt.Errorf("no domain configured")
+		}
+		// autocert stores cert+key in a single file named after the domain
+		cacheDir := filepath.Join(m.dataDir, "ssl", "autocert")
+		data, err := os.ReadFile(filepath.Join(cacheDir, m.domain))
+		if err != nil {
+			return "", "", fmt.Errorf("read autocert cache: %w", err)
+		}
+		// autocert cache file contains PEM blocks: cert(s) + key
+		var certs, key []byte
+		rest := data
+		for {
+			var block *pem.Block
+			block, rest = pem.Decode(rest)
+			if block == nil {
+				break
+			}
+			encoded := pem.EncodeToMemory(block)
+			if block.Type == "EC PRIVATE KEY" || block.Type == "RSA PRIVATE KEY" || block.Type == "PRIVATE KEY" {
+				key = append(key, encoded...)
+			} else {
+				certs = append(certs, encoded...)
+			}
+		}
+		if len(certs) == 0 || len(key) == 0 {
+			return "", "", fmt.Errorf("incomplete cert data in autocert cache")
+		}
+		return string(certs), string(key), nil
+
+	default: // self-signed, custom
+		if m.certPath == "" || m.keyPath == "" {
+			return "", "", fmt.Errorf("no cert available")
+		}
+		certData, err := os.ReadFile(m.certPath)
+		if err != nil {
+			return "", "", fmt.Errorf("read cert: %w", err)
+		}
+		keyData, err := os.ReadFile(m.keyPath)
+		if err != nil {
+			return "", "", fmt.Errorf("read key: %w", err)
+		}
+		return string(certData), string(keyData), nil
+	}
+}
+
+// ExportToShared writes the current cert/key to {dataDir}/ssl/shared/ for
+// child containers to mount. Returns true if the cert content changed.
+func (m *SSLManager) ExportToShared() (changed bool, err error) {
+	cert, key, err := m.ExportCertPEM()
+	if err != nil {
+		return false, err
+	}
+
+	sharedDir := filepath.Join(m.dataDir, "ssl", "shared")
+	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+		return false, fmt.Errorf("create shared dir: %w", err)
+	}
+
+	certPath := filepath.Join(sharedDir, "cert.pem")
+	keyPath := filepath.Join(sharedDir, "key.pem")
+
+	// Check if content changed
+	oldCert, _ := os.ReadFile(certPath)
+	if string(oldCert) == cert {
+		return false, nil
+	}
+
+	if err := os.WriteFile(certPath, []byte(cert), 0644); err != nil {
+		return false, fmt.Errorf("write cert: %w", err)
+	}
+	if err := os.WriteFile(keyPath, []byte(key), 0600); err != nil {
+		return false, fmt.Errorf("write key: %w", err)
+	}
+
+	log.Printf("SSL cert exported to %s", sharedDir)
+	return true, nil
+}
+
+// SharedCertDir returns the path to the shared cert directory.
+func (m *SSLManager) SharedCertDir() string {
+	return filepath.Join(m.dataDir, "ssl", "shared")
+}
+
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil

@@ -97,6 +97,8 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			tmpl.ResolveGeneratedDefaults(merged, generated)
 		}
 
+
+
 		// 4. Render template
 		dataDir := deps.DataDir
 		if dataDir == "" {

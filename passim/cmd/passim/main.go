@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -103,6 +104,28 @@ func main() {
 		if err := sslMgr.Init(); err != nil {
 			log.Printf("warning: SSL init failed: %v", err)
 		}
+	}
+
+	// Export SSL cert to shared directory for child containers
+	if sslMgr != nil {
+		if _, err := sslMgr.ExportToShared(); err != nil {
+			log.Printf("warning: SSL cert export: %v", err)
+		}
+		// Periodic re-export (catches autocert renewals)
+		go func() {
+			ticker := time.NewTicker(1 * time.Hour)
+			defer ticker.Stop()
+			for range ticker.C {
+				changed, err := sslMgr.ExportToShared()
+				if err != nil {
+					log.Printf("cert sync: export failed: %v", err)
+					continue
+				}
+				if changed && dockerClient != nil {
+					restartTLSApps(database, dockerClient, dataDir)
+				}
+			}
+		}()
 	}
 
 	// Task queue
@@ -344,6 +367,32 @@ func getEnvDefault(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// restartTLSApps restarts containers that have TLS cert files, after cert renewal.
+func restartTLSApps(database *sql.DB, dockerClient docker.DockerClient, dataDir string) {
+	apps, err := db.ListApps(database)
+	if err != nil {
+		log.Printf("cert sync: list apps: %v", err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	for _, app := range apps {
+		if app.ContainerID == "" || app.Status != "running" {
+			continue
+		}
+		// Check if this app mounts the shared cert dir (has server.crt in config)
+		appDir := filepath.Join(dataDir, "apps", app.Template+"-"+app.ID[:8], "configs")
+		if _, err := os.Stat(filepath.Join(appDir, "server.crt")); err != nil {
+			continue
+		}
+		if err := dockerClient.RestartContainer(ctx, app.ContainerID); err != nil {
+			log.Printf("cert sync: restart %s-%s: %v", app.Template, app.ID[:8], err)
+		} else {
+			log.Printf("cert sync: restarted %s-%s after cert renewal", app.Template, app.ID[:8])
+		}
+	}
 }
 
 // discoverDataMount inspects the current container to find how dataDir is mounted.
