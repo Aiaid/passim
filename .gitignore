@@ -17,3 +17,6 @@ web/dist/
 # App (Phase 5)
 app/node_modules/
 app/.expo/
+
+# Legacy (archived)
+_legacy/
