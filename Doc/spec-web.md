@@ -104,7 +104,8 @@ web/src/
 │       ├── passkey-list.tsx
 │       ├── passkey-register.tsx
 │       ├── ssl-settings.tsx
-│       └── iperf-settings.tsx            # iperf3 测速服务开关
+│       ├── iperf-settings.tsx            # iperf3 测速服务开关
+│       └── update-settings.tsx           # 版本信息 + 软件更新 (含预发布/dev 通道)
 ├── hooks/                                # 自定义 Hooks
 │   ├── use-event-stream.tsx             # 统一 SSE 流: EventStreamProvider + useEventStream + useResourceEvents
 │   ├── use-mobile.ts                     # 响应式检测
@@ -249,10 +250,15 @@ Header 显示节点信息 (名称/版本/运行时间/公网 IPv4/IPv6+国家/SS
 
 ### 设置页 `/settings`
 
-三个 Tab:
+四个 Tab:
 - **General**: 节点名称 (inline 编辑 + 保存)、主题 (Light/Dark/System)、语言 (中文/English)、iperf3 测速服务开关
 - **Security**: API Key 状态、Passkey 列表 + 注册/删除
 - **SSL**: SSL 模式、域名、证书有效性、到期时间、续期/上传
+- **System**: 版本信息 (版本号/commit/构建时间) + 软件更新。支持：
+  - 稳定版更新检查 (GitHub Releases `/releases/latest`)
+  - 预发布版本开关 (beta/rc，GitHub Releases `/releases` 含 prerelease)
+  - Dev 通道: 强制拉取 main 分支最新构建 (`:dev` Docker tag)
+  - Dev 版本 (`dev-<sha>`) 显示为"最新发布版"而非"有更新"，用户自行决定是否切换
 
 ### 远程节点 — Phase 3
 

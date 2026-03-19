@@ -9,9 +9,23 @@ import (
 
 func versionCheckHandler(checker *update.Checker) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Return cached result if available, otherwise fetch
+		prerelease := c.Query("prerelease") == "true"
+		force := c.Query("force") == "true"
+
+		if prerelease {
+			// Prerelease checks always fetch fresh (not cached)
+			info, err := checker.CheckPrerelease(c.Request.Context())
+			if err != nil {
+				c.JSON(http.StatusBadGateway, gin.H{"error": "failed to check for updates"})
+				return
+			}
+			c.JSON(http.StatusOK, info)
+			return
+		}
+
+		// Stable: return cached result if available, otherwise fetch
 		info := checker.Cached()
-		if info == nil || c.Query("force") == "true" {
+		if info == nil || force {
 			var err error
 			info, err = checker.Check(c.Request.Context())
 			if err != nil {

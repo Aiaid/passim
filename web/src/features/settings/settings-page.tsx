@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GeneralSettings } from './general-settings';
 import { SecuritySettings } from './security-settings';
 import { SSLSettings } from './ssl-settings';
+import { UpdateSettings } from './update-settings';
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -16,6 +17,7 @@ export function SettingsPage() {
           <TabsTrigger value="general">{t('settings.general')}</TabsTrigger>
           <TabsTrigger value="security">{t('settings.security')}</TabsTrigger>
           <TabsTrigger value="ssl">{t('settings.ssl')}</TabsTrigger>
+          <TabsTrigger value="system">{t('settings.system')}</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-6">
           <GeneralSettings />
@@ -25,6 +27,9 @@ export function SettingsPage() {
         </TabsContent>
         <TabsContent value="ssl" className="mt-6">
           <SSLSettings />
+        </TabsContent>
+        <TabsContent value="system" className="mt-6">
+          <UpdateSettings />
         </TabsContent>
       </Tabs>
     </div>

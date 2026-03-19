@@ -29,6 +29,7 @@ type UpdateInfo struct {
 	Available   bool   `json:"available"`
 	Changelog   string `json:"changelog,omitempty"`
 	PublishedAt string `json:"published_at,omitempty"`
+	Prerelease  bool   `json:"prerelease,omitempty"`
 }
 
 // Checker periodically checks for new versions.
@@ -50,11 +51,86 @@ func NewChecker(repo string) *Checker {
 	}
 }
 
-// Check queries GitHub Releases API for the latest release and compares
+// Check queries GitHub Releases API for the latest stable release and compares
 // it against the running version. Results are cached.
 func (c *Checker) Check(ctx context.Context) (*UpdateInfo, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", c.repo)
+	return c.check(ctx, false)
+}
 
+// CheckPrerelease queries GitHub Releases API including pre-release versions.
+// This is NOT cached (separate from the background stable check).
+func (c *Checker) CheckPrerelease(ctx context.Context) (*UpdateInfo, error) {
+	return c.check(ctx, true)
+}
+
+func (c *Checker) check(ctx context.Context, includePrerelease bool) (*UpdateInfo, error) {
+	var release *GitHubRelease
+
+	if includePrerelease {
+		// Use /releases to get all releases including prereleases
+		url := fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=10", c.repo)
+		r, err := c.fetchRelease(ctx, url)
+		if err != nil {
+			return nil, err
+		}
+		release = r
+	} else {
+		// Use /releases/latest for stable only
+		url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", c.repo)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("create request: %w", err)
+		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("User-Agent", "passim/"+version.Version)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("fetch releases: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("github api returned %d", resp.StatusCode)
+		}
+
+		var rel GitHubRelease
+		if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+			return nil, fmt.Errorf("decode response: %w", err)
+		}
+
+		if rel.Draft || rel.Prerelease {
+			info := &UpdateInfo{Current: version.Version, Latest: version.Version, Available: false}
+			c.setCache(info)
+			return info, nil
+		}
+		release = &rel
+	}
+
+	if release == nil {
+		info := &UpdateInfo{Current: version.Version, Latest: version.Version, Available: false}
+		return info, nil
+	}
+
+	latest := release.TagName
+	info := &UpdateInfo{
+		Current:     version.Version,
+		Latest:      latest,
+		Available:   isNewerOrDev(version.Version, latest),
+		Changelog:   release.Body,
+		PublishedAt: release.PublishedAt.Format(time.RFC3339),
+		Prerelease:  release.Prerelease,
+	}
+
+	// Only cache stable checks
+	if !includePrerelease {
+		c.setCache(info)
+	}
+	return info, nil
+}
+
+// fetchRelease fetches the list of releases and returns the first non-draft one.
+func (c *Checker) fetchRelease(ctx context.Context, url string) (*GitHubRelease, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -72,28 +148,17 @@ func (c *Checker) Check(ctx context.Context) (*UpdateInfo, error) {
 		return nil, fmt.Errorf("github api returned %d", resp.StatusCode)
 	}
 
-	var release GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	var releases []GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	if release.Draft || release.Prerelease {
-		info := &UpdateInfo{Current: version.Version, Latest: version.Version, Available: false}
-		c.setCache(info)
-		return info, nil
+	for i := range releases {
+		if !releases[i].Draft {
+			return &releases[i], nil
+		}
 	}
-
-	latest := release.TagName
-	info := &UpdateInfo{
-		Current:     version.Version,
-		Latest:      latest,
-		Available:   isNewer(version.Version, latest),
-		Changelog:   release.Body,
-		PublishedAt: release.PublishedAt.Format(time.RFC3339),
-	}
-
-	c.setCache(info)
-	return info, nil
+	return nil, nil
 }
 
 // Cached returns the last cached check result, or nil.
@@ -134,6 +199,18 @@ func (c *Checker) StartBackground(ctx context.Context, interval time.Duration) {
 			}
 		}
 	}()
+}
+
+// isNewerOrDev returns true if latest is newer than current,
+// or if current is a non-semver build (e.g. "dev") and latest differs.
+func isNewerOrDev(current, latest string) bool {
+	curRaw := strings.TrimPrefix(current, "v")
+	if !isSemver(curRaw) {
+		// Dev/unknown build — any valid release is considered available
+		latRaw := strings.TrimPrefix(latest, "v")
+		return isSemver(latRaw)
+	}
+	return isNewer(current, latest)
 }
 
 // isNewer returns true if latest is a newer semver than current.

@@ -132,6 +132,21 @@ export const api = {
   updateSettings: (data: { node_name?: string }) =>
     request<{ ok: boolean }>('/settings', { method: 'PATCH', body: JSON.stringify(data) }),
 
+  // Version & Update
+  getVersion: () => request<VersionInfo>('/version'),
+  checkUpdate: (opts?: { force?: boolean; prerelease?: boolean }) => {
+    const params = new URLSearchParams();
+    if (opts?.force) params.set('force', 'true');
+    if (opts?.prerelease) params.set('prerelease', 'true');
+    const qs = params.toString();
+    return request<UpdateInfo>(`/version/check${qs ? `?${qs}` : ''}`);
+  },
+  performUpdate: (version: string) =>
+    request<{ status: string; message: string }>('/update', {
+      method: 'POST',
+      body: JSON.stringify({ version }),
+    }),
+
   // SSL
   getSSLStatus: () => request<SSLStatus>('/ssl/status'),
   renewSSL: () => request<{ message: string }>('/ssl/renew', { method: 'POST' }),
@@ -316,6 +331,21 @@ export interface SSLStatus {
   domain: string;
   expires_at: string;
   issuer?: string;
+}
+
+export interface VersionInfo {
+  version: string;
+  commit: string;
+  build_time: string;
+}
+
+export interface UpdateInfo {
+  current: string;
+  latest: string;
+  available: boolean;
+  changelog?: string;
+  published_at?: string;
+  prerelease?: boolean;
 }
 
 // WebAuthn types for browsers that don't have full type definitions
