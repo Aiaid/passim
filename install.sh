@@ -19,6 +19,12 @@
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
 
+# ── Require bash (script uses arrays, [[ ]], etc.) ────────────
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "Error: This script requires bash. Run: bash install.sh" >&2
+  exit 1
+fi
+
 # ── Defaults ──────────────────────────────────────────────────
 IMAGE="ghcr.io/aiaid/passim"
 TAG="latest"
@@ -79,7 +85,7 @@ if $UNINSTALL; then
 fi
 
 # ── Root check ────────────────────────────────────────────────
-if [[ $EUID -ne 0 ]]; then
+if [[ $(id -u) -ne 0 ]]; then
   fatal "Please run as root:  sudo bash install.sh"
 fi
 
