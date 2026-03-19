@@ -344,14 +344,14 @@ func (m *SSLManager) ExportCertPEM() (certPEM, keyPEM string, err error) {
 // ExportToShared writes the current cert/key to {dataDir}/ssl/shared/ for
 // child containers to mount. Returns true if the cert content changed.
 func (m *SSLManager) ExportToShared() (changed bool, err error) {
-	cert, key, err := m.ExportCertPEM()
-	if err != nil {
-		return false, err
-	}
-
 	sharedDir := filepath.Join(m.dataDir, "ssl", "shared")
 	if err := os.MkdirAll(sharedDir, 0755); err != nil {
 		return false, fmt.Errorf("create shared dir: %w", err)
+	}
+
+	cert, key, err := m.ExportCertPEM()
+	if err != nil {
+		return false, err
 	}
 
 	certPath := filepath.Join(sharedDir, "cert.pem")

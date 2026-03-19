@@ -109,10 +109,16 @@ func main() {
 	// Export SSL cert to shared directory for child containers
 	if sslMgr != nil {
 		if _, err := sslMgr.ExportToShared(); err != nil {
-			log.Printf("warning: SSL cert export: %v", err)
+			log.Printf("warning: SSL cert export: %v (will retry after server starts)", err)
 		}
-		// Periodic re-export (catches autocert renewals)
+		// Periodic re-export (catches autocert lazy init + renewals)
 		go func() {
+			// Retry soon after startup — autocert obtains cert on first TLS handshake
+			time.Sleep(15 * time.Second)
+			if changed, err := sslMgr.ExportToShared(); err == nil && changed && dockerClient != nil {
+				restartTLSApps(database, dockerClient, dataDir)
+			}
+
 			ticker := time.NewTicker(1 * time.Hour)
 			defer ticker.Stop()
 			for range ticker.C {
