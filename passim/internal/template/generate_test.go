@@ -206,6 +206,45 @@ func TestResolveGeneratedDefaultsNonString(t *testing.T) {
 	}
 }
 
+func TestResolveNodeDefaults(t *testing.T) {
+	merged := map[string]interface{}{
+		"domain":   "{{node.Domain}}",
+		"password": "secret123",
+		"port":     443,
+	}
+	node := NodeInfo{
+		PublicIP:  "1.2.3.4",
+		Hostname:  "my-vps",
+		Domain:    "example.com",
+		DataDir:   "/data",
+	}
+
+	ResolveNodeDefaults(merged, node)
+
+	if merged["domain"] != "example.com" {
+		t.Errorf("domain = %q, want example.com", merged["domain"])
+	}
+	if merged["password"] != "secret123" {
+		t.Errorf("password changed unexpectedly")
+	}
+	if merged["port"] != 443 {
+		t.Errorf("port changed unexpectedly")
+	}
+}
+
+func TestResolveNodeDefaultsEmptyDomain(t *testing.T) {
+	merged := map[string]interface{}{
+		"domain": "{{node.Domain}}",
+	}
+	node := NodeInfo{Domain: ""}
+
+	ResolveNodeDefaults(merged, node)
+
+	if merged["domain"] != "" {
+		t.Errorf("domain = %q, want empty string", merged["domain"])
+	}
+}
+
 func TestGenerateMultipleSpecs(t *testing.T) {
 	specs := []GeneratedSpec{
 		{Key: "secret", Type: "random_string", Length: 16},

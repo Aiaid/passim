@@ -91,6 +91,28 @@ func ResolveGeneratedDefaults(merged map[string]interface{}, generated map[strin
 	}
 }
 
+// ResolveNodeDefaults replaces {{node.KEY}} placeholder strings in merged
+// settings with actual node values. This handles template defaults like
+// `default: "{{node.Domain}}"` that reference node context.
+func ResolveNodeDefaults(merged map[string]interface{}, node NodeInfo) {
+	nodeVars := map[string]string{
+		"{{node.PublicIP}}":  node.PublicIP,
+		"{{node.Hostname}}": node.Hostname,
+		"{{node.Domain}}":   node.Domain,
+		"{{node.DataDir}}":  node.DataDir,
+		"{{node.Timezone}}": node.Timezone,
+	}
+	for key, val := range merged {
+		s, ok := val.(string)
+		if !ok {
+			continue
+		}
+		if resolved, exists := nodeVars[s]; exists {
+			merged[key] = resolved
+		}
+	}
+}
+
 // randomPort finds an available TCP port by binding to :0 and returning
 // the port assigned by the OS.
 func randomPort() int {

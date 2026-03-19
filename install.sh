@@ -152,6 +152,12 @@ fi
 mkdir -p "$DATA_DIR"
 ok "Data directory: ${DATA_DIR}"
 
+# ── Detect fresh install vs update ─────────────────────────────
+IS_UPDATE=false
+if [[ -f "${DATA_DIR}/passim.db" ]]; then
+  IS_UPDATE=true
+fi
+
 # ── Stop existing container if any ────────────────────────────
 if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
   info "Removing existing container: ${CONTAINER_NAME}"
@@ -203,6 +209,19 @@ if [[ "$STATUS" == "healthy" ]]; then
   ok "Passim is healthy!"
 else
   warn "Health check not passing yet (status: ${STATUS}). Container is still starting..."
+fi
+
+# ── Reset API key on update if new key provided ───────────────
+if $IS_UPDATE && [[ -n "$API_KEY" ]]; then
+  info "Updating API key (existing installation detected)..."
+  NEW_KEY_OUTPUT=$(docker exec "$CONTAINER_NAME" passim reset-api-key "$API_KEY" 2>&1)
+  if [[ $? -eq 0 ]]; then
+    ok "API key updated. Restarting container..."
+    docker restart "$CONTAINER_NAME" >/dev/null
+    sleep 3
+  else
+    warn "Failed to reset API key: ${NEW_KEY_OUTPUT}"
+  fi
 fi
 
 # ── Detect IP and build access URL ─────────────────────────────

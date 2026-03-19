@@ -90,7 +90,7 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		// 3. Generate values and resolve generated references in settings
+		// 3. Generate values and resolve generated/node references in settings
 		var generated map[string]string
 		if len(t.Generated) > 0 {
 			generated = tmpl.GenerateValues(t.Generated)
@@ -120,6 +120,9 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			DataDir:   dataDir,
 			Domain:    sslDomain,
 		}
+		// Resolve {{node.*}} placeholder defaults in settings (e.g. "{{node.Domain}}")
+		tmpl.ResolveNodeDefaults(merged, nodeInfo)
+
 		appDir := filepath.Join(dataDir, "apps", t.Name+"-"+appID[:8])
 		rendered, err := tmpl.Render(t, tmpl.RenderData{
 			Settings:  merged,
