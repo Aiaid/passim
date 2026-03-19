@@ -41,7 +41,7 @@ type Checker struct {
 	cached *UpdateInfo
 }
 
-// NewChecker creates a version checker for the given GitHub repo (e.g. "passim/passim").
+// NewChecker creates a version checker for the given GitHub repo (e.g. "aiaid/passim").
 func NewChecker(repo string) *Checker {
 	return &Checker{
 		repo: repo,

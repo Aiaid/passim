@@ -8,7 +8,7 @@ import (
 
 func TestEncodeDecodeSwitchConfig(t *testing.T) {
 	cfg := SwitchConfig{
-		Image: "ghcr.io/passim/passim:v1.1.0",
+		Image: "ghcr.io/aiaid/passim:v1.1.0",
 		Env:   []string{"PORT=8443", "SSL_MODE=off"},
 		Binds: []string{"/var/run/docker.sock:/var/run/docker.sock", "passim-data:/data"},
 		PortBindings: map[string]string{

@@ -16,11 +16,11 @@ import (
 // Updater handles pulling new images and orchestrating the container switch.
 type Updater struct {
 	docker    docker.DockerClient
-	imageName string // e.g. "ghcr.io/passim/passim"
+	imageName string // e.g. "ghcr.io/aiaid/passim"
 }
 
 // NewUpdater creates an updater.
-// imageName is the Docker image base name without tag (e.g. "ghcr.io/passim/passim").
+// imageName is the Docker image base name without tag (e.g. "ghcr.io/aiaid/passim").
 func NewUpdater(dockerClient docker.DockerClient, imageName string) *Updater {
 	return &Updater{
 		docker:    dockerClient,

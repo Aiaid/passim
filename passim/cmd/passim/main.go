@@ -182,8 +182,8 @@ func main() {
 	defer nodeHub.Stop()
 
 	// Update checker + updater
-	githubRepo := getEnvDefault("GITHUB_REPO", "passim/passim")
-	imageName := getEnvDefault("IMAGE_NAME", "ghcr.io/passim/passim")
+	githubRepo := getEnvDefault("GITHUB_REPO", "aiaid/passim")
+	imageName := getEnvDefault("IMAGE_NAME", "ghcr.io/aiaid/passim")
 	checker := update.NewChecker(githubRepo)
 	var updater *update.Updater
 	if dockerClient != nil {
