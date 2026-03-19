@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { Container } from '@/lib/api-client';
 import { useContainerAction, useRemoveContainer, useContainerLogs } from './queries';
 import { mapState } from './utils';
+import { TerminalTab } from './terminal-tab';
 
 interface ContainerDetailPanelProps {
   container: Container | null;
@@ -158,6 +159,9 @@ export function ContainerDetailPanel({
                 <TabsTrigger value="logs" className="flex-1">
                   {t('container.logs')}
                 </TabsTrigger>
+                <TabsTrigger value="terminal" className="flex-1" disabled={!isRunning}>
+                  {t('container.terminal')}
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -167,6 +171,10 @@ export function ContainerDetailPanel({
 
             <TabsContent value="logs" className="flex-1 overflow-hidden mt-0">
               <LogsTab containerId={container.Id} containerName={name} />
+            </TabsContent>
+
+            <TabsContent value="terminal" className="flex-1 overflow-hidden mt-0">
+              <TerminalTab containerId={container.Id} containerName={name} />
             </TabsContent>
           </Tabs>
         </SheetContent>

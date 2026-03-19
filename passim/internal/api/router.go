@@ -107,6 +107,7 @@ func NewRouter(deps Deps) http.Handler {
 			protected.POST("/containers/:id/restart", restartContainerHandler(deps))
 			protected.DELETE("/containers/:id", removeContainerHandler(deps))
 			protected.GET("/containers/:id/logs", containerLogsHandler(deps))
+			protected.GET("/containers/:id/terminal", containerTerminalHandler(deps))
 
 			// App routes
 			protected.POST("/apps", deployAppHandler(deps))

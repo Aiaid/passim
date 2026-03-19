@@ -14,6 +14,12 @@ import (
 	"github.com/docker/go-connections/nat"
 )
 
+// ExecSession represents an interactive exec session attached to a container.
+type ExecSession struct {
+	ID   string               // exec ID (for resize)
+	Conn types.HijackedResponse // bidirectional stream
+}
+
 // DockerClient is the interface for interacting with Docker.
 // It can be mocked for testing.
 type DockerClient interface {
@@ -28,6 +34,8 @@ type DockerClient interface {
 	CreateAndStartContainer(ctx context.Context, cfg *ContainerConfig) (string, error)
 	RenameContainer(ctx context.Context, id string, newName string) error
 	ExecContainer(ctx context.Context, id string, cmd []string) (string, error)
+	ExecInteractive(ctx context.Context, id string, cmd []string) (*ExecSession, error)
+	ResizeExec(ctx context.Context, execID string, height, width uint) error
 	Ping(ctx context.Context) error
 	Close() error
 }
@@ -221,6 +229,32 @@ func (c *Client) ExecContainer(ctx context.Context, id string, cmd []string) (st
 		return "", fmt.Errorf("exec read: %w", err)
 	}
 	return string(output), nil
+}
+
+func (c *Client) ExecInteractive(ctx context.Context, id string, cmd []string) (*ExecSession, error) {
+	execCfg := container.ExecOptions{
+		Cmd:          cmd,
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+	}
+	execResp, err := c.cli.ContainerExecCreate(ctx, id, execCfg)
+	if err != nil {
+		return nil, fmt.Errorf("exec create: %w", err)
+	}
+	attachResp, err := c.cli.ContainerExecAttach(ctx, execResp.ID, container.ExecAttachOptions{Tty: true})
+	if err != nil {
+		return nil, fmt.Errorf("exec attach: %w", err)
+	}
+	return &ExecSession{ID: execResp.ID, Conn: attachResp}, nil
+}
+
+func (c *Client) ResizeExec(ctx context.Context, execID string, height, width uint) error {
+	return c.cli.ContainerExecResize(ctx, execID, container.ResizeOptions{
+		Height: height,
+		Width:  width,
+	})
 }
 
 func (c *Client) Ping(ctx context.Context) error {

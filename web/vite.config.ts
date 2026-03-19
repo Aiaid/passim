@@ -16,6 +16,7 @@ export default defineConfig({
         target: process.env.E2E_API_URL || 'https://localhost:8443',
         changeOrigin: true,
         secure: false,
+        ws: true,
       },
     },
   },

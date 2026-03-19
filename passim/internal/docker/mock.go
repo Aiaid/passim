@@ -34,9 +34,12 @@ type MockClient struct {
 	CreateID        string
 	CreateErr       error
 	RenameErr       error
-	ExecOutput      string
-	ExecErr         error
-	PingErr         error
+	ExecOutput             string
+	ExecErr                error
+	ExecInteractiveResult  *ExecSession
+	ExecInteractiveErr     error
+	ResizeExecErr          error
+	PingErr                error
 }
 
 func (m *MockClient) record(method string, args ...interface{}) {
@@ -96,6 +99,16 @@ func (m *MockClient) RenameContainer(ctx context.Context, id string, newName str
 func (m *MockClient) ExecContainer(ctx context.Context, id string, cmd []string) (string, error) {
 	m.record("ExecContainer", id, cmd)
 	return m.ExecOutput, m.ExecErr
+}
+
+func (m *MockClient) ExecInteractive(ctx context.Context, id string, cmd []string) (*ExecSession, error) {
+	m.record("ExecInteractive", id, cmd)
+	return m.ExecInteractiveResult, m.ExecInteractiveErr
+}
+
+func (m *MockClient) ResizeExec(ctx context.Context, execID string, height, width uint) error {
+	m.record("ResizeExec", execID, height, width)
+	return m.ResizeExecErr
 }
 
 func (m *MockClient) Ping(ctx context.Context) error {
