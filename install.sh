@@ -13,6 +13,7 @@
 #   --email EMAIL       Email for Let's Encrypt
 #   --data-dir DIR      Host data directory (default: /opt/passim/data)
 #   --image TAG         Image tag (default: latest)
+#   --dev               Use dev image (latest main build)
 #   --skip-docker       Skip Docker installation
 #   --uninstall         Remove Passim container and data
 # ──────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ while [[ $# -gt 0 ]]; do
     --dns-domain) DNS_BASE_DOMAIN="$2"; shift 2 ;;
     --data-dir)   DATA_DIR="$2";   shift 2 ;;
     --image)      TAG="$2";        shift 2 ;;
+    --dev)        TAG="dev";       shift ;;
     --skip-docker) SKIP_DOCKER=true; shift ;;
     --uninstall)  UNINSTALL=true;  shift ;;
     -h|--help)
