@@ -167,7 +167,8 @@ func shareSubscribeHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		configs := []clientcfg.ResolvedConfig{*resolved}
-		// TODO: Phase F — aggregate remote node configs
+		// Aggregate configs from remote nodes running the same template
+		configs = append(configs, fetchRemoteConfigs(c.Request.Context(), deps, app.Template)...)
 
 		yaml, err := clientcfg.GenerateClashYAML(configs)
 		if err != nil {

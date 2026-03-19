@@ -188,7 +188,7 @@ export function AppDetailPage() {
 
         {/* Client Config tab */}
         <TabsContent value="client-config" className="mt-6">
-          <ClientConfig appId={app.id} />
+          <ClientConfig appId={app.id} templateName={app.template} />
         </TabsContent>
 
         {/* Events tab */}

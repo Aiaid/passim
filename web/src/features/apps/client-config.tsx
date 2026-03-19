@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueries } from '@tanstack/react-query';
 import {
   Download, QrCode, FileText, Link2, Copy, Check, Share2,
-  Archive, ExternalLink, ShieldCheck, Globe, X, Unlink,
+  Archive, ExternalLink, ShieldCheck, Globe, X, Unlink, Server,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
@@ -15,15 +16,18 @@ import {
 import { CredentialField } from '@/components/shared/credential-field';
 import { EmptyState } from '@/components/shared/empty-state';
 import { useAppClientConfig, useCreateShare, useRevokeShare } from './queries';
-import type { ClientConfigResponse } from '@/lib/api-client';
+import { useEventStream } from '@/hooks/use-event-stream';
+import { api } from '@/lib/api-client';
+import type { ClientConfigResponse, AppResponse, RemoteNode } from '@/lib/api-client';
 
 interface ClientConfigProps {
   appId: string;
+  templateName?: string;
 }
 
 // ─── Main Component ──────────────────────────────────────
 
-export function ClientConfig({ appId }: ClientConfigProps) {
+export function ClientConfig({ appId, templateName }: ClientConfigProps) {
   const { data: config, isLoading } = useAppClientConfig(appId);
 
   if (isLoading) {
@@ -62,7 +66,7 @@ export function ClientConfig({ appId }: ClientConfigProps) {
       {/* Content by type */}
       {config.type === 'file_per_user' && <FilePerUserConfig appId={appId} config={config} />}
       {config.type === 'credentials' && <CredentialsConfig config={config} />}
-      {config.type === 'url' && <URLConfig appId={appId} config={config} />}
+      {config.type === 'url' && <URLConfig appId={appId} config={config} templateName={templateName} />}
 
       {/* Share */}
       {config.share_supported && (
@@ -233,8 +237,69 @@ function CredentialsConfig({ config }: { config: ClientConfigResponse }) {
 
 // ─── URL Config ──────────────────────────────────────────
 
-function URLConfig({ appId, config }: { appId: string; config: ClientConfigResponse }) {
+interface NodeURLGroup {
+  nodeName: string;
+  nodeCountry?: string;
+  urls: { name: string; scheme: string; qr?: boolean }[];
+}
+
+function useRemoteNodeConfigs(templateName?: string) {
+  const { nodes } = useEventStream();
+  const connectedNodes = (nodes ?? []).filter((n: RemoteNode) => n.status === 'connected');
+
+  // Fetch apps from each connected node
+  const nodeAppQueries = useQueries({
+    queries: connectedNodes.map(node => ({
+      queryKey: ['nodes', node.id, 'apps'] as const,
+      queryFn: () => api.getNodeApps(node.id),
+      staleTime: 30_000,
+      enabled: !!templateName,
+    })),
+  });
+
+  // For each node that has a matching app, fetch its client config
+  const matchingApps: { nodeId: string; nodeName: string; nodeCountry?: string; appId: string }[] = [];
+  connectedNodes.forEach((node, i) => {
+    const apps = nodeAppQueries[i]?.data;
+    if (!apps || !templateName) return;
+    const match = apps.find((a: AppResponse) => a.template === templateName);
+    if (match) {
+      matchingApps.push({
+        nodeId: node.id,
+        nodeName: node.name || node.address,
+        nodeCountry: node.country,
+        appId: match.id,
+      });
+    }
+  });
+
+  const configQueries = useQueries({
+    queries: matchingApps.map(({ nodeId, appId }) => ({
+      queryKey: ['nodes', nodeId, 'apps', appId, 'client-config'] as const,
+      queryFn: () => api.getNodeAppClientConfig(nodeId, appId),
+      staleTime: 60_000,
+    })),
+  });
+
+  const groups: NodeURLGroup[] = [];
+  matchingApps.forEach((app, i) => {
+    const cfg = configQueries[i]?.data;
+    if (cfg?.type === 'url' && cfg.urls && cfg.urls.length > 0) {
+      groups.push({
+        nodeName: app.nodeName,
+        nodeCountry: app.nodeCountry,
+        urls: cfg.urls,
+      });
+    }
+  });
+
+  return { remoteGroups: groups, totalNodes: 1 + groups.length };
+}
+
+function URLConfig({ appId, config, templateName }: { appId: string; config: ClientConfigResponse; templateName?: string }) {
   const [qrURI, setQrURI] = useState<string | null>(null);
+  const { remoteGroups, totalNodes } = useRemoteNodeConfigs(templateName);
+
   const subscribeURL = config.share_token
     ? `${window.location.origin}/api/s/${config.share_token}/subscribe`
     : (() => {
@@ -244,38 +309,31 @@ function URLConfig({ appId, config }: { appId: string; config: ClientConfigRespo
 
   return (
     <>
-      {/* URI entries */}
+      {/* URI entries — local node */}
       <div className="cfg-panel">
         <div className="cfg-stripe cfg-accent-url" />
         <h3 className="text-sm font-semibold text-foreground tracking-tight mb-3">
           Import URI
         </h3>
         <div className="space-y-4">
-          {config.urls?.map((url) => (
-            <div key={url.name}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {url.name}
-                </span>
-                <div className="flex items-center gap-0.5">
-                  <CopyButton text={url.scheme} />
-                  {url.qr && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      onClick={() => setQrURI(url.scheme)}
-                    >
-                      <QrCode className="size-3.5" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <div className="cfg-terminal">
-                <span className="cfg-terminal-prompt">$</span>
-                {url.scheme}
-              </div>
-            </div>
+          {/* Local node URIs */}
+          {(config.urls && config.urls.length > 0) && (
+            <URIGroup
+              label="Local"
+              urls={config.urls}
+              onQR={setQrURI}
+            />
+          )}
+
+          {/* Remote node URIs */}
+          {remoteGroups.map((group) => (
+            <URIGroup
+              key={group.nodeName}
+              label={group.nodeName}
+              country={group.nodeCountry}
+              urls={group.urls}
+              onQR={setQrURI}
+            />
           ))}
         </div>
       </div>
@@ -286,7 +344,15 @@ function URLConfig({ appId, config }: { appId: string; config: ClientConfigRespo
           <div className="flex items-center gap-2 min-w-0">
             <Link2 className="size-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Subscription URL</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Subscription URL</p>
+                {totalNodes > 1 && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground">
+                    <Server className="size-2.5" />
+                    {totalNodes}
+                  </span>
+                )}
+              </div>
               <p className="text-xs font-mono text-foreground truncate mt-0.5">{subscribeURL}</p>
             </div>
           </div>
@@ -317,6 +383,61 @@ function URLConfig({ appId, config }: { appId: string; config: ClientConfigRespo
       />
     </>
   );
+}
+
+function URIGroup({
+  label,
+  country,
+  urls,
+  onQR,
+}: {
+  label: string;
+  country?: string;
+  urls: { name: string; scheme: string; qr?: boolean }[];
+  onQR: (uri: string) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-2">
+        {country && <span className="text-xs">{countryFlag(country)}</span>}
+        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+          {label}
+        </span>
+      </div>
+      {urls.map((url) => (
+        <div key={url.scheme} className="mb-2 last:mb-0">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              {url.name}
+            </span>
+            <div className="flex items-center gap-0.5">
+              <CopyButton text={url.scheme} />
+              {url.qr && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7"
+                  onClick={() => onQR(url.scheme)}
+                >
+                  <QrCode className="size-3.5" />
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="cfg-terminal">
+            <span className="cfg-terminal-prompt">$</span>
+            {url.scheme}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function countryFlag(code: string): string {
+  return [...code.toUpperCase()]
+    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
 }
 
 // ─── Share Section ────────────────────────────────────────

@@ -135,7 +135,7 @@ export function AppDetailPanel({
           </TabsContent>
 
           <TabsContent value="config" className="flex-1 overflow-auto mt-0 px-5 py-4">
-            <ClientConfig appId={app.id} />
+            <ClientConfig appId={app.id} templateName={app.template} />
           </TabsContent>
 
           {hasRemoteNodes && (

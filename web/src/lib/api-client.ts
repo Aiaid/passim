@@ -163,6 +163,8 @@ export const api = {
   getNodeStatus: (id: string) => request<StatusResponse>(`/nodes/${id}/status`),
   getNodeContainers: (id: string) => request<Container[]>(`/nodes/${id}/containers`),
   getNodeApps: (id: string) => request<AppResponse[]>(`/nodes/${id}/apps`),
+  getNodeAppClientConfig: (nodeId: string, appId: string) =>
+    request<ClientConfigResponse>(`/nodes/${nodeId}/apps/${appId}/client-config`),
   deployNodeApp: (nodeId: string, data: { template: string; settings: Record<string, unknown> }) =>
     request<AppResponse>(`/nodes/${nodeId}/apps`, { method: 'POST', body: JSON.stringify(data) }),
   batchDeploy: (data: { template: string; settings: Record<string, unknown>; targets: string[] }) =>

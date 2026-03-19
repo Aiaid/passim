@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/clientcfg"
@@ -172,7 +174,8 @@ func appSubscribeHandler(deps Deps) gin.HandlerFunc {
 
 		configs := []clientcfg.ResolvedConfig{*resolved}
 
-		// TODO: Phase F — aggregate remote node configs here
+		// Aggregate configs from remote nodes running the same template
+		configs = append(configs, fetchRemoteConfigs(c.Request.Context(), deps, app.Template)...)
 
 		yaml, err := clientcfg.GenerateClashYAML(configs)
 		if err != nil {
@@ -361,4 +364,111 @@ func buildClientConfigResponse(resolved *clientcfg.ResolvedConfig, t *tmpl.Templ
 	}
 
 	return resp
+}
+
+// fetchRemoteConfigs queries all connected remote nodes for apps using the
+// same template and returns their resolved client configs. This enables the
+// subscription endpoint to aggregate proxy URIs from every node into a single
+// Clash YAML so users get all servers in one subscription.
+func fetchRemoteConfigs(ctx context.Context, deps Deps, templateName string) []clientcfg.ResolvedConfig {
+	if deps.NodeHub == nil {
+		return nil
+	}
+
+	nodes := deps.NodeHub.ListNodes()
+	if len(nodes) == 0 {
+		return nil
+	}
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	var all []clientcfg.ResolvedConfig
+
+	for _, n := range nodes {
+		if n.Status != "connected" {
+			continue
+		}
+		wg.Add(1)
+		go func(nodeID, nodeName, nodeCountry string) {
+			defer wg.Done()
+
+			cfgs := fetchNodeConfigs(ctx, deps, nodeID, nodeName, nodeCountry, templateName)
+			if len(cfgs) > 0 {
+				mu.Lock()
+				all = append(all, cfgs...)
+				mu.Unlock()
+			}
+		}(n.ID, n.Name, n.Country)
+	}
+
+	wg.Wait()
+	return all
+}
+
+// fetchNodeConfigs fetches client configs for a specific template from a single
+// remote node. It first lists all apps on the node, filters by template name,
+// then retrieves the client config for each matching app.
+func fetchNodeConfigs(ctx context.Context, deps Deps, nodeID, nodeName, nodeCountry, templateName string) []clientcfg.ResolvedConfig {
+	// List apps on the remote node
+	status, body, err := deps.NodeHub.ProxyRequest(ctx, nodeID, "GET", "/api/apps", nil)
+	if err != nil || status != http.StatusOK {
+		log.Printf("[subscribe] failed to list apps on node %s: status=%d err=%v", nodeID, status, err)
+		return nil
+	}
+
+	var apps []struct {
+		ID       string `json:"id"`
+		Template string `json:"template"`
+	}
+	if err := json.Unmarshal(body, &apps); err != nil {
+		log.Printf("[subscribe] failed to parse apps from node %s: %v", nodeID, err)
+		return nil
+	}
+
+	var configs []clientcfg.ResolvedConfig
+	for _, app := range apps {
+		if app.Template != templateName {
+			continue
+		}
+
+		// Fetch client config for this app
+		ccStatus, ccBody, err := deps.NodeHub.ProxyRequest(
+			ctx, nodeID, "GET", "/api/apps/"+app.ID+"/client-config", nil,
+		)
+		if err != nil || ccStatus != http.StatusOK {
+			log.Printf("[subscribe] failed to get client-config for app %s on node %s: status=%d err=%v",
+				app.ID, nodeID, ccStatus, err)
+			continue
+		}
+
+		var ccResp clientConfigResponse
+		if err := json.Unmarshal(ccBody, &ccResp); err != nil {
+			log.Printf("[subscribe] failed to parse client-config from node %s: %v", nodeID, err)
+			continue
+		}
+
+		if ccResp.Type != "url" || len(ccResp.URLs) == 0 {
+			continue
+		}
+
+		// Convert to ResolvedConfig
+		var urls []clientcfg.ResolvedURL
+		for _, u := range ccResp.URLs {
+			urls = append(urls, clientcfg.ResolvedURL{
+				Name: u.Name,
+				URI:  u.Scheme,
+				QR:   u.QR,
+			})
+		}
+
+		configs = append(configs, clientcfg.ResolvedConfig{
+			Type:        "url",
+			URLs:        urls,
+			ImportURLs:  ccResp.ImportURLs,
+			NodeName:    nodeName,
+			NodeCountry: nodeCountry,
+		})
+	}
+
+	return configs
 }
