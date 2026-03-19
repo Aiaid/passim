@@ -89,6 +89,7 @@ func testServerIntegration(t *testing.T, mock *docker.MockClient) *integEnv {
 		Templates: reg,
 		SSE:       broker,
 		Tasks:     q,
+		DataDir:   dataDir,
 	}
 	RegisterTaskHandlers(q, deps)
 

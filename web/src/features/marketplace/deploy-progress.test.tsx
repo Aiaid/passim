@@ -40,39 +40,22 @@ function renderProgress(
 // -- Tests -------------------------------------------------------------------
 
 describe('DeployProgress', () => {
-  // -- statusToProgress (tested via Progress indicator transform) -------------
-
-  it('sets progress to 15% for pending status', () => {
-    renderProgress('pending');
-    const indicator = document.querySelector('[data-slot="progress-indicator"]') as HTMLElement;
-    // 100 - 15 = 85 → translateX(-85%)
-    expect(indicator.style.transform).toBe('translateX(-85%)');
+  it('shows spinner for pending/queued status', () => {
+    renderProgress('queued');
+    const spinner = document.querySelector('.animate-spin');
+    expect(spinner).toBeInTheDocument();
   });
 
-  it('sets progress to 60% for running status', () => {
-    renderProgress('running');
-    const indicator = document.querySelector('[data-slot="progress-indicator"]') as HTMLElement;
-    // 100 - 60 = 40 → translateX(-40%)
-    expect(indicator.style.transform).toBe('translateX(-40%)');
+  it('shows step labels', () => {
+    renderProgress('queued');
+    expect(screen.getByText('marketplace.step_pending')).toBeInTheDocument();
+    expect(screen.getByText('marketplace.step_pulling')).toBeInTheDocument();
+    expect(screen.getByText('marketplace.step_deploying')).toBeInTheDocument();
+    expect(screen.getByText('marketplace.step_running')).toBeInTheDocument();
   });
 
-  it('sets progress to 100% for done status', () => {
-    renderProgress('done');
-    const indicator = document.querySelector('[data-slot="progress-indicator"]') as HTMLElement;
-    // 100 - 100 = 0 → translateX(-0%)
-    expect(indicator.style.transform).toBe('translateX(-0%)');
-  });
-
-  it('sets progress to 100% for failed status', () => {
-    renderProgress('failed');
-    const indicator = document.querySelector('[data-slot="progress-indicator"]') as HTMLElement;
-    expect(indicator.style.transform).toBe('translateX(-0%)');
-  });
-
-  // -- Conditional rendering -------------------------------------------------
-
-  it('shows view_app button when done', () => {
-    renderProgress('done');
+  it('shows view_app button when completed', () => {
+    renderProgress('completed');
     expect(
       screen.getByRole('button', { name: 'marketplace.view_app' }),
     ).toBeInTheDocument();
@@ -85,15 +68,23 @@ describe('DeployProgress', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows spinner for pending status', () => {
-    renderProgress('pending');
-    // Loader2 has the animate-spin class
-    const spinner = document.querySelector('.animate-spin');
-    expect(spinner).toBeInTheDocument();
+  it('shows deploy_failed text when failed', () => {
+    renderProgress('failed');
+    expect(screen.getByText('marketplace.deploy_failed')).toBeInTheDocument();
   });
 
-  it('shows deploying text for running status', () => {
-    renderProgress('running');
-    expect(screen.getByText('marketplace.deploying')).toBeInTheDocument();
+  it('shows deploy_success text when completed', () => {
+    renderProgress('completed');
+    expect(screen.getByText('marketplace.deploy_success')).toBeInTheDocument();
+  });
+
+  it('shows error result when failed with result', () => {
+    renderProgress('failed', { result: 'image pull timeout' });
+    expect(screen.getByText('image pull timeout')).toBeInTheDocument();
+  });
+
+  it('shows step_failed label when failed', () => {
+    renderProgress('failed');
+    expect(screen.getByText('marketplace.step_failed')).toBeInTheDocument();
   });
 });
