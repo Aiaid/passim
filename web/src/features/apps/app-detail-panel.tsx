@@ -19,6 +19,7 @@ import { CredentialField } from '@/components/shared/credential-field';
 import { CATEGORY_GRADIENTS } from '@/lib/constants';
 import { useTemplateDetail } from './queries';
 import { ConnectionGuide } from './connection-guide';
+import { ClientConfig } from './client-config';
 import { useEventStream } from '@/hooks/use-event-stream';
 import { api } from '@/lib/api-client';
 import type { AppResponse, TemplateSummary } from '@/lib/api-client';
@@ -110,6 +111,9 @@ export function AppDetailPanel({
               <TabsTrigger value="credentials" className="flex-1">
                 {t('app.credentials')}
               </TabsTrigger>
+              <TabsTrigger value="config" className="flex-1">
+                {t('app.configs')}
+              </TabsTrigger>
               {hasRemoteNodes && (
                 <TabsTrigger value="nodes" className="flex-1">
                   <Server className="size-3 mr-1" />
@@ -128,6 +132,10 @@ export function AppDetailPanel({
 
           <TabsContent value="credentials" className="flex-1 overflow-auto mt-0 px-5 py-4">
             <AppCredentialsTab app={app} />
+          </TabsContent>
+
+          <TabsContent value="config" className="flex-1 overflow-auto mt-0 px-5 py-4">
+            <ClientConfig appId={app.id} />
           </TabsContent>
 
           {hasRemoteNodes && (
