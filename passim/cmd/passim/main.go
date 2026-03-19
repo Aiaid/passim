@@ -42,6 +42,9 @@ func main() {
 		case "update-exec":
 			runUpdateExec(os.Args[2:])
 			os.Exit(0)
+		case "reset-api-key":
+			runResetAPIKey()
+			os.Exit(0)
 		}
 	}
 
@@ -293,6 +296,43 @@ func runUpdateExec(args []string) {
 	}
 
 	log.Println("update-exec: switch completed successfully")
+}
+
+// runResetAPIKey regenerates the API key and prints the new one.
+// Usage: passim reset-api-key [NEW_KEY]
+func runResetAPIKey() {
+	dataDir := getEnvDefault("DATA_DIR", "/data")
+	database, err := db.Open(filepath.Join(dataDir, "passim.db"))
+	if err != nil {
+		log.Fatalf("reset-api-key: %v", err)
+	}
+	defer database.Close()
+
+	var plain string
+	if len(os.Args) > 2 {
+		plain = os.Args[2]
+	} else {
+		var err error
+		plain, _, err = auth.GenerateAPIKey()
+		if err != nil {
+			log.Fatalf("reset-api-key: generate key: %v", err)
+		}
+	}
+
+	hash := auth.HashAPIKey(plain)
+	if err := db.SetConfig(database, "api_key_hash", hash); err != nil {
+		log.Fatalf("reset-api-key: %v", err)
+	}
+
+	// Bump auth_version to invalidate all existing JWTs
+	if v, _ := db.GetConfig(database, "auth_version"); v != "" {
+		n := 1
+		fmt.Sscanf(v, "%d", &n)
+		db.SetConfig(database, "auth_version", fmt.Sprintf("%d", n+1))
+	}
+
+	fmt.Printf("API key reset to: %s\n", plain)
+	fmt.Println("Restart the container for changes to take effect.")
 }
 
 func getEnvDefault(key, fallback string) string {
