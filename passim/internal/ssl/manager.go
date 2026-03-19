@@ -46,10 +46,15 @@ type SSLManager struct {
 }
 
 // NewSSLManager creates a new SSLManager with the given configuration.
-// Supported modes: "self-signed", "auto", "custom".
+// Supported modes: "self-signed", "auto" (alias: "letsencrypt"), "custom", "off".
 func NewSSLManager(cfg SSLManagerConfig) *SSLManager {
+	mode := cfg.Mode
+	// Normalize user-friendly aliases
+	if mode == "letsencrypt" {
+		mode = "auto"
+	}
 	return &SSLManager{
-		mode:       cfg.Mode,
+		mode:       mode,
 		dataDir:    cfg.DataDir,
 		domain:     cfg.Domain,
 		baseDomain: cfg.BaseDomain,
