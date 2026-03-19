@@ -107,9 +107,6 @@ export const api = {
   updateApp: (id: string, settings: Record<string, unknown>) =>
     request<{ status: string; task_id?: string; settings?: Record<string, unknown> }>(`/apps/${id}`, { method: 'PATCH', body: JSON.stringify({ settings }) }),
   deleteApp: (id: string) => request<void>(`/apps/${id}`, { method: 'DELETE' }),
-  getAppConfigs: (id: string) => request<string[]>(`/apps/${id}/configs`),
-  getAppConfigFile: (id: string, file: string) =>
-    request<{ content: string }>(`/apps/${id}/configs/${file}`),
   getAppClientConfig: (id: string) => request<ClientConfigResponse>(`/apps/${id}/client-config`),
   createShare: (id: string, userIndex?: number) =>
     request<{ token: string; url: string }>(`/apps/${id}/share`, {

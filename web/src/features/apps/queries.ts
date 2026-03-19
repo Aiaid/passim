@@ -19,22 +19,6 @@ export function useApp(id: string) {
   });
 }
 
-export function useAppConfigs(id: string) {
-  return useQuery({
-    queryKey: ['app-configs', id],
-    queryFn: () => api.getAppConfigs(id),
-    enabled: !!id,
-  });
-}
-
-export function useAppConfigFile(id: string, file: string | null) {
-  return useQuery({
-    queryKey: ['app-config-file', id, file],
-    queryFn: () => api.getAppConfigFile(id, file!),
-    enabled: !!id && !!file,
-  });
-}
-
 export function useUpdateApp() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
