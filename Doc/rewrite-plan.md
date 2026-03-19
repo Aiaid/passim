@@ -798,45 +798,47 @@ Phase 2 完成后的密集打磨期（~30 commits），包含重大 UI 重设计
 
 **交付物**: 生产级 UI 质量的单机 Passim，部署流程稳定可靠
 
-### Phase 3: 多节点管理 (3 周)
+### Phase 3: 多节点管理 ✅ (已完成 2026-03-19)
 
 **目标**: 对等互联，管理远程节点
 
+**注**: 实际实现采用 **SSE + REST 代理** 替代了原计划的 WebSocket 协议。Hub 订阅远程节点的 `/api/stream` SSE 获取实时数据，操作通过 `ProxyRequest` 转发 REST API。比 WebSocket 更简单，每个节点本身就有完整 REST API，无需额外协议。
+
 **后端 (Go):**
-- [ ] `internal/node/` 包: hub.go / client.go / server.go / proxy.go / sync.go
-- [ ] WebSocket 节点通信协议
-  - 连接/认证/心跳 (10s)/重连 (指数退避，上限 60s)
-  - JSON 消息格式: heartbeat / request / response / event
-  - 任务下发 + 结果回传
-  - 指标实时推送
-- [ ] Node Hub (管理端): 连接管理、状态聚合、请求代理
-- [ ] Node Server (被管端): 接受连接、执行远程任务、连接可见性
-- [ ] WebSocket 端点: `GET /ws/node?key=<api_key>`
-- [ ] 远程节点 CRUD API (`POST/GET/DELETE/PATCH /api/nodes`)
-- [ ] 远程代理 API (`GET /api/nodes/:id/status|containers|apps|...`)
-- [ ] 远程部署 API (`POST /api/nodes/:id/apps`)
-- [ ] 批量部署 API (`POST /api/batch/deploy`)
-- [ ] 连接管理 API (`GET /api/connections`, `DELETE /api/connections/:id`)
-- [ ] S3 凭证管理 API (`/api/s3/*`) — 从 Phase 2 移入
+- [x] `internal/node/` 包: hub.go (Hub 连接管理/CRUD/ProxyRequest) + client.go (SSE 订阅/自动重连/认证)
+- [x] SSE 实时数据订阅 (替代 WebSocket)
+  - 自动 HTTPS/HTTP 探测 + JWT 认证 + 401 自动刷新 token
+  - 指数退避重连 (1s→60s 上限)
+  - 实时推送: metrics / status / containers / apps 事件
+- [x] Node Hub (管理端): 连接管理、状态聚合、请求代理、节点测速
+- [x] 远程节点 CRUD API (`POST/GET/DELETE/PATCH /api/nodes`)
+- [x] 远程代理 API (`GET /api/nodes/:id/status|containers|apps|...`)
+- [x] 远程部署 API (`POST /api/nodes/:id/apps`)
+- [x] 批量部署 API (`POST /api/batch/deploy`)
+- [x] 节点间测速 API (`POST /api/nodes/:id/speedtest`)
+- [ ] 连接管理 API (`GET /api/connections`, `DELETE /api/connections/:id`) — stub，返回空列表/501
+- [x] S3 凭证管理 DB 层 (`db/node.go` CRUD) — API 端点待接入
 
 **前端 (Web):**
-- [ ] 新路由: `/nodes`, `/nodes/:id`
-- [ ] 添加/移除远程节点 UI
-- [ ] 统一面板显示本地 + 远程节点
-- [ ] 远程部署/操作 (start/stop/restart/remove)
-- [ ] "Deploy to" 目标选择器
-- [ ] 批量部署到多节点
-- [ ] 连接授权管理 (查看/断开连接)
+- [x] 新路由: `/nodes` (节点列表), `/nodes/:id` (节点详情)
+- [x] 添加/移除远程节点 UI (`AddNodeDialog` + `ConfirmDialog`)
+- [x] `NodeCard` 组件 (国旗、CPU/MEM 小条、连接状态动画)
+- [x] 节点详情页三个 Tab (Overview / Containers / Apps)
+- [x] 统一面板显示本地 + 远程节点 (`MultiNodePanel` + Dashboard 地球仪标记)
+- [x] 远程容器列表 + Sheet 详情
+- [x] 远程应用列表 + `AppDetailPanel`
+- [x] "Deploy to" 目标选择器 (部署向导中 `selectedTargets`)
+- [x] 批量部署到多节点 (`batchDeployMutation`)
+- [ ] 连接授权管理 (查看/断开连接) — 后端 stub 未实现
 
 **测试:**
-- [ ] Node Hub/Client/Server 单元测试
-- [ ] WebSocket 协议集成测试
-- [ ] 远程代理 API 测试
-- [ ] 前端节点管理组件测试
+- [x] Node Hub 单元测试 (`hub_test.go`)
+- [x] Node Client 单元测试 (`client_test.go`)
+- [x] Node API 测试 (`node_test.go`)
 
 **数据库**: `remote_nodes` 和 `remote_deployments` 表已在 Phase 1 建好，`s3_credentials` 表已建好
 
-**交付物**: 完整的多节点 Passim
+**交付物**: 完整的多节点 Passim (SSE + REST 代理架构)
 
 ### Phase 4: 打磨 + 迁移 (2 周)
 
