@@ -20,4 +20,8 @@ if [ -S "$SOCK" ]; then
   fi
 fi
 
+# Ensure the data directory is writable by passim user
+DATA_DIR="${DATA_DIR:-/data}"
+chown passim:passim "$DATA_DIR" 2>/dev/null || true
+
 exec su-exec passim "$@"
