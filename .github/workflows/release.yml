@@ -11,7 +11,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/passim
+  IMAGE_NAME: anend-s-cat/passim
 
 jobs:
   build:
