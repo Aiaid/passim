@@ -145,24 +145,27 @@ func main() {
 	iperfSrv := speedtest.NewIperfServer("5201")
 	defer iperfSrv.Stop()
 
-	// WebAuthn manager
+	// WebAuthn manager — rpID/rpOrigin must match the domain the browser sees.
+	// Priority: SSL_DOMAIN > sslMgr.GetDomain() (DNS reflector) > localhost
 	rpID := "localhost"
 	scheme := "https"
 	if sslMode == "off" {
 		scheme = "http"
 	}
-	rpOrigin := scheme + "://localhost:8443"
+	port := getEnvDefault("PORT", "8443")
+	rpOrigin := scheme + "://localhost:" + port
 	if sslDomain != "" {
 		rpID = sslDomain
 		rpOrigin = scheme + "://" + sslDomain
-	}
-	if port := os.Getenv("PORT"); port != "" && sslDomain == "" {
-		rpOrigin = scheme + "://localhost:" + port
+	} else if sslMgr != nil && sslMgr.GetDomain() != "" {
+		rpID = sslMgr.GetDomain()
+		rpOrigin = scheme + "://" + sslMgr.GetDomain()
 	}
 	webauthnMgr, err := auth.NewWebAuthnManager(rpID, rpOrigin)
 	if err != nil {
 		log.Printf("warning: WebAuthn init failed: %v", err)
 	}
+	log.Printf("webauthn: rpID=%s rpOrigin=%s", rpID, rpOrigin)
 
 	// Auto-discover Docker volume/bind mount backing dataDir (for Docker-in-Docker deploys)
 	dataVolume := os.Getenv("DATA_VOLUME") // explicit override
