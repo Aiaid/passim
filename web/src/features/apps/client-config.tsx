@@ -235,7 +235,12 @@ function CredentialsConfig({ config }: { config: ClientConfigResponse }) {
 
 function URLConfig({ appId, config }: { appId: string; config: ClientConfigResponse }) {
   const [qrURI, setQrURI] = useState<string | null>(null);
-  const subscribeURL = `${window.location.origin}/api/apps/${appId}/subscribe`;
+  const subscribeURL = config.share_token
+    ? `${window.location.origin}/api/s/${config.share_token}/subscribe`
+    : (() => {
+        const token = localStorage.getItem('auth-token');
+        return `${window.location.origin}/api/apps/${appId}/subscribe${token ? `?token=${token}` : ''}`;
+      })();
 
   return (
     <>

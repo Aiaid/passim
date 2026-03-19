@@ -110,6 +110,7 @@ func shareConfigHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		appCtx, nodeCtx := buildContexts(deps, app, t)
+		appCtx.SubscribeURL = computeShareSubscribeURL(c, token)
 
 		// If per-user share, filter to specific user index
 		if st.UserIndex > 0 && clientsDef.Type == "file_per_user" {
@@ -158,6 +159,7 @@ func shareSubscribeHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		appCtx, nodeCtx := buildContexts(deps, app, t)
+		appCtx.SubscribeURL = computeShareSubscribeURL(c, token)
 		resolved, err := clientcfg.Resolve(clientsDef, appCtx, nodeCtx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "resolve: " + err.Error()})

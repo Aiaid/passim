@@ -2,6 +2,7 @@ package clientcfg
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,10 +22,11 @@ type NodeContext struct {
 
 // AppContext provides app info for template rendering.
 type AppContext struct {
-	ID       string
-	Template string
-	Settings map[string]interface{}
-	AppDir   string // e.g. /data/apps/wireguard-abc12345
+	ID           string
+	Template     string
+	Settings     map[string]interface{}
+	AppDir       string // e.g. /data/apps/wireguard-abc12345
+	SubscribeURL string // full URL for subscription (e.g. https://host/api/s/token/subscribe)
 }
 
 // ResolvedFile represents a single config file for file_per_user type.
@@ -231,16 +233,26 @@ func buildTemplateData(app AppContext, node NodeContext) map[string]string {
 		data["settings_"+k] = fmt.Sprintf("%v", v)
 	}
 
+	// Subscribe URL (for import_urls rendering)
+	if app.SubscribeURL != "" {
+		data["subscribe_url"] = app.SubscribeURL
+		data["base64_subscribe_url"] = base64.StdEncoding.EncodeToString([]byte(app.SubscribeURL))
+	}
+
 	return data
 }
 
 // renderString renders a template string with {{var}} placeholders.
-// Converts {{settings.foo}} → {{.settings_foo}} and renders.
+// Converts {{settings.foo}} → {{.settings_foo}}, {{var}} → {{.var}}, and renders.
 func renderString(tmplStr string, data map[string]string) (string, error) {
 	// Replace dot-separated placeholders with underscore-separated
 	s := tmplStr
 	for _, prefix := range []string{"settings", "node", "generated"} {
 		s = strings.ReplaceAll(s, "{{"+prefix+".", "{{."+prefix+"_")
+	}
+	// Handle bare template variables (no dot prefix)
+	for _, bare := range []string{"subscribe_url", "base64_subscribe_url"} {
+		s = strings.ReplaceAll(s, "{{"+bare+"}}", "{{."+bare+"}}")
 	}
 
 	t, err := template.New("").Option("missingkey=zero").Parse(s)

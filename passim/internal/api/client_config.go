@@ -60,6 +60,7 @@ func appClientConfigHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		appCtx, nodeCtx := buildContexts(deps, app, t)
+		appCtx.SubscribeURL = computeSubscribeURL(c, deps.DB, app.ID)
 
 		resolved, err := clientcfg.Resolve(clientsDef, appCtx, nodeCtx)
 		if err != nil {
@@ -162,6 +163,7 @@ func appSubscribeHandler(deps Deps) gin.HandlerFunc {
 
 		// Resolve local config
 		appCtx, nodeCtx := buildContexts(deps, app, t)
+		appCtx.SubscribeURL = computeSubscribeURL(c, deps.DB, app.ID)
 		resolved, err := clientcfg.Resolve(clientsDef, appCtx, nodeCtx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "resolve config: " + err.Error()})
@@ -181,6 +183,22 @@ func appSubscribeHandler(deps Deps) gin.HandlerFunc {
 		c.Header("Content-Disposition", "inline; filename=\"subscribe.yaml\"")
 		c.Data(http.StatusOK, "text/yaml; charset=utf-8", yaml)
 	}
+}
+
+// computeSubscribeURL returns the best subscribe URL for an app.
+// Prefers share-token-based URL (permanent, no auth) over authenticated URL.
+func computeSubscribeURL(c *gin.Context, database *sql.DB, appID string) string {
+	scheme := "https"
+	host := c.Request.Host
+	if st, _ := db.GetShareTokenByApp(database, appID); st != nil {
+		return scheme + "://" + host + "/api/s/" + st.Token + "/subscribe"
+	}
+	return scheme + "://" + host + "/api/apps/" + appID + "/subscribe"
+}
+
+// computeShareSubscribeURL returns the subscribe URL for a share token.
+func computeShareSubscribeURL(c *gin.Context, token string) string {
+	return "https://" + c.Request.Host + "/api/s/" + token + "/subscribe"
 }
 
 // --- helpers ---

@@ -160,6 +160,50 @@ func TestResolveURL(t *testing.T) {
 	}
 }
 
+func TestResolveURLWithImportURLs(t *testing.T) {
+	clients := &ClientsDef{
+		Type: "url",
+		URLs: []URLDef{
+			{
+				Name:   "Hysteria 2",
+				Scheme: "hysteria2://{{settings.password}}@{{node.public_ip}}:443/?insecure=1#{{node.hostname}}",
+				QR:     true,
+			},
+		},
+		ImportURLs: map[string]string{
+			"stash":       "stash://install-config?url={{subscribe_url}}",
+			"shadowrocket": "sub://{{base64_subscribe_url}}",
+		},
+	}
+
+	app := AppContext{
+		Settings: map[string]interface{}{
+			"password": "pass123",
+		},
+		SubscribeURL: "https://example.com/api/s/tok123/subscribe",
+	}
+	node := NodeContext{
+		PublicIP: "1.2.3.4",
+		Hostname: "node-1",
+	}
+
+	result, err := Resolve(clients, app, node)
+	if err != nil {
+		t.Fatalf("Resolve() error: %v", err)
+	}
+
+	if result.ImportURLs["stash"] != "stash://install-config?url=https://example.com/api/s/tok123/subscribe" {
+		t.Errorf("stash import URL = %q", result.ImportURLs["stash"])
+	}
+
+	// base64 of "https://example.com/api/s/tok123/subscribe"
+	expectedB64 := "aHR0cHM6Ly9leGFtcGxlLmNvbS9hcGkvcy90b2sxMjMvc3Vic2NyaWJl"
+	expected := "sub://" + expectedB64
+	if result.ImportURLs["shadowrocket"] != expected {
+		t.Errorf("shadowrocket import URL = %q, want %q", result.ImportURLs["shadowrocket"], expected)
+	}
+}
+
 func TestResolveNilClients(t *testing.T) {
 	_, err := Resolve(nil, AppContext{}, NodeContext{})
 	if err == nil {
@@ -216,7 +260,12 @@ func TestRenderString(t *testing.T) {
 		{"{{settings.port}}", "443"},
 		{"http://{{node.public_ip}}:{{settings.port}}", "http://1.2.3.4:443"},
 		{"plain text", "plain text"},
+		{"stash://install-config?url={{subscribe_url}}", "stash://install-config?url=https://host/api/s/tok/subscribe"},
+		{"sub://{{base64_subscribe_url}}", "sub://aHR0cHM6Ly9ob3N0L2FwaS9zL3Rvay9zdWJzY3JpYmU="},
 	}
+
+	data["subscribe_url"] = "https://host/api/s/tok/subscribe"
+	data["base64_subscribe_url"] = "aHR0cHM6Ly9ob3N0L2FwaS9zL3Rvay9zdWJzY3JpYmU="
 
 	for _, tt := range tests {
 		result, err := renderString(tt.input, data)
