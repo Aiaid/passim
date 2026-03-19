@@ -148,6 +148,16 @@ func (m *SSLManager) GetTLSConfig() (*tls.Config, error) {
 		}
 		tlsCfg := m.autocertMgr.TLSConfig()
 		tlsCfg.MinVersion = tls.VersionTLS12
+		// Remove "acme-tls/1" from NextProtos to disable TLS-ALPN-01 challenge.
+		// Passim listens on non-standard port (8443), not 443, so TLS-ALPN-01
+		// always fails. Force HTTP-01 via the port 80 HTTPChallengeHandler instead.
+		filtered := tlsCfg.NextProtos[:0]
+		for _, p := range tlsCfg.NextProtos {
+			if p != "acme-tls/1" {
+				filtered = append(filtered, p)
+			}
+		}
+		tlsCfg.NextProtos = filtered
 		return tlsCfg, nil
 	default:
 		if m.certPath == "" || m.keyPath == "" {

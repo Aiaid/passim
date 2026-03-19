@@ -146,6 +146,7 @@ func main() {
 	defer iperfSrv.Stop()
 
 	// WebAuthn manager — rpID/rpOrigin must match the domain the browser sees.
+	// rpOrigin must include non-standard ports (anything other than 443 for HTTPS / 80 for HTTP).
 	// Priority: SSL_DOMAIN > sslMgr.GetDomain() (DNS reflector) > localhost
 	rpID := "localhost"
 	scheme := "https"
@@ -153,13 +154,19 @@ func main() {
 		scheme = "http"
 	}
 	port := getEnvDefault("PORT", "8443")
-	rpOrigin := scheme + "://localhost:" + port
+	// Determine if we need to append the port to the origin.
+	// Standard ports (443 for https, 80 for http) are omitted by browsers.
+	portSuffix := ""
+	if (scheme == "https" && port != "443") || (scheme == "http" && port != "80") {
+		portSuffix = ":" + port
+	}
+	rpOrigin := scheme + "://localhost" + portSuffix
 	if sslDomain != "" {
 		rpID = sslDomain
-		rpOrigin = scheme + "://" + sslDomain
+		rpOrigin = scheme + "://" + sslDomain + portSuffix
 	} else if sslMgr != nil && sslMgr.GetDomain() != "" {
 		rpID = sslMgr.GetDomain()
-		rpOrigin = scheme + "://" + sslMgr.GetDomain()
+		rpOrigin = scheme + "://" + sslMgr.GetDomain() + portSuffix
 	}
 	webauthnMgr, err := auth.NewWebAuthnManager(rpID, rpOrigin)
 	if err != nil {
