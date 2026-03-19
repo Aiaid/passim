@@ -124,7 +124,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body: |
-            ## Docker
+            ## Install
+
+            **One-line install** (installs Docker if needed, auto-HTTPS via DNS reflector):
+
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | sudo bash
+            ```
+
+            **Or pull the image directly:**
 
             ```bash
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}

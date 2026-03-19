@@ -124,8 +124,14 @@ VPS A                    VPS B                    VPS C
 **场景 1**: 单机用户
 
 ```bash
+# 一键安装 (自动装 Docker + DNS 反射器自动 HTTPS)
+curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | sudo bash
+
+# 或手动 docker run
 docker run -d -v /var/run/docker.sock:/var/run/docker.sock \
-  -v passim-data:/data -p 8443:8443 -p 80:80 passim/passim
+  -v passim-data:/data -p 8443:8443 -p 80:80 \
+  -e SSL_MODE=letsencrypt -e DNS_BASE_DOMAIN=dns.passim.io \
+  ghcr.io/anend-s-cat/passim
 # 访问 https://<ip>:8443 → 管理本机 (端口 80 用于 ACME 证书验证)
 ```
 
@@ -187,6 +193,10 @@ ENTRYPOINT ["passim"]
 ```
 
 ```bash
+# 推荐: 一键安装脚本 (自动装 Docker + DNS 反射器自动 HTTPS，无需域名)
+curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | sudo bash
+
+# 或手动运行:
 docker run -d \
   --name passim \
   --restart always \
@@ -195,7 +205,9 @@ docker run -d \
   -p 8443:8443 \
   -p 80:80 \
   -p 5201:5201 \
-  passim/passim:latest
+  -e SSL_MODE=letsencrypt \
+  -e DNS_BASE_DOMAIN=dns.passim.io \
+  ghcr.io/anend-s-cat/passim:latest
 # 8443: 主 HTTPS/HTTP 端口
 # 80:   ACME HTTP-01 证书验证 + HTTP→HTTPS 重定向
 # 5201: iperf3 测速
@@ -207,10 +219,10 @@ docker run -d \
 |------|--------|------|
 | `PORT` | `8443` | 监听端口 |
 | `API_KEY` | (自动生成) | 预设 API Key；省略则首次启动自动生成 |
-| `SSL_MODE` | `self-signed` | `self-signed` / `letsencrypt` / `off` |
-| `SSL_DOMAIN` | — | Let's Encrypt 域名（最高优先级） |
+| `SSL_MODE` | `letsencrypt` | `self-signed` / `letsencrypt` / `off` |
+| `SSL_DOMAIN` | — | 自有域名用于 Let's Encrypt（最高优先级） |
 | `SSL_EMAIL` | — | Let's Encrypt 联系邮箱 |
-| `DNS_BASE_DOMAIN` | — | DNS 反射器基础域名；未设 `SSL_DOMAIN` 时自动发现公网 IP 拼域名 |
+| `DNS_BASE_DOMAIN` | `dns.passim.io` | DNS 反射器基础域名；未设 `SSL_DOMAIN` 时自动发现公网 IP 拼域名 |
 | `DATA_DIR` | `/data` | 数据目录 |
 | `GITHUB_REPO` | `passim/passim` | GitHub 仓库 (更新检查用) |
 | `IMAGE_NAME` | `ghcr.io/passim/passim` | Docker 镜像名 (自我更新用) |
@@ -604,6 +616,7 @@ POST   /api/containers/:name/stop
 POST   /api/containers/:name/restart
 DELETE /api/containers/:name
 GET    /api/containers/:name/logs?lines=200&follow=false
+GET    /api/containers/:name/terminal         # WebSocket 交互式终端
 ```
 
 ### 本地应用
@@ -723,6 +736,7 @@ GET  /api/containers              # 容器列表
 POST /api/containers/:id/start|stop|restart
 DELETE /api/containers/:id
 GET  /api/containers/:id/logs
+GET  /api/containers/:id/terminal # WebSocket 交互式终端 (Phase 4)
 GET  /api/templates               # 模板列表
 POST /api/apps                    # 部署应用 (同步或异步)
 GET  /api/apps                    # 应用列表
@@ -855,9 +869,11 @@ Phase 2 完成后的密集打磨期（~30 commits），包含重大 UI 重设计
 - [x] Clash/Stash 订阅生成 (`/api/apps/:id/subscribe` + URI 解析 + 跨节点聚合)
 - [x] 配置 ZIP 打包下载 (支持多节点国旗前缀)
 - [x] 模板 YAML 迁移 (7 个模板: clients + share + guide.platforms)
+- [x] 容器 Web 终端 (WebSocket + xterm.js，交互式 shell 到运行中容器)
 - [ ] 容器日志 (Sheet + 实时尾随 + 搜索)
 - [ ] 监控历史图表 (最近 1h/6h/24h)
 - [ ] 性能优化 + 安全审查
+- [x] 一键安装脚本 (`install.sh` — 自动装 Docker + DNS 反射器 HTTPS，无需域名)
 - [ ] 文档
 
 **交付物**: 可从旧系统迁移的生产版本
@@ -903,7 +919,7 @@ Phase 2 完成后的密集打磨期（~30 commits），包含重大 UI 重设计
 
 **其他增强:**
 - [ ] 多用户 + 密码登录 + RBAC
-- [ ] Web Terminal (xterm.js)
+- [x] Web Terminal (xterm.js) — 已在 Phase 4 完成
 - [ ] 灰度发布
 - [ ] 审计日志
 - [ ] DNS 服务器 Go 重写 (可选)

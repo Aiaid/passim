@@ -18,6 +18,16 @@ Passim is a personal cloud management assistant for ordinary people. One `docker
 
 ## Quick Start
 
+**One-line install** (installs Docker if needed, sets up HTTPS via DNS reflector automatically):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | sudo bash
+```
+
+The script auto-detects your public IP, obtains a Let's Encrypt certificate via DNS reflector (`dns.passim.io`) — no domain required. An API key is auto-generated on first run and printed to the terminal.
+
+**Or run manually:**
+
 ```bash
 docker run -d \
   --name passim \
@@ -26,13 +36,37 @@ docker run -d \
   -v passim-data:/data \
   -p 8443:8443 \
   -p 80:80 \
-  ghcr.io/passim/passim:latest
+  -e SSL_MODE=letsencrypt \
+  -e DNS_BASE_DOMAIN=dns.passim.io \
+  ghcr.io/anend-s-cat/passim:latest
 ```
 
-Open `https://<your-ip>:8443` in your browser. An API key is auto-generated on first run — find it in the container logs:
+Open `https://<your-ip>:8443` in your browser. Find the auto-generated API key in the container logs:
 
 ```bash
 docker logs passim
+```
+
+### Install Script Options
+
+```
+--port PORT         Listen port (default: 8443)
+--api-key KEY       Pre-set API key (default: auto-generated)
+--ssl MODE          SSL mode: self-signed | letsencrypt | off (default: letsencrypt)
+--dns-domain DOMAIN DNS reflector base domain (default: dns.passim.io)
+--domain DOMAIN     Your own domain for Let's Encrypt
+--email EMAIL       Email for Let's Encrypt
+--data-dir DIR      Host data directory (default: /opt/passim/data)
+--image TAG         Image tag (default: latest)
+--skip-docker       Skip Docker installation
+--uninstall         Remove Passim container and data
+```
+
+**Have your own domain?** Use `--domain` to skip DNS reflector:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | \
+  sudo bash -s -- --domain example.com --email you@example.com
 ```
 
 ### Ports
@@ -41,6 +75,7 @@ docker logs passim
 |------|---------|
 | `8443` | HTTPS Web UI + API |
 | `80` | ACME HTTP-01 certificate validation + HTTP → HTTPS redirect |
+| `5201` | iperf3 speed test (node-to-node) |
 
 ### Environment Variables
 
@@ -48,9 +83,10 @@ docker logs passim
 |----------|---------|-------------|
 | `PORT` | `8443` | Listen port |
 | `API_KEY` | *(auto-generated)* | Pre-set API key; omit to auto-generate on first run |
-| `SSL_MODE` | `self-signed` | `self-signed` / `letsencrypt` / `off` |
-| `SSL_DOMAIN` | — | Domain for Let's Encrypt |
+| `SSL_MODE` | `letsencrypt` | `self-signed` / `letsencrypt` / `off` |
+| `SSL_DOMAIN` | — | Your own domain for Let's Encrypt (highest priority) |
 | `SSL_EMAIL` | — | Contact email for Let's Encrypt |
+| `DNS_BASE_DOMAIN` | `dns.passim.io` | DNS reflector base domain; auto-discovers public IP when `SSL_DOMAIN` is not set |
 | `DATA_DIR` | `/data` | Persistent data directory |
 
 ### Volumes
@@ -166,8 +202,8 @@ Tags trigger the release pipeline:
 ```bash
 git tag -a v1.0.0 -m "release: v1.0.0"
 git push origin v1.0.0
-# → CI builds multi-arch images → pushes to ghcr.io/passim/passim
-# → Creates GitHub Release with changelog
+# → CI builds multi-arch images → pushes to ghcr.io/anend-s-cat/passim
+# → Creates GitHub Release with changelog + install instructions
 ```
 
 ## License

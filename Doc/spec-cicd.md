@@ -268,7 +268,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body: |
-            ## Docker 镜像
+            ## 安装
+
+            **一键安装** (自动装 Docker + DNS 反射器自动 HTTPS，无需域名):
+
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | sudo bash
+            ```
+
+            **或直接拉取镜像:**
 
             ```bash
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
@@ -324,7 +332,7 @@ CI 使用 `docker buildx` + QEMU 交叉编译。Go 的 CGO (SQLite) 需要对应
 
 | Registry | 用途 | 镜像路径 |
 |----------|------|----------|
-| **GHCR** (主) | GitHub 原生，免费私有仓库 | `ghcr.io/passim/passim:v1.0.0` |
+| **GHCR** (主) | GitHub 原生，免费私有仓库 | `ghcr.io/anend-s-cat/passim:v1.0.0` |
 | **Docker Hub** (可选) | 用户拉取便捷，无需指定 registry | `passim/passim:v1.0.0` |
 
 ### Tag 策略

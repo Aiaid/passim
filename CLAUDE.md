@@ -96,13 +96,13 @@ python app/app.py                # Runs nserver DNS on port 153
 |----------|---------|-------------|
 | `PORT` | `8443` | Listen port |
 | `API_KEY` | (auto-generated) | Pre-set API key; omit to auto-generate on first run |
-| `SSL_MODE` | `self-signed` | `self-signed` / `letsencrypt` / `off` |
-| `SSL_DOMAIN` | — | Domain for Let's Encrypt cert (highest priority) |
+| `SSL_MODE` | `letsencrypt` | `self-signed` / `letsencrypt` / `off` |
+| `SSL_DOMAIN` | — | Your own domain for Let's Encrypt (highest priority) |
 | `SSL_EMAIL` | — | Contact email for Let's Encrypt |
-| `DNS_BASE_DOMAIN` | — | DNS reflector base domain; auto-discovers public IP when `SSL_DOMAIN` is not set |
+| `DNS_BASE_DOMAIN` | `dns.passim.io` | DNS reflector base domain; auto-discovers public IP when `SSL_DOMAIN` is not set |
 | `DATA_DIR` | `/data` | Data directory (SQLite, configs, certs) |
-| `GITHUB_REPO` | `passim/passim` | GitHub repo for update checks |
-| `IMAGE_NAME` | `ghcr.io/passim/passim` | Docker image name for self-update |
+| `GITHUB_REPO` | `anend-s-cat/passim` | GitHub repo for update checks |
+| `IMAGE_NAME` | `ghcr.io/anend-s-cat/passim` | Docker image name for self-update |
 
 ### DNS
 | Variable | Default | Description |

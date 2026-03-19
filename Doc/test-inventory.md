@@ -1,6 +1,6 @@
 # Test Inventory
 
-> 最后更新: 2026-03-16 | 总测试: **367** (Go 237 + Frontend 130) | 全部通过
+> 最后更新: 2026-03-19 | 总测试: **371** (Go 241 + Frontend 130) | 全部通过
 
 ## 运行命令
 
@@ -28,15 +28,16 @@ cd web && pnpm test:coverage
 
 ## Go 后端 (passim/)
 
-**~40 test files, 237 top-level test functions (含子测试)**
+**~41 test files, 241 top-level test functions (含子测试)**
 
-### internal/api/ — API 层 (13 files)
+### internal/api/ — API 层 (14 files)
 
 | File | Tests | 覆盖模块 |
 |------|-------|---------|
 | `auth_test.go` | LoginSuccess, LoginWrongKey, LoginMissingKey, RefreshSuccess, RefreshInvalidToken | 密码认证 + JWT 刷新 |
 | `middleware_test.go` | MiddlewareValidToken, MiddlewareInvalidToken, MiddlewareNoToken, MiddlewareRevokedToken, MiddlewareQueryParamToken, MiddlewareQueryParamTokenInvalid, MiddlewareQueryParamTokenRevoked | JWT 中间件 + query param token |
 | `container_test.go` | ListContainers, StartContainer, StopContainer, RestartContainer, RemoveContainer, ContainerLogs, Containers_RequireAuth (7 subtests) | 容器 CRUD |
+| `terminal_test.go` | Terminal_RequireAuth, Terminal_DockerUnavailable, Terminal_ExecError, Terminal_DataFlow | WebSocket 容器终端 (认证/Docker 不可用/exec 失败/双向数据流+resize) |
 | `app_test.go` | DeployApp, DeployApp_DefaultSettings, DeployApp_InvalidSettings, DeployApp_NoAuth, DeployApp_TemplateNotFound, ListApps_Empty, GetApp_NotFound, DeleteApp_NotFound, AppConfigs, AppConfigs_NoConfigs | 应用部署 + 管理 |
 | `passkey_test.go` | PasskeyExistsEmpty, PasskeyExistsWithPasskey, PasskeyBeginRegisterRequiresAuth, PasskeyBeginRegisterSuccess, PasskeyBeginLoginNoPasskeys, PasskeyFinishLoginNoPasskeys, PasskeyDeleteNotFound, PasskeyDeleteSuccess, PasskeyListEmpty, PasskeyListWithPasskeys, PasskeyProtectedRoutesRequireAuth (4 subtests), PasskeyRoutesNotRegisteredWithoutWebAuthn (3 subtests) | Passkey WebAuthn API |
 | `static_test.go` | StaticServesIndexHTML, StaticServesAsset, StaticSPAFallback, StaticAPIRouteReturns404JSON, StaticFavicon | SPA 静态文件服务 |

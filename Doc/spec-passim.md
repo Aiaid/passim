@@ -138,6 +138,7 @@ crypto/rsa + crypto/x509          -- 自签 SSL 证书
 ```
 github.com/go-webauthn/webauthn   -- WebAuthn/FIDO2 (Passkey) ✅
 golang.org/x/crypto/acme/autocert -- ACME 客户端 (Let's Encrypt) ✅
+github.com/gorilla/websocket      -- WebSocket (容器终端) ✅
 ```
 
 > iperf3: 使用 Alpine 系统包 `iperf3`，Go 通过 `os/exec` 调用命令行
@@ -252,6 +253,30 @@ data: {"hostname":"...","cpu_percent":23.5,"mem_percent":37.5,...,"timestamp":"2
 #### `GET /api/containers/:id/logs?lines=200`
 
 返回纯文本日志（Content-Type: text/plain）。默认 200 行。
+
+#### `GET /api/containers/:id/terminal` (WebSocket) ✅ Phase 4
+
+交互式容器终端。HTTP 升级为 WebSocket 连接，通过 Docker exec 创建 TTY shell。
+
+**认证**: 通过 `?token=<jwt>` query parameter（与 SSE 一致，浏览器 WebSocket 不支持自定义 header）。
+
+**消息协议**:
+- Binary 帧 = 终端 I/O 数据（双向）
+- Text 帧 = JSON 控制消息（如 resize）
+
+**控制消息**:
+```json
+{"type": "resize", "cols": 120, "rows": 40}
+```
+
+**Query 参数**:
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `token` | — | JWT 认证 token（必须）|
+| `shell` | `/bin/sh` | 要启动的 shell 路径 |
+
+**Go 依赖**: `github.com/gorilla/websocket`
+**前端**: `@xterm/xterm` + `@xterm/addon-fit` + `@xterm/addon-web-links`
 
 ### 应用管理 ✅ Phase 1
 
@@ -743,18 +768,18 @@ Passim 不使用配置文件——所有配置通过**环境变量**传入，运
 |------|--------|------|
 | `PORT` | `8443` | 监听端口 |
 | `API_KEY` | (自动生成) | 预设 API Key；省略则首次启动自动生成并打印到日志 |
-| `SSL_MODE` | `self-signed` | SSL 模式：`self-signed` / `letsencrypt` / `off` |
-| `SSL_DOMAIN` | — | 域名，用于 Let's Encrypt 证书签发（最高优先级） |
+| `SSL_MODE` | `letsencrypt` | SSL 模式：`self-signed` / `letsencrypt` / `off` |
+| `SSL_DOMAIN` | — | 自有域名，用于 Let's Encrypt 证书签发（最高优先级） |
 | `SSL_EMAIL` | — | Let's Encrypt 联系邮箱 |
-| `DNS_BASE_DOMAIN` | — | DNS 反射器基础域名；未设 `SSL_DOMAIN` 时自动发现公网 IP 拼域名 |
+| `DNS_BASE_DOMAIN` | `dns.passim.io` | DNS 反射器基础域名；未设 `SSL_DOMAIN` 时自动发现公网 IP 拼域名 |
 | `DATA_DIR` | `/data` | 数据目录（SQLite、配置、证书） |
 
 ### SSL 模式说明
 
 | 模式 | 行为 |
 |------|------|
-| `self-signed` | 自动生成自签证书到 `/data/certs/`（默认） |
-| `letsencrypt` | ACME 自动申请 Let's Encrypt 证书，需设置 `SSL_DOMAIN` 或 `DNS_BASE_DOMAIN` |
+| `self-signed` | 自动生成自签证书到 `/data/certs/` |
+| `letsencrypt` | ACME 自动申请 Let's Encrypt 证书（默认），通过 DNS 反射器 `dns.passim.io` 自动获取域名，或设置 `SSL_DOMAIN` 使用自有域名 |
 | `off` | 纯 HTTP，不启用 TLS（开发模式） |
 
 **Let's Encrypt 域名优先级：**
@@ -780,11 +805,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PORT=8443
-      - SSL_MODE=self-signed
+      - SSL_MODE=letsencrypt
+      - DNS_BASE_DOMAIN=dns.passim.io
       # - API_KEY=your-secret-key
       # - SSL_DOMAIN=example.com
       # - SSL_EMAIL=you@example.com
-      # - DNS_BASE_DOMAIN=dns.passim.io
 ```
 
 ### 运行时存储 (SQLite `config` 表)

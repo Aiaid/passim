@@ -32,6 +32,9 @@
   "zod": "4.3.6",
   "react-i18next": "^15.0.0",
   "i18next": "^24.0.0",
+  "@xterm/xterm": "6.0.0",
+  "@xterm/addon-fit": "0.11.0",
+  "@xterm/addon-web-links": "0.12.0",
   "recharts": "3.8.0",
   "sonner": "^2.0.0",
   "lucide-react": "^0.400.0",
@@ -76,7 +79,8 @@ web/src/
 │   │   ├── containers-page.tsx
 │   │   ├── container-list.tsx            # 卡片网格 (非表格)，状态色左边框
 │   │   ├── container-actions.tsx         # 操作菜单 (start/stop/restart/remove)
-│   │   ├── container-detail-panel.tsx    # UniFi 风格侧边面板 (Info/Logs tabs)
+│   │   ├── container-detail-panel.tsx    # UniFi 风格侧边面板 (Info/Logs/Terminal tabs)
+│   │   ├── terminal-tab.tsx              # 交互式终端 (xterm.js + WebSocket)
 │   │   └── queries.ts                    # 容器相关查询和 mutations
 │   ├── apps/                             # 应用管理
 │   │   ├── apps-page.tsx
@@ -239,8 +243,9 @@ Header 显示节点信息 (名称/版本/运行时间/公网 IPv4/IPv6+国家/SS
 
 点击容器卡片或应用卡片打开右侧 Sheet 面板 (sm:max-w-lg)，包含:
 - Header: 名称 + 镜像/模板 + 操作按钮 (start/stop/restart/remove)
-- Tabs: Info (状态/镜像/ID/创建时间) | Logs (终端风格, macOS 窗口装饰, 行号, 悬停高亮)
+- Tabs: Info (状态/镜像/ID/创建时间) | Logs (终端风格, macOS 窗口装饰, 行号, 悬停高亮) | Terminal (交互式 shell, 仅运行中容器可用)
 - Log 查看器使用原生 `overflow-y-auto` 而非 Radix ScrollArea (flex 布局兼容性更好)
+- Terminal 使用 xterm.js + WebSocket 连接到 `/api/containers/:id/terminal`，支持自动适配大小 (FitAddon + ResizeObserver)，断连后显示重连按钮
 
 ### 设置页 `/settings`
 
