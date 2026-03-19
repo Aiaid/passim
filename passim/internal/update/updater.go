@@ -80,6 +80,11 @@ func (u *Updater) Execute(ctx context.Context, targetVersion string) error {
 		containerName = containerName[1:]
 	}
 
+	// Clean up any leftover helper container from a previous (possibly failed) update
+	const helperName = "passim-updater"
+	_ = u.docker.StopContainer(ctx, helperName)
+	_ = u.docker.RemoveContainer(ctx, helperName)
+
 	helperCfg := &docker.ContainerConfig{
 		Name:  "passim-updater",
 		Image: newImage,

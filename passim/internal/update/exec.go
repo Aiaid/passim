@@ -2,6 +2,7 @@ package update
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -65,9 +66,23 @@ func ExecSwitch(ctx context.Context, dockerClient docker.DockerClient, targetID,
 		return rollback(ctx, dockerClient, targetID, oldName, name, err)
 	}
 
-	// Health check — wait for the new container to respond
-	log.Printf("update-exec: health checking new container %s", newID)
-	if err := waitForHealthy(ctx, name, 60*time.Second); err != nil {
+	// Health check — wait for the new container to respond.
+	// Use container IP because default bridge doesn't support name DNS.
+	containerIP := ""
+	if info, inspErr := dockerClient.InspectContainer(ctx, newID); inspErr == nil {
+		for _, net := range info.NetworkSettings.Networks {
+			if net.IPAddress != "" {
+				containerIP = net.IPAddress
+				break
+			}
+		}
+	}
+	healthTarget := containerIP
+	if healthTarget == "" {
+		healthTarget = name // fallback to name (works on user-defined networks)
+	}
+	log.Printf("update-exec: health checking new container %s (ip=%s)", newID, healthTarget)
+	if err := waitForHealthy(ctx, healthTarget, 60*time.Second); err != nil {
 		log.Printf("update-exec: health check failed, rolling back: %v", err)
 		// Stop and remove the unhealthy new container
 		dockerClient.StopContainer(ctx, newID)
@@ -100,19 +115,20 @@ func rollback(ctx context.Context, dockerClient docker.DockerClient, oldID, oldN
 }
 
 // waitForHealthy polls the container's health endpoint until it responds.
-func waitForHealthy(ctx context.Context, containerName string, timeout time.Duration) error {
+// host is the container IP or name.
+func waitForHealthy(ctx context.Context, host string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: nil, // Will be set below
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // health check against local container
 		},
 	}
 
-	// Try both HTTPS (self-signed) and HTTP
+	// Try both HTTPS and HTTP — passim may run with SSL off
 	urls := []string{
-		fmt.Sprintf("https://%s:8443/api/version", containerName),
-		fmt.Sprintf("http://%s:8443/api/version", containerName),
+		fmt.Sprintf("https://%s:8443/api/version", host),
+		fmt.Sprintf("http://%s:8443/api/version", host),
 	}
 
 	for time.Now().Before(deadline) {
