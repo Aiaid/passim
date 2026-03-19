@@ -458,8 +458,9 @@ func TestInteg_AppSettingsUpdateValidation(t *testing.T) {
 	w := httptest.NewRecorder()
 	env.Handler.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("valid patch: expected 200, got %d: %s", w.Code, w.Body.String())
+	// 202 = settings updated + async redeploy triggered; 200 = updated without redeploy
+	if w.Code != http.StatusOK && w.Code != http.StatusAccepted {
+		t.Fatalf("valid patch: expected 200 or 202, got %d: %s", w.Code, w.Body.String())
 	}
 
 	// PATCH with out-of-range settings -> 400
