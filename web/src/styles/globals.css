@@ -781,3 +781,369 @@
   border-top-color: rgba(94, 92, 230, 0.35);
 }
 
+/* ── Client Config: Dispatch Console ──────────────────── */
+
+@keyframes cfg-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cfg-qr-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes cfg-live-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 oklch(0.65 0.2 150 / 0.5); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 4px oklch(0.65 0.2 150 / 0); }
+}
+
+@keyframes cfg-copy-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes cfg-shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+/* Stagger container */
+.cfg-stagger > * {
+  opacity: 0;
+  animation: cfg-enter 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.cfg-stagger > :nth-child(1) { animation-delay: 0.04s; }
+.cfg-stagger > :nth-child(2) { animation-delay: 0.1s; }
+.cfg-stagger > :nth-child(3) { animation-delay: 0.12s; }
+.cfg-stagger > :nth-child(4) { animation-delay: 0.18s; }
+.cfg-stagger > :nth-child(5) { animation-delay: 0.24s; }
+.cfg-stagger > :nth-child(6) { animation-delay: 0.3s; }
+.cfg-stagger > :nth-child(7) { animation-delay: 0.36s; }
+.cfg-stagger > :nth-child(8) { animation-delay: 0.42s; }
+.cfg-stagger > :nth-child(9) { animation-delay: 0.48s; }
+.cfg-stagger > :nth-child(10) { animation-delay: 0.54s; }
+
+/* Glass panel — reused across config sections */
+.cfg-panel {
+  position: relative;
+  padding: 20px 20px 20px 28px;
+  border-radius: 14px;
+  background: oklch(0.98 0.004 255 / 0.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  backdrop-filter: blur(28px) saturate(1.8);
+  border: 1px solid oklch(0.88 0.01 255 / 0.55);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.45),
+    0 1px 3px oklch(0.3 0.02 255 / 0.05),
+    0 6px 24px oklch(0.3 0.02 255 / 0.04);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.dark .cfg-panel {
+  background: oklch(0.16 0.01 265 / 0.38);
+  border-color: oklch(1 0 0 / 0.07);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.04),
+    0 1px 3px oklch(0 0 0 / 0.3),
+    0 8px 32px oklch(0 0 0 / 0.35);
+}
+
+/* Left accent stripe */
+.cfg-stripe {
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+}
+
+/* Type-specific accent colors */
+.cfg-accent-file { background: oklch(0.62 0.17 185); }
+.cfg-accent-cred { background: oklch(0.68 0.16 75); }
+.cfg-accent-url  { background: oklch(0.58 0.2 275); }
+
+.cfg-accent-file-bg { background: oklch(0.62 0.17 185 / 0.1); color: oklch(0.5 0.14 185); }
+.cfg-accent-cred-bg { background: oklch(0.68 0.16 75 / 0.1); color: oklch(0.55 0.14 75); }
+.cfg-accent-url-bg  { background: oklch(0.58 0.2 275 / 0.1); color: oklch(0.48 0.18 275); }
+
+.dark .cfg-accent-file-bg { background: oklch(0.62 0.17 185 / 0.15); color: oklch(0.72 0.14 185); }
+.dark .cfg-accent-cred-bg { background: oklch(0.68 0.16 75 / 0.15); color: oklch(0.78 0.14 75); }
+.dark .cfg-accent-url-bg  { background: oklch(0.58 0.2 275 / 0.15); color: oklch(0.72 0.16 275); }
+
+/* File row */
+.cfg-file-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: background 0.15s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cfg-file-row:hover {
+  background: oklch(0.5 0 0 / 0.04);
+  transform: translateX(2px);
+}
+
+.dark .cfg-file-row:hover {
+  background: oklch(1 0 0 / 0.04);
+}
+
+/* Index badge */
+.cfg-idx {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  border: 1px solid oklch(0.62 0.17 185 / 0.2);
+}
+
+/* Terminal code block for URLs */
+.cfg-terminal {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: oklch(0.12 0.015 265);
+  color: oklch(0.82 0.06 185);
+  overflow-x: auto;
+  word-break: break-all;
+  border: 1px solid oklch(1 0 0 / 0.06);
+}
+
+.cfg-terminal-prompt {
+  color: oklch(0.55 0.12 275);
+  user-select: none;
+  margin-right: 8px;
+}
+
+/* QR spotlight */
+.cfg-qr-spotlight {
+  background: oklch(0.05 0.015 270 / 0.9);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  backdrop-filter: blur(24px) saturate(1.2);
+}
+
+.cfg-qr-reveal {
+  animation: cfg-qr-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  filter: drop-shadow(0 0 48px oklch(1 0 0 / 0.12));
+}
+
+/* Copy success */
+.cfg-copy-pop {
+  animation: cfg-copy-pop 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Live dot */
+.cfg-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: oklch(0.65 0.2 150);
+  animation: cfg-live-pulse 2.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* Share panel gradient border */
+.cfg-share-panel {
+  position: relative;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: oklch(0.98 0.004 255 / 0.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  backdrop-filter: blur(28px) saturate(1.8);
+  border: 1px solid oklch(0.65 0.2 150 / 0.2);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.3),
+    0 1px 3px oklch(0.3 0.02 255 / 0.05),
+    0 4px 16px oklch(0.65 0.2 150 / 0.04);
+}
+
+.dark .cfg-share-panel {
+  background: oklch(0.16 0.01 265 / 0.38);
+  border-color: oklch(0.65 0.2 150 / 0.15);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.03),
+    0 1px 3px oklch(0 0 0 / 0.3),
+    0 4px 16px oklch(0.65 0.2 150 / 0.06);
+}
+
+/* Subscription card */
+.cfg-sub-card {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: oklch(0.58 0.2 275 / 0.06);
+  border: 1px dashed oklch(0.58 0.2 275 / 0.2);
+  transition: border-color 0.2s ease;
+}
+
+.cfg-sub-card:hover {
+  border-color: oklch(0.58 0.2 275 / 0.35);
+}
+
+.dark .cfg-sub-card {
+  background: oklch(0.58 0.2 275 / 0.08);
+  border-color: oklch(0.58 0.2 275 / 0.15);
+}
+
+.dark .cfg-sub-card:hover {
+  border-color: oklch(0.58 0.2 275 / 0.3);
+}
+
+/* Loading skeleton shimmer */
+.cfg-skeleton {
+  background: linear-gradient(
+    90deg,
+    oklch(0.92 0 0 / 0.5) 0%,
+    oklch(0.96 0 0 / 0.8) 50%,
+    oklch(0.92 0 0 / 0.5) 100%
+  );
+  background-size: 200% 100%;
+  animation: cfg-shimmer 1.8s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.dark .cfg-skeleton {
+  background: linear-gradient(
+    90deg,
+    oklch(0.2 0 0 / 0.5) 0%,
+    oklch(0.25 0 0 / 0.8) 50%,
+    oklch(0.2 0 0 / 0.5) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* ── Share Page ────────────────────────────────────────── */
+
+.share-shell {
+  position: relative;
+  min-height: 100svh;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, oklch(0.55 0.18 250 / 0.06), transparent 70%),
+    var(--background);
+  overflow: hidden;
+}
+
+.dark .share-shell {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, oklch(0.4 0.15 270 / 0.12), transparent 70%),
+    var(--background);
+}
+
+/* Subtle noise overlay */
+.share-noise {
+  position: fixed;
+  inset: 0;
+  opacity: 0.025;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px;
+}
+
+.dark .share-noise {
+  opacity: 0.04;
+}
+
+/* Stagger entrance */
+.share-stagger > * {
+  opacity: 0;
+  animation: cfg-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.share-stagger > :nth-child(1) { animation-delay: 0.05s; }
+.share-stagger > :nth-child(2) { animation-delay: 0.12s; }
+.share-stagger > :nth-child(3) { animation-delay: 0.19s; }
+.share-stagger > :nth-child(4) { animation-delay: 0.26s; }
+.share-stagger > :nth-child(5) { animation-delay: 0.33s; }
+.share-stagger > :nth-child(6) { animation-delay: 0.4s; }
+.share-stagger > :nth-child(7) { animation-delay: 0.47s; }
+
+/* Share card */
+.share-card {
+  padding: 20px;
+  border-radius: 16px;
+  background: oklch(0.99 0.003 255 / 0.7);
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  backdrop-filter: blur(32px) saturate(1.8);
+  border: 1px solid oklch(0.88 0.008 255 / 0.6);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.5),
+    0 1px 4px oklch(0.3 0.02 255 / 0.04),
+    0 8px 32px oklch(0.3 0.02 255 / 0.06);
+}
+
+.dark .share-card {
+  background: oklch(0.16 0.012 265 / 0.5);
+  border-color: oklch(1 0 0 / 0.08);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.04),
+    0 1px 4px oklch(0 0 0 / 0.3),
+    0 8px 32px oklch(0 0 0 / 0.4);
+}
+
+/* File row in share page */
+.share-file-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.share-file-row:hover {
+  background: oklch(0.5 0 0 / 0.04);
+}
+
+.dark .share-file-row:hover {
+  background: oklch(1 0 0 / 0.04);
+}
+
+.share-file-idx {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  background: oklch(0.55 0.18 250 / 0.1);
+  color: oklch(0.45 0.15 250);
+}
+
+.dark .share-file-idx {
+  background: oklch(0.55 0.18 250 / 0.15);
+  color: oklch(0.7 0.15 250);
+}
+
