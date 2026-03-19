@@ -130,10 +130,12 @@ export function EventStreamProvider({ children }: { children: React.ReactNode })
 /**
  * Consume the global event stream data.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useEventStream() {
   const ctx = useContext(EventStreamContext);
   if (!ctx) throw new Error('useEventStream must be used within <EventStreamProvider>');
-  const { sourceRef: _, ...rest } = ctx;
+  const { sourceRef: _sourceRef, ...rest } = ctx;
+  void _sourceRef; // Intentionally unused in this hook
   return rest;
 }
 
@@ -141,10 +143,14 @@ export function useEventStream() {
  * Subscribe to a specific SSE event name on the shared connection.
  * Used for dynamic per-resource events (e.g., "task:abc-123", "app:xyz-789").
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useResourceEvents(topic: string, handler: (data: unknown) => void) {
   const ctx = useContext(EventStreamContext);
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  });
 
   // Re-run when isConnected changes (ensures sourceRef is populated)
   const isConnected = ctx?.isConnected ?? false;

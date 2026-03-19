@@ -1,33 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 const MOBILE_BREAKPOINT = 768;
 
+function getIsMobileSnapshot() {
+  return window.innerWidth < MOBILE_BREAKPOINT;
+}
+
+function getIsMobileServerSnapshot() {
+  return false;
+}
+
+function subscribeToMobile(callback: () => void) {
+  const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+  mql.addEventListener('change', callback);
+  return () => mql.removeEventListener('change', callback);
+}
+
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = useState<boolean | undefined>(undefined);
-
-  useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
-    const onChange = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    };
-    mql.addEventListener('change', onChange);
-    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
-
-  return !!isMobile;
+  return useSyncExternalStore(subscribeToMobile, getIsMobileSnapshot, getIsMobileServerSnapshot);
 }
 
 export function useMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-    const onChange = () => setIsMobile(mql.matches);
-    onChange();
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, [breakpoint]);
-
-  return isMobile;
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+      mql.addEventListener('change', callback);
+      return () => mql.removeEventListener('change', callback);
+    },
+    [breakpoint],
+  );
+  const getSnapshot = useCallback(
+    () => window.innerWidth < breakpoint,
+    [breakpoint],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }

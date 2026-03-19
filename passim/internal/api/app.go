@@ -108,8 +108,9 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 		if tz == "" {
 			tz = time.Now().Location().String()
 		}
+		appPublicIP, _, _, _, _ := readGeo()
 		nodeInfo := tmpl.NodeInfo{
-			PublicIP:  cachedIP,
+			PublicIP:  appPublicIP,
 			Timezone:  tz,
 			Hostname:  hostname,
 			DataDir:   dataDir,
@@ -356,11 +357,12 @@ func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[stri
 	if tz == "" {
 		tz = time.Now().Location().String()
 	}
+	redeployIP, _, _, _, _ := readGeo()
 	appDir := filepath.Join(dataDir, "apps", t.Name+"-"+appID[:8])
 	rendered, err := tmpl.Render(t, tmpl.RenderData{
 		Settings: settings,
 		Node: tmpl.NodeInfo{
-			PublicIP:  cachedIP,
+			PublicIP:  redeployIP,
 			Timezone:  tz,
 			Hostname:  hostname,
 			DataDir:   dataDir,

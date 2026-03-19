@@ -35,7 +35,7 @@ async function globalSetup() {
           const line = data.substring(0, newlineIdx).trim();
           try {
             resolve(JSON.parse(line));
-          } catch (e) {
+          } catch {
             reject(new Error(`Failed to parse server output: ${line}`));
           }
         }

@@ -265,10 +265,11 @@ func buildContexts(deps Deps, app *db.App, t *tmpl.Template) (clientcfg.AppConte
 	// Ensure geo cache is populated
 	geoOnce.Do(discoverGeo)
 
+	cfgIP, _, cfgCC, _, _ := readGeo()
 	nodeCtx := clientcfg.NodeContext{
-		PublicIP:  cachedIP,
+		PublicIP:  cfgIP,
 		Hostname:  hostname,
-		Country:   cachedCC,
+		Country:   cfgCC,
 		DataDir:   dataDir,
 	}
 

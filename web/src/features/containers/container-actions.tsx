@@ -18,7 +18,7 @@ import {
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { Container } from '@/lib/api-client';
 import { useContainerAction, useRemoveContainer } from './queries';
-import { mapState } from './container-list';
+import { mapState } from './utils';
 
 interface ContainerActionsProps {
   container: Container;

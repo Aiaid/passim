@@ -79,58 +79,75 @@ type containersSummary struct {
 	Total   int `json:"total"`
 }
 
-// Cached public IPs and country (discovered lazily, once)
+// Cached public IPs and country (discovered lazily in background)
 var (
-	geoOnce    sync.Once
-	cachedIP   string
-	cachedIPv6 string
-	cachedCC   string
-	cachedLat  float64
-	cachedLon  float64
+	geoOnce sync.Once
+	geoMu   sync.RWMutex
+	geoData struct {
+		ip   string
+		ipv6 string
+		cc   string
+		lat  float64
+		lon  float64
+	}
 )
 
 func discoverGeo() {
 	// IPv4
 	ip, err := ssl.DiscoverPublicIP()
-	if err == nil {
-		cachedIP = ip
+	if err != nil {
+		ip = ""
 	}
 
 	// IPv6 (best-effort)
 	ip6, err := ssl.DiscoverPublicIPv6()
-	if err == nil {
-		cachedIPv6 = ip6
+	if err != nil {
+		ip6 = ""
 	}
 
 	// Country lookup via IPv4 (or IPv6 fallback)
-	lookupIP := cachedIP
+	lookupIP := ip
 	if lookupIP == "" {
-		lookupIP = cachedIPv6
-	}
-	if lookupIP == "" {
-		return
+		lookupIP = ip6
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get("http://ip-api.com/json/" + lookupIP + "?fields=countryCode,lat,lon")
-	if err != nil {
-		return
+	var cc string
+	var lat, lon float64
+
+	if lookupIP != "" {
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Get("http://ip-api.com/json/" + lookupIP + "?fields=countryCode,lat,lon")
+		if err == nil {
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			if err == nil {
+				var geo struct {
+					CountryCode string  `json:"countryCode"`
+					Lat         float64 `json:"lat"`
+					Lon         float64 `json:"lon"`
+				}
+				if json.Unmarshal(body, &geo) == nil {
+					cc = strings.ToUpper(geo.CountryCode)
+					lat = geo.Lat
+					lon = geo.Lon
+				}
+			}
+		}
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-	var geo struct {
-		CountryCode string  `json:"countryCode"`
-		Lat         float64 `json:"lat"`
-		Lon         float64 `json:"lon"`
-	}
-	if json.Unmarshal(body, &geo) == nil {
-		cachedCC = strings.ToUpper(geo.CountryCode)
-		cachedLat = geo.Lat
-		cachedLon = geo.Lon
-	}
+
+	geoMu.Lock()
+	geoData.ip = ip
+	geoData.ipv6 = ip6
+	geoData.cc = cc
+	geoData.lat = lat
+	geoData.lon = lon
+	geoMu.Unlock()
+}
+
+func readGeo() (ip, ipv6, cc string, lat, lon float64) {
+	geoMu.RLock()
+	defer geoMu.RUnlock()
+	return geoData.ip, geoData.ipv6, geoData.cc, geoData.lat, geoData.lon
 }
 
 func statusHandler(deps Deps) gin.HandlerFunc {
@@ -141,7 +158,7 @@ func statusHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		// Discover public IPs & country (lazy, once)
+		// Discover public IPs & country (lazy, once, in background)
 		geoOnce.Do(func() { go discoverGeo() })
 
 		// Get node info from DB (best effort)
@@ -167,17 +184,19 @@ func statusHandler(deps Deps) gin.HandlerFunc {
 			}
 		}
 
+		ip, ipv6, cc, lat, lon := readGeo()
+
 		resp := statusResponse{
 			Node: nodeInfo{
 				ID:         nodeID,
 				Name:       nodeName,
 				Version:    version.Version,
 				Uptime:     m.Uptime,
-				PublicIP:   cachedIP,
-				PublicIPv6: cachedIPv6,
-				Country:    cachedCC,
-				Latitude:   cachedLat,
-				Longitude:  cachedLon,
+				PublicIP:   ip,
+				PublicIPv6: ipv6,
+				Country:    cc,
+				Latitude:   lat,
+				Longitude:  lon,
 			},
 			System: systemInfo{
 				CPU: cpuInfo{

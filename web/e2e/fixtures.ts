@@ -7,10 +7,12 @@ type E2EFixtures = {
 };
 
 export const test = base.extend<E2EFixtures>({
+  // eslint-disable-next-line no-empty-pattern
   apiKey: async ({}, use) => {
     const info = JSON.parse(
       fs.readFileSync('/tmp/passim-e2e-info.json', 'utf8')
     );
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(info.api_key);
   },
   authenticatedPage: async ({ page, apiKey }, use) => {
@@ -18,6 +20,7 @@ export const test = base.extend<E2EFixtures>({
     await page.getByPlaceholder('Enter API Key').fill(apiKey);
     await page.getByRole('button', { name: 'Sign In' }).click();
     await page.waitForURL('/');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(page);
   },
 });

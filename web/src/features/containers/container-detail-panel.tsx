@@ -14,7 +14,7 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { Container } from '@/lib/api-client';
 import { useContainerAction, useRemoveContainer, useContainerLogs } from './queries';
-import { mapState } from './container-list';
+import { mapState } from './utils';
 
 interface ContainerDetailPanelProps {
   container: Container | null;
@@ -233,12 +233,13 @@ function LogsTab({
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const logs = data?.logs;
   const lines = useMemo(() => {
-    if (!data?.logs) return [];
-    const raw = data.logs.split('\n');
+    if (!logs) return [];
+    const raw = logs.split('\n');
     while (raw.length > 0 && raw[raw.length - 1] === '') raw.pop();
     return raw;
-  }, [data?.logs]);
+  }, [logs]);
 
   useEffect(() => {
     if (lines.length > 0) {

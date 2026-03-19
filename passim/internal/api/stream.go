@@ -291,17 +291,19 @@ func buildStatusResponse(ctx context.Context, deps Deps, cache *metricsCache) st
 		}
 	}
 
+	ip, ipv6, cc, lat, lon := readGeo()
+
 	return statusResponse{
 		Node: nodeInfo{
 			ID:         nodeID,
 			Name:       nodeName,
 			Version:    version.Version,
 			Uptime:     m.Uptime,
-			PublicIP:   cachedIP,
-			PublicIPv6: cachedIPv6,
-			Country:    cachedCC,
-			Latitude:   cachedLat,
-			Longitude:  cachedLon,
+			PublicIP:   ip,
+			PublicIPv6: ipv6,
+			Country:    cc,
+			Latitude:   lat,
+			Longitude:  lon,
 		},
 		System: systemInfo{
 			CPU: cpuInfo{

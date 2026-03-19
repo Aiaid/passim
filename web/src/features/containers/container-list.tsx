@@ -5,18 +5,10 @@ import { cn } from '@/lib/utils';
 import type { Container } from '@/lib/api-client';
 import { ContainerActions } from './container-actions';
 import { ContainerDetailPanel } from './container-detail-panel';
+import { mapState, displayName } from './utils';
 
 interface ContainerListProps {
   containers: Container[];
-}
-
-export function mapState(state: string): string {
-  if (state === 'exited') return 'stopped';
-  return state;
-}
-
-function displayName(container: Container): string {
-  return container.Names[0]?.replace(/^\//, '') ?? container.Id.slice(0, 12);
 }
 
 const borderColor: Record<string, string> = {

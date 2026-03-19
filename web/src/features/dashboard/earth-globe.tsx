@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState, useEffect, useCallback, Fragment } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback, useSyncExternalStore, Fragment } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import { useQuery } from '@tanstack/react-query';
@@ -32,11 +32,12 @@ const TEX_CLOUDS = 'https://raw.githubusercontent.com/turban/webgl-earth/master/
 // ── Load textures ────────────────────────────────────────────────────
 function useManualTextures(urls: string[]) {
   const [textures, setTextures] = useState<THREE.Texture[] | null>(null);
+  // urls is a stable module-level constant, but include it for exhaustive-deps correctness
   useEffect(() => {
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin('anonymous');
     Promise.all(urls.map((url) => loader.loadAsync(url))).then(setTextures).catch(() => {});
-  }, []);
+  }, [urls]);
   return textures;
 }
 
@@ -408,9 +409,20 @@ function CloudLayer({ radius }: { radius: number }) {
   );
 }
 
+// ── Deterministic PRNG (mulberry32) ──────────────────────────────────
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 // ── Stars ────────────────────────────────────────────────────────────
 function Stars({ isDark }: { isDark: boolean }) {
   const geo = useMemo(() => {
+    const rand = mulberry32(42);
     const count = isDark ? 3000 : 1500;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
@@ -424,9 +436,9 @@ function Stars({ isDark }: { isDark: boolean }) {
     ];
 
     for (let i = 0; i < count; i++) {
-      const r = 10 + Math.random() * 18;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
+      const r = 10 + rand() * 18;
+      const theta = rand() * Math.PI * 2;
+      const phi = Math.acos(2 * rand() - 1);
       positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       positions[i * 3 + 2] = r * Math.cos(phi);
@@ -436,7 +448,7 @@ function Stars({ isDark }: { isDark: boolean }) {
         colors[i * 3 + 1] = 1;
         colors[i * 3 + 2] = 1;
       } else {
-        const c = palette[Math.floor(Math.random() * palette.length)];
+        const c = palette[Math.floor(rand() * palette.length)];
         colors[i * 3] = c[0];
         colors[i * 3 + 1] = c[1];
         colors[i * 3 + 2] = c[2];
@@ -897,25 +909,24 @@ function EarthScene({
 // ── Resolve effective dark mode ───────────────────────────────────────
 function useIsDark() {
   const { theme } = usePreferencesStore();
-  const [isDark, setIsDark] = useState(() => {
+
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      if (theme !== 'system') return () => {};
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      mq.addEventListener('change', callback);
+      return () => mq.removeEventListener('change', callback);
+    },
+    [theme],
+  );
+
+  const getSnapshot = useCallback(() => {
     if (theme === 'dark') return true;
     if (theme === 'light') return false;
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-
-  useEffect(() => {
-    if (theme !== 'system') {
-      setIsDark(theme === 'dark');
-      return;
-    }
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    setIsDark(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
   }, [theme]);
 
-  return isDark;
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
 
 // ── Exported component ───────────────────────────────────────────────
