@@ -11,7 +11,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   REGISTRY: ghcr.io
-  IMAGE_NAME: anend-s-cat/passim
+  IMAGE_NAME: aiaid/passim
 
 jobs:
   build:
@@ -129,7 +129,7 @@ jobs:
             **One-line install** (installs Docker if needed, auto-HTTPS via DNS reflector):
 
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | sudo bash
+            curl -fsSL https://raw.githubusercontent.com/aiaid/passim/main/install.sh | sudo bash
             ```
 
             **Or pull the image directly:**

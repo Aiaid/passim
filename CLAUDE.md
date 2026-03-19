@@ -101,8 +101,8 @@ python app/app.py                # Runs nserver DNS on port 153
 | `SSL_EMAIL` | — | Contact email for Let's Encrypt |
 | `DNS_BASE_DOMAIN` | `dns.passim.io` | DNS reflector base domain; auto-discovers public IP when `SSL_DOMAIN` is not set |
 | `DATA_DIR` | `/data` | Data directory (SQLite, configs, certs) |
-| `GITHUB_REPO` | `anend-s-cat/passim` | GitHub repo for update checks |
-| `IMAGE_NAME` | `ghcr.io/anend-s-cat/passim` | Docker image name for self-update |
+| `GITHUB_REPO` | `aiaid/passim` | GitHub repo for update checks |
+| `IMAGE_NAME` | `ghcr.io/aiaid/passim` | Docker image name for self-update |
 
 ### DNS
 | Variable | Default | Description |

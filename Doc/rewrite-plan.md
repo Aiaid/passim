@@ -125,13 +125,13 @@ VPS A                    VPS B                    VPS C
 
 ```bash
 # 一键安装 (自动装 Docker + DNS 反射器自动 HTTPS)
-curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/aiaid/passim/main/install.sh | sudo bash
 
 # 或手动 docker run
 docker run -d -v /var/run/docker.sock:/var/run/docker.sock \
   -v passim-data:/data -p 8443:8443 -p 80:80 \
   -e SSL_MODE=letsencrypt -e DNS_BASE_DOMAIN=dns.passim.io \
-  ghcr.io/anend-s-cat/passim
+  ghcr.io/aiaid/passim
 # 访问 https://<ip>:8443 → 管理本机 (端口 80 用于 ACME 证书验证)
 ```
 
@@ -194,7 +194,7 @@ ENTRYPOINT ["passim"]
 
 ```bash
 # 推荐: 一键安装脚本 (自动装 Docker + DNS 反射器自动 HTTPS，无需域名)
-curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/aiaid/passim/main/install.sh | sudo bash
 
 # 或手动运行:
 docker run -d \
@@ -207,7 +207,7 @@ docker run -d \
   -p 5201:5201 \
   -e SSL_MODE=letsencrypt \
   -e DNS_BASE_DOMAIN=dns.passim.io \
-  ghcr.io/anend-s-cat/passim:latest
+  ghcr.io/aiaid/passim:latest
 # 8443: 主 HTTPS/HTTP 端口
 # 80:   ACME HTTP-01 证书验证 + HTTP→HTTPS 重定向
 # 5201: iperf3 测速

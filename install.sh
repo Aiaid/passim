@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────
 # Passim — One-click VPS installer
-# Usage:  curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | bash
+# Usage:  curl -fsSL https://raw.githubusercontent.com/aiaid/passim/main/install.sh | bash
 #    or:  bash install.sh [OPTIONS]
 #
 # Options:
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 # ── Defaults ──────────────────────────────────────────────────
-IMAGE="ghcr.io/anend-s-cat/passim"
+IMAGE="ghcr.io/aiaid/passim"
 TAG="latest"
 PORT=8443
 API_KEY=""

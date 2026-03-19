@@ -21,7 +21,7 @@ Passim is a personal cloud management assistant for ordinary people. One `docker
 **One-line install** (installs Docker if needed, sets up HTTPS via DNS reflector automatically):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/aiaid/passim/main/install.sh | sudo bash
 ```
 
 The script auto-detects your public IP, obtains a Let's Encrypt certificate via DNS reflector (`dns.passim.io`) — no domain required. An API key is auto-generated on first run and printed to the terminal.
@@ -38,7 +38,7 @@ docker run -d \
   -p 80:80 \
   -e SSL_MODE=letsencrypt \
   -e DNS_BASE_DOMAIN=dns.passim.io \
-  ghcr.io/anend-s-cat/passim:latest
+  ghcr.io/aiaid/passim:latest
 ```
 
 Open `https://<your-ip>:8443` in your browser. Find the auto-generated API key in the container logs:
@@ -65,7 +65,7 @@ docker logs passim
 **Have your own domain?** Use `--domain` to skip DNS reflector:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/anend-s-cat/passim/main/install.sh | \
+curl -fsSL https://raw.githubusercontent.com/aiaid/passim/main/install.sh | \
   sudo bash -s -- --domain example.com --email you@example.com
 ```
 
@@ -202,7 +202,7 @@ Tags trigger the release pipeline:
 ```bash
 git tag -a v1.0.0 -m "release: v1.0.0"
 git push origin v1.0.0
-# → CI builds multi-arch images → pushes to ghcr.io/anend-s-cat/passim
+# → CI builds multi-arch images → pushes to ghcr.io/aiaid/passim
 # → Creates GitHub Release with changelog + install instructions
 ```
 

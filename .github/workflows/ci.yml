@@ -77,8 +77,8 @@ jobs:
           file: passim/Dockerfile
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
-            ghcr.io/anend-s-cat/passim:dev
-            ghcr.io/anend-s-cat/passim:dev-${{ github.sha }}
+            ghcr.io/aiaid/passim:dev
+            ghcr.io/aiaid/passim:dev-${{ github.sha }}
           build-args: |
             VERSION=dev-${{ github.sha }}
             COMMIT=${{ github.sha }}
