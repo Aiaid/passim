@@ -424,6 +424,10 @@ data: {"status":"running"}
 
 生成 Clash/Stash 兼容的订阅 YAML（仅 `url` 类型）。聚合本地及远程节点的同模板应用。
 
+> **认证与订阅 URL**：此端点需要 JWT 认证。对于外部客户端（Clash/Stash/Shadowrocket），应优先使用 share token 路径 `/api/s/:token/subscribe`（永久、无需认证）。前端在展示订阅 URL 时，如果 app 已有 share token，自动使用 share 路径；否则回退到带 `?token=<jwt>` 的认证路径。
+>
+> `import_urls` 中的 `{{subscribe_url}}` 和 `{{base64_subscribe_url}}` 由后端自动注入，优先使用 share token 路径。
+
 ```yaml
 proxies:
   - name: "tokyo-1"

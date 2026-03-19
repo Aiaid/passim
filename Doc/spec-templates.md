@@ -268,8 +268,8 @@ clients:
   # scheme: "hysteria2://{{ generated.password }}@{{ node.public_ip }}:443/?insecure=1&sni={{ node.domain }}#{{ node.name }}-hysteria"
   # qr: true
   # import_urls:               # 各客户端的导入 URL scheme
-  #   stash: "stash://install-config?url={{ urlencode(config_url) }}"
-  #   shadowrocket: "shadowrocket://add/{{ base64(url) }}"
+  #   stash: "stash://install-config?url={{subscribe_url}}"
+  #   shadowrocket: "sub://{{base64_subscribe_url}}"
 
 # ════════════════════════════════════════
 # 用户/客户端管理 — 怎么增删用户 (Phase 2)
@@ -568,14 +568,18 @@ clients:
       scheme: "hysteria2://{{ generated.password }}@{{ node.public_ip }}:443/?insecure=1&sni={{ node.domain }}#{{ node.name }}"
       qr: true
   import_urls:
-    stash: "stash://install-config?url={{ urlencode(subscribe_url) }}"
-    shadowrocket: "sub://{{ base64(subscribe_url) }}"
+    stash: "stash://install-config?url={{subscribe_url}}"
+    shadowrocket: "sub://{{base64_subscribe_url}}"
 ```
 
 典型应用：Hysteria 2, V2Ray, Shadowsocks
 - 配置就是一个 URL
 - 支持生成 QR 码
 - 支持各客户端的 import URL scheme（一键导入 Stash/Shadowrocket 等）
+
+**模板变量说明：**
+- `{{subscribe_url}}` — 订阅 URL，后端自动注入。优先使用 share token 路径 `/api/s/:token/subscribe`（永久、无需认证），无 share token 时回退到 `/api/apps/:id/subscribe`
+- `{{base64_subscribe_url}}` — subscribe_url 的 Base64 编码，后端自动生成
 
 ---
 
@@ -874,8 +878,8 @@ clients:
       scheme: "hysteria2://{{ user.name }}:{{ user.password }}@{{ node.public_ip }}:443/?insecure=0&sni={{ node.domain }}#{{ node.name }}"
       qr: true
   import_urls:
-    stash: "stash://install-config?url={{ urlencode(subscribe_url) }}"
-    shadowrocket: "sub://{{ base64(subscribe_url) }}"
+    stash: "stash://install-config?url={{subscribe_url}}"
+    shadowrocket: "sub://{{base64_subscribe_url}}"
 
 users:
   add:
