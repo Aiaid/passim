@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/clientcfg"
@@ -65,6 +67,13 @@ func appClientConfigHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		// If file_per_user returned 0 files, it may be a permissions issue.
+		// Try to fix permissions via docker exec and retry once.
+		if resolved.Type == "file_per_user" && len(resolved.Files) == 0 && app.ContainerID != "" && deps.Docker != nil {
+			fixConfigPermissions(deps, app.ContainerID, t)
+			resolved, _ = clientcfg.Resolve(clientsDef, appCtx, nodeCtx)
+		}
+
 		resp := buildClientConfigResponse(resolved, t, deps.DB, app.ID)
 		c.JSON(http.StatusOK, resp)
 	}
@@ -95,7 +104,7 @@ func appClientConfigFileHandler(deps Deps) gin.HandlerFunc {
 		}
 		appDir := filepath.Join(dataDir, "apps", app.Template+"-"+app.ID[:8])
 
-		name, content, err := clientcfg.ReadFileByIndex(t.Clients.Source, appDir, index)
+		name, content, err := clientcfg.ReadFileByIndexWithFallback(t.Clients.Source, appDir, dataDir, app.Template, index)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "config file not found"})
 			return
@@ -264,6 +273,24 @@ func buildContexts(deps Deps, app *db.App, t *tmpl.Template) (clientcfg.AppConte
 	}
 
 	return appCtx, nodeCtx
+}
+
+// fixConfigPermissions exec's into the app container to chmod config volumes
+// so the passim process (running as a different UID) can read generated files.
+func fixConfigPermissions(deps Deps, containerID string, t *tmpl.Template) {
+	ctx := context.Background()
+	for _, v := range t.Container.Volumes {
+		parts := strings.SplitN(v, ":", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		target := parts[1]
+		// Strip :ro suffix if present
+		if idx := strings.Index(target, ":"); idx >= 0 {
+			target = target[:idx]
+		}
+		deps.Docker.ExecContainer(ctx, containerID, []string{"chmod", "-R", "o+rX", target})
+	}
 }
 
 func buildClientConfigResponse(resolved *clientcfg.ResolvedConfig, t *tmpl.Template, database *sql.DB, appID string) clientConfigResponse {

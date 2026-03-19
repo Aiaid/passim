@@ -42,7 +42,7 @@ container:
     net.ipv4.conf.all.src_valid_mark: "1"
 clients:
   type: file_per_user
-  source: "/config/wg_confs/peer{n}.conf"
+  source: "/config/peer{n}/peer{n}.conf"
   format: conf
   qr: true
 share:

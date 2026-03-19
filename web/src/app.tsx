@@ -14,6 +14,7 @@ import { AppDetailPage } from '@/features/apps/app-detail-page';
 import { GlobeTestPage } from '@/features/dashboard/globe-test-page';
 import { NodesPage } from '@/features/nodes/nodes-page';
 import { NodeDetailPage } from '@/features/nodes/node-detail-page';
+import { SharePage } from '@/features/share/share-page';
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/test" element={<GlobeTestPage />} />
+        <Route path="/s/:token" element={<SharePage />} />
         <Route element={<AuthGuard />}>
           <Route element={<AppLayout />}>
             <Route path="/" element={<DashboardPage />} />

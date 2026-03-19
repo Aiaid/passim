@@ -119,6 +119,10 @@ export const api = {
   revokeShare: (id: string) =>
     request<{ ok: boolean }>(`/apps/${id}/share`, { method: 'DELETE' }),
 
+  // Public share (no auth)
+  getShareConfig: (token: string) => request<ShareConfigResponse>(`/s/${token}`),
+  getShareFileURL: (token: string, index: number) => `/api/s/${token}/file/${index}`,
+
   // Tasks
   getTasks: () => request<Task[]>('/tasks'),
   getTask: (id: string) => request<Task>(`/tasks/${id}`),
@@ -254,6 +258,17 @@ export interface ClientConfigResponse {
   import_urls?: Record<string, string>;
   share_supported: boolean;
   share_token?: string;
+}
+
+export interface ShareConfigResponse {
+  type: 'file_per_user' | 'credentials' | 'url';
+  qr?: boolean;
+  files?: { index: number; name: string }[];
+  fields?: { key: string; label: Record<string, string>; value: string; secret?: boolean }[];
+  urls?: { name: string; scheme: string; qr?: boolean }[];
+  import_urls?: Record<string, string>;
+  guide?: TemplateGuide;
+  limitations?: string[];
 }
 
 export interface SettingOptionInfo {

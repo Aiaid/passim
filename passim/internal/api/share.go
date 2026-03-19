@@ -52,7 +52,7 @@ func createShareHandler(deps Deps) gin.HandlerFunc {
 			host := c.Request.Host
 			c.JSON(http.StatusOK, createShareResponse{
 				Token: existing.Token,
-				URL:   scheme + "://" + host + "/api/s/" + existing.Token,
+				URL:   scheme + "://" + host + "/s/" + existing.Token,
 			})
 			return
 		}
@@ -77,7 +77,7 @@ func createShareHandler(deps Deps) gin.HandlerFunc {
 		host := c.Request.Host
 		c.JSON(http.StatusCreated, createShareResponse{
 			Token: token,
-			URL:   scheme + "://" + host + "/api/s/" + token,
+			URL:   scheme + "://" + host + "/s/" + token,
 		})
 	}
 }
@@ -204,7 +204,7 @@ func shareFileHandler(deps Deps) gin.HandlerFunc {
 		}
 		appDir := filepath.Join(dataDir, "apps", app.Template+"-"+app.ID[:8])
 
-		name, content, err := clientcfg.ReadFileByIndex(t.Clients.Source, appDir, index)
+		name, content, err := clientcfg.ReadFileByIndexWithFallback(t.Clients.Source, appDir, dataDir, app.Template, index)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "config file not found"})
 			return

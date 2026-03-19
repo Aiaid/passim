@@ -109,18 +109,37 @@ func Resolve(clients *ClientsDef, app AppContext, node NodeContext) (*ResolvedCo
 
 func resolveFilePerUser(clients *ClientsDef, app AppContext, node NodeContext) (*ResolvedConfig, error) {
 	// Expand {n} in source pattern to find files on disk.
-	// Source: "/config/wg_confs/peer{n}.conf"
-	// AppDir maps container paths to host paths: container /config → {appDir}/configs
+	// Source: "/config/peer{n}/peer{n}.conf"
 	source := clients.Source
 	if source == "" {
 		return nil, fmt.Errorf("file_per_user: source is empty")
 	}
 
-	// The container path /config is mounted at {appDir}/configs
-	// Replace leading /config with the actual host path
+	// Try the primary path (appDir/configs), then fallback to legacy path
+	// (dataDir/configs/{template}). The legacy path supports containers
+	// deployed before the per-app directory layout was introduced.
 	hostPattern := containerPathToHost(source, app.AppDir)
+	files := scanPeerFiles(hostPattern)
 
-	// Find all matching files by expanding {n} = 1, 2, 3, ...
+	if len(files) == 0 && node.DataDir != "" && app.Template != "" {
+		legacyBase := filepath.Join(node.DataDir, "configs", app.Template)
+		parts := strings.SplitN(source, "/", 3) // ["", "config", "peer{n}/..."]
+		if len(parts) >= 3 {
+			files = scanPeerFiles(filepath.Join(legacyBase, parts[2]))
+		}
+	}
+
+	return &ResolvedConfig{
+		Type:        "file_per_user",
+		Files:       files,
+		QR:          clients.QR,
+		NodeName:    node.Hostname,
+		NodeCountry: node.Country,
+	}, nil
+}
+
+// scanPeerFiles expands {n} = 1..100 in a path pattern and reads matching files.
+func scanPeerFiles(hostPattern string) []ResolvedFile {
 	var files []ResolvedFile
 	for n := 1; n <= 100; n++ {
 		path := strings.ReplaceAll(hostPattern, "{n}", strconv.Itoa(n))
@@ -135,14 +154,7 @@ func resolveFilePerUser(clients *ClientsDef, app AppContext, node NodeContext) (
 			Content: string(content),
 		})
 	}
-
-	return &ResolvedConfig{
-		Type:        "file_per_user",
-		Files:       files,
-		QR:          clients.QR,
-		NodeName:    node.Hostname,
-		NodeCountry: node.Country,
-	}, nil
+	return files
 }
 
 func resolveCredentials(clients *ClientsDef, app AppContext, node NodeContext) (*ResolvedConfig, error) {
@@ -287,4 +299,25 @@ func ReadFileByIndex(source, appDir string, index int) (string, string, error) {
 		return "", "", fmt.Errorf("read config file: %w", err)
 	}
 	return filepath.Base(path), string(content), nil
+}
+
+// ReadFileByIndexWithFallback tries appDir first, then falls back to
+// dataDir/configs/{template} for legacy deployments.
+func ReadFileByIndexWithFallback(source, appDir, dataDir, templateName string, index int) (string, string, error) {
+	name, content, err := ReadFileByIndex(source, appDir, index)
+	if err == nil {
+		return name, content, nil
+	}
+	if dataDir != "" && templateName != "" {
+		legacyBase := filepath.Join(dataDir, "configs", templateName)
+		parts := strings.SplitN(source, "/", 3)
+		if len(parts) >= 3 {
+			path := filepath.Join(legacyBase, strings.ReplaceAll(parts[2], "{n}", strconv.Itoa(index)))
+			content, err := os.ReadFile(path)
+			if err == nil {
+				return filepath.Base(path), string(content), nil
+			}
+		}
+	}
+	return "", "", fmt.Errorf("read config file: %w", err)
 }
