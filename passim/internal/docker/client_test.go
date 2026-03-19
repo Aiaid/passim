@@ -291,3 +291,51 @@ func TestMockClient_ExecContainer_Error(t *testing.T) {
 		t.Errorf("error = %q, want %q", err.Error(), "exec failed")
 	}
 }
+
+func TestSplitVolumes_NamedVolume(t *testing.T) {
+	volumes := []string{"/data/apps/hy-abc/configs:/etc/hysteria", "/var/run/docker.sock:/var/run/docker.sock"}
+	binds, mounts := splitVolumes(volumes, "/data", "passim_data", "")
+
+	if len(binds) != 1 || binds[0] != "/var/run/docker.sock:/var/run/docker.sock" {
+		t.Errorf("binds = %v, want docker.sock only", binds)
+	}
+	if len(mounts) != 1 {
+		t.Fatalf("mounts count = %d, want 1", len(mounts))
+	}
+	if mounts[0].Source != "passim_data" {
+		t.Errorf("mount source = %q, want passim_data", mounts[0].Source)
+	}
+	if mounts[0].VolumeOptions == nil || mounts[0].VolumeOptions.Subpath != "apps/hy-abc/configs" {
+		t.Errorf("mount subpath = %v", mounts[0].VolumeOptions)
+	}
+}
+
+func TestSplitVolumes_BindMount(t *testing.T) {
+	volumes := []string{"/data/apps/hy-abc/configs:/etc/hysteria", "/var/run/docker.sock:/var/run/docker.sock"}
+	binds, mounts := splitVolumes(volumes, "/data", "", "/opt/passim/data")
+
+	if len(mounts) != 0 {
+		t.Errorf("mounts should be empty for bind mount mode, got %d", len(mounts))
+	}
+	if len(binds) != 2 {
+		t.Fatalf("binds count = %d, want 2", len(binds))
+	}
+	if binds[0] != "/opt/passim/data/apps/hy-abc/configs:/etc/hysteria" {
+		t.Errorf("rewritten bind = %q, want /opt/passim/data/apps/hy-abc/configs:/etc/hysteria", binds[0])
+	}
+	if binds[1] != "/var/run/docker.sock:/var/run/docker.sock" {
+		t.Errorf("non-data bind = %q", binds[1])
+	}
+}
+
+func TestSplitVolumes_NoDocker(t *testing.T) {
+	volumes := []string{"/data/apps/hy-abc/configs:/etc/hysteria"}
+	binds, mounts := splitVolumes(volumes, "/data", "", "")
+
+	if len(mounts) != 0 {
+		t.Error("expected no mounts in non-Docker mode")
+	}
+	if len(binds) != 1 || binds[0] != volumes[0] {
+		t.Errorf("expected volumes passed through unchanged, got %v", binds)
+	}
+}

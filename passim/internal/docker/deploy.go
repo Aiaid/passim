@@ -22,8 +22,9 @@ type DeployRequest struct {
 	Sysctls     map[string]string
 	Args        []string
 	ConfigFiles []DeployConfigFile
-	DataDir     string // base data directory (e.g. /data)
-	DataVolume  string // Docker named volume for DataDir (e.g. "passim_passim-data")
+	DataDir      string // base data directory (e.g. /data)
+	DataVolume   string // Docker named volume for DataDir (e.g. "passim_passim-data")
+	DataHostPath string // host bind-mount source for DataDir (e.g. "/opt/passim/data")
 }
 
 // DeployConfigFile is a config file to write before starting the container.
@@ -97,6 +98,7 @@ func CreateAndRun(ctx context.Context, client DockerClient, req *DeployRequest) 
 		RestartPolicy: "unless-stopped",
 		DataDir:       req.DataDir,
 		DataVolume:    req.DataVolume,
+		DataHostPath:  req.DataHostPath,
 	}
 
 	id, err := client.CreateAndStartContainer(ctx, cfg)

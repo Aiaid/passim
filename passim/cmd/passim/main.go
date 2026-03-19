@@ -135,12 +135,15 @@ func main() {
 		log.Printf("warning: WebAuthn init failed: %v", err)
 	}
 
-	// Auto-discover Docker volume backing dataDir (for Docker-in-Docker deploys)
+	// Auto-discover Docker volume/bind mount backing dataDir (for Docker-in-Docker deploys)
 	dataVolume := os.Getenv("DATA_VOLUME") // explicit override
+	var dataHostPath string
 	if dataVolume == "" && dockerClient != nil {
-		dataVolume = discoverDataVolume(dockerClient, dataDir)
+		dataVolume, dataHostPath = discoverDataMount(dockerClient, dataDir)
 		if dataVolume != "" {
 			log.Printf("auto-discovered data volume: %s", dataVolume)
+		} else if dataHostPath != "" {
+			log.Printf("auto-discovered data host path: %s (bind mount mode)", dataHostPath)
 		}
 	}
 
@@ -169,8 +172,9 @@ func main() {
 		Tasks:      taskQueue,
 		SSE:        sseBroker,
 		NodeHub:    nodeHub,
-		DataDir:    dataDir,
-		DataVolume: dataVolume,
+		DataDir:      dataDir,
+		DataVolume:   dataVolume,
+		DataHostPath: dataHostPath,
 		Checker:    checker,
 		Updater:    updater,
 	}
@@ -342,24 +346,29 @@ func getEnvDefault(key, fallback string) string {
 	return fallback
 }
 
-// discoverDataVolume inspects the current container to find the Docker named
-// volume mounted at dataDir. Returns empty string if not running in Docker
-// or no volume is found.
-func discoverDataVolume(dockerClient docker.DockerClient, dataDir string) string {
+// discoverDataMount inspects the current container to find how dataDir is mounted.
+// Returns (volumeName, "") for named volumes, or ("", hostPath) for bind mounts.
+// Returns ("", "") if not running in Docker or no mount is found.
+func discoverDataMount(dockerClient docker.DockerClient, dataDir string) (string, string) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	info, err := dockerClient.InspectContainer(ctx, hostname)
 	if err != nil {
-		return "" // not in Docker or can't inspect self
+		return "", "" // not in Docker or can't inspect self
 	}
 	for _, m := range info.Mounts {
-		if m.Destination == dataDir && string(m.Type) == "volume" {
-			return m.Name
+		if m.Destination == dataDir {
+			if string(m.Type) == "volume" {
+				return m.Name, ""
+			}
+			if string(m.Type) == "bind" {
+				return "", m.Source
+			}
 		}
 	}
-	return ""
+	return "", ""
 }

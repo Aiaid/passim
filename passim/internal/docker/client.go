@@ -59,8 +59,11 @@ type ContainerConfig struct {
 	// When set, volume specs with host paths under DataDir are converted to
 	// volume mounts with Subpath instead of bind mounts, solving Docker-in-Docker
 	// path visibility issues.
-	// When empty, all volumes are treated as bind mounts (dev/non-Docker mode).
 	DataVolume string
+	// DataHostPath is the host-side bind mount source for DataDir (e.g. "/opt/passim/data").
+	// When DataVolume is empty but DataHostPath is set, volume specs under DataDir
+	// are rewritten to use the host path instead (bind mount Docker-in-Docker mode).
+	DataHostPath string
 }
 
 // Client wraps the Docker SDK client and implements DockerClient.
@@ -123,7 +126,7 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, cfg *ContainerConf
 		return "", fmt.Errorf("parse ports: %w", err)
 	}
 
-	binds, mounts := splitVolumes(cfg.Volumes, cfg.DataDir, cfg.DataVolume)
+	binds, mounts := splitVolumes(cfg.Volumes, cfg.DataDir, cfg.DataVolume, cfg.DataHostPath)
 
 	containerCfg := &container.Config{
 		Image:        cfg.Image,
@@ -159,9 +162,11 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, cfg *ContainerConf
 
 // splitVolumes separates volume specs into bind mounts and named volume mounts.
 // Paths under dataDir are converted to named volume mounts with Subpath when
-// dataVolume is set (Docker-in-Docker mode). Other paths remain as bind mounts.
-func splitVolumes(volumes []string, dataDir, dataVolume string) ([]string, []mount.Mount) {
-	if dataVolume == "" || dataDir == "" {
+// dataVolume is set (Docker-in-Docker mode). When only dataHostPath is set
+// (bind mount mode), paths under dataDir are rewritten to use the host path.
+// Other paths remain as bind mounts unchanged.
+func splitVolumes(volumes []string, dataDir, dataVolume, dataHostPath string) ([]string, []mount.Mount) {
+	if dataDir == "" || (dataVolume == "" && dataHostPath == "") {
 		return volumes, nil
 	}
 
@@ -173,17 +178,28 @@ func splitVolumes(volumes []string, dataDir, dataVolume string) ([]string, []mou
 		hostPath, target, readOnly := parseVolumeSpec(v)
 
 		if strings.HasPrefix(hostPath, prefix) || hostPath == strings.TrimSuffix(dataDir, "/") {
-			subpath := strings.TrimPrefix(hostPath, prefix)
-			m := mount.Mount{
-				Type:     mount.TypeVolume,
-				Source:   dataVolume,
-				Target:   target,
-				ReadOnly: readOnly,
-				VolumeOptions: &mount.VolumeOptions{
-					Subpath: subpath,
-				},
+			if dataVolume != "" {
+				// Named volume mode: use volume mount with Subpath
+				subpath := strings.TrimPrefix(hostPath, prefix)
+				m := mount.Mount{
+					Type:     mount.TypeVolume,
+					Source:   dataVolume,
+					Target:   target,
+					ReadOnly: readOnly,
+					VolumeOptions: &mount.VolumeOptions{
+						Subpath: subpath,
+					},
+				}
+				mounts = append(mounts, m)
+			} else {
+				// Bind mount mode: rewrite container path to host path
+				hostPathRewritten := strings.Replace(hostPath, strings.TrimSuffix(dataDir, "/"), strings.TrimSuffix(dataHostPath, "/"), 1)
+				spec := hostPathRewritten + ":" + target
+				if readOnly {
+					spec += ":ro"
+				}
+				binds = append(binds, spec)
 			}
-			mounts = append(mounts, m)
 		} else {
 			binds = append(binds, v)
 		}

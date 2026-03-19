@@ -153,9 +153,10 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			CapAdd:      rendered.CapAdd,
 			Sysctls:     rendered.Sysctls,
 			Args:        rendered.Args,
-			ConfigFiles: configFiles,
-			DataDir:     dataDir,
-			DataVolume:  deps.DataVolume,
+			ConfigFiles:  configFiles,
+			DataDir:      dataDir,
+			DataVolume:   deps.DataVolume,
+			DataHostPath: deps.DataHostPath,
 		}
 
 		// Async path: enqueue deploy task
@@ -403,9 +404,10 @@ func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[stri
 		CapAdd:      rendered.CapAdd,
 		Sysctls:     rendered.Sysctls,
 		Args:        rendered.Args,
-		ConfigFiles: configFiles,
-		DataDir:     dataDir,
-		DataVolume:  deps.DataVolume,
+		ConfigFiles:  configFiles,
+		DataDir:      dataDir,
+		DataVolume:   deps.DataVolume,
+		DataHostPath: deps.DataHostPath,
 	}, nil
 }
 

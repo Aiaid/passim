@@ -27,8 +27,9 @@ type Deps struct {
 	Tasks     *task.Queue
 	SSE        *sse.Broker
 	NodeHub    NodeHub
-	DataDir    string
-	DataVolume string // Docker named volume for DataDir (auto-discovered)
+	DataDir      string
+	DataVolume   string // Docker named volume for DataDir (auto-discovered)
+	DataHostPath string // Host bind-mount source for DataDir (auto-discovered)
 	Checker    *update.Checker
 	Updater    *update.Updater
 }
