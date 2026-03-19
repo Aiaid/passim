@@ -221,12 +221,19 @@ func main() {
 		}
 	}()
 
-	// HTTP server on port 80: ACME challenges + redirect to HTTPS (skip in dev mode)
+	// HTTP server on port 80: ACME challenges + health check + redirect to HTTPS (skip in dev mode)
 	if sslMode != "off" {
 		go func() {
+			acmeHandler := sslMgr.HTTPChallengeHandler()
+			mux := http.NewServeMux()
+			mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("ok"))
+			})
+			mux.Handle("/", acmeHandler)
 			httpSrv := &http.Server{
 				Addr:    ":80",
-				Handler: sslMgr.HTTPChallengeHandler(),
+				Handler: mux,
 			}
 			if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Printf("HTTP server (:80) error: %v (ACME challenges may not work)", err)

@@ -41,7 +41,7 @@ VOLUME /data
 EXPOSE 8443 80
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO /dev/null https://localhost:8443/api/status --no-check-certificate || exit 1
+  CMD wget -qO /dev/null http://localhost:80/healthz || exit 1
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["passim"]
