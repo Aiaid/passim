@@ -54,7 +54,7 @@ clients:
   type: url
   urls:
     - name: "Hysteria 2"
-      scheme: "hysteria2://{{settings.password}}@{{node.public_ip}}:{{settings.port}}/?insecure=1#{{node.hostname}}"
+      scheme: "hysteria2://{{settings.password}}@{{node.public_ip}}:{{settings.port}}/?insecure=1&sni={{node.domain}}#{{node.hostname}}"
       qr: true
   import_urls:
     stash: "stash://install-config?url={{subscribe_url}}"

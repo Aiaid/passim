@@ -284,11 +284,16 @@ func buildContexts(deps Deps, app *db.App, t *tmpl.Template) (clientcfg.AppConte
 	geoOnce.Do(discoverGeo)
 
 	cfgIP, _, cfgCC, _, _ := readGeo()
+	var sslDomain string
+	if deps.SSL != nil {
+		sslDomain = deps.SSL.GetDomain()
+	}
 	nodeCtx := clientcfg.NodeContext{
 		PublicIP:  cfgIP,
 		Hostname:  hostname,
 		Country:   cfgCC,
 		DataDir:   dataDir,
+		Domain:    sslDomain,
 	}
 
 	return appCtx, nodeCtx

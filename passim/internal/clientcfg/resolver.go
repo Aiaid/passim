@@ -18,6 +18,7 @@ type NodeContext struct {
 	Hostname  string
 	Country   string
 	DataDir   string
+	Domain    string // SSL domain (e.g. "abc.dns.passim.io")
 }
 
 // AppContext provides app info for template rendering.
@@ -227,6 +228,7 @@ func buildTemplateData(app AppContext, node NodeContext) map[string]string {
 	data["node_hostname"] = node.Hostname
 	data["node_country"] = node.Country
 	data["node_data_dir"] = node.DataDir
+	data["node_domain"] = node.Domain
 
 	// Settings
 	for k, v := range app.Settings {

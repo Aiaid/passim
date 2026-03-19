@@ -175,18 +175,29 @@ func (m *SSLManager) Status() SSLStatus {
 	switch m.mode {
 	case "auto":
 		status.Domain = m.domain
-		// Try reading cert from autocert cache
-		cacheDir := filepath.Join(m.dataDir, "ssl", "autocert")
-		certPEM, err := os.ReadFile(filepath.Join(cacheDir, m.domain))
-		if err != nil {
-			return status // cert not yet obtained
+		if m.autocertMgr == nil {
+			return status
 		}
-		parsed := parseCertStatus(certPEM)
-		status.Valid = parsed.Valid
-		status.ExpiresAt = parsed.ExpiresAt
-		status.Issuer = parsed.Issuer
-		if parsed.Domain != "" {
-			status.Domain = parsed.Domain
+		// Get cert from autocert Manager (memory, not DirCache file)
+		hello := &tls.ClientHelloInfo{ServerName: m.domain}
+		tlsCert, err := m.autocertMgr.GetCertificate(hello)
+		if err != nil || tlsCert == nil || tlsCert.Leaf == nil {
+			// Try parsing the first cert in the chain
+			if err == nil && tlsCert != nil && len(tlsCert.Certificate) > 0 {
+				if leaf, e := x509.ParseCertificate(tlsCert.Certificate[0]); e == nil {
+					tlsCert.Leaf = leaf
+				}
+			}
+			if tlsCert == nil || tlsCert.Leaf == nil {
+				return status
+			}
+		}
+		leaf := tlsCert.Leaf
+		status.Valid = time.Now().Before(leaf.NotAfter) && time.Now().After(leaf.NotBefore)
+		status.ExpiresAt = leaf.NotAfter.UTC().Format(time.RFC3339)
+		status.Issuer = leaf.Issuer.CommonName
+		if len(leaf.DNSNames) > 0 {
+			status.Domain = leaf.DNSNames[0]
 		}
 		return status
 	default:
