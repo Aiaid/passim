@@ -13,6 +13,7 @@ type NodeInfo struct {
 	Timezone string
 	Hostname string
 	DataDir  string
+	Domain   string // SSL domain (e.g., "vruwbka8.dns.passim.io" or user's own domain)
 }
 
 // AppInfo describes the deployed app instance for template rendering.
@@ -58,6 +59,7 @@ func buildFlatMap(data RenderData) map[string]interface{} {
 	m["node_Timezone"] = data.Node.Timezone
 	m["node_Hostname"] = data.Node.Hostname
 	m["node_data_dir"] = data.Node.DataDir
+	m["node_Domain"] = data.Node.Domain
 	for k, v := range data.Generated {
 		m["generated_"+k] = v
 	}

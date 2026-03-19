@@ -285,6 +285,11 @@ func (m *SSLManager) GetMode() string {
 	return m.mode
 }
 
+// GetDomain returns the SSL domain (user-provided or DNS-reflector-discovered).
+func (m *SSLManager) GetDomain() string {
+	return m.domain
+}
+
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil

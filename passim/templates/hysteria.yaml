@@ -34,14 +34,14 @@ settings:
       zh-CN: "客户端认证密码"
   - key: domain
     type: string
-    default: ""
+    default: "{{node.Domain}}"
     advanced: true
     label:
-      en-US: "Domain (optional)"
-      zh-CN: "域名（可选）"
+      en-US: "Domain"
+      zh-CN: "域名"
     description:
-      en-US: "Domain name for automatic TLS certificate via ACME. Leave empty for self-signed."
-      zh-CN: "用于 ACME 自动获取 TLS 证书的域名。留空则使用自签证书。"
+      en-US: "Domain for TLS certificate. Auto-filled from Passim's SSL domain."
+      zh-CN: "TLS 证书域名。自动填入 Passim 的 SSL 域名。"
 generated:
   - key: password
     type: random_string

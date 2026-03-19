@@ -205,19 +205,33 @@ else
   warn "Health check not passing yet (status: ${STATUS}). Container is still starting..."
 fi
 
-# ── Detect IP ─────────────────────────────────────────────────
+# ── Detect IP and build access URL ─────────────────────────────
 PUBLIC_IP=$(curl -fsSL --max-time 5 https://api.ipify.org 2>/dev/null || \
             curl -fsSL --max-time 5 https://ifconfig.me 2>/dev/null || \
             hostname -I 2>/dev/null | awk '{print $1}' || \
             echo "<your-server-ip>")
 
+if [[ "$SSL_MODE" == "off" ]]; then
+  ACCESS_URL="http://${PUBLIC_IP}:${PORT}"
+elif [[ -n "$SSL_DOMAIN" ]]; then
+  ACCESS_URL="https://${SSL_DOMAIN}:${PORT}"
+elif [[ -n "$DNS_BASE_DOMAIN" && "$PUBLIC_IP" != "<your-server-ip>" ]]; then
+  # Base32-encode IP to match DNS reflector domain (same algorithm as Go backend)
+  ENCODED=$(printf '%s' "$PUBLIC_IP" | awk -F. '{printf "%c%c%c%c", $1,$2,$3,$4}' | base32 | tr '=' '8' | tr 'A-Z' 'a-z')
+  ACCESS_URL="https://${ENCODED}.${DNS_BASE_DOMAIN}:${PORT}"
+else
+  ACCESS_URL="https://${PUBLIC_IP}:${PORT}"
+fi
+
 # ── Retrieve API key from logs if auto-generated ──────────────
 SHOWN_KEY="$API_KEY"
 if [[ -z "$API_KEY" ]]; then
   sleep 3
-  SHOWN_KEY=$(docker logs "$CONTAINER_NAME" 2>&1 | grep -oP 'API key: \K\S+' | head -1 || echo "")
-  if [[ -z "$SHOWN_KEY" ]]; then
-    SHOWN_KEY="(check: docker logs passim)"
+  SHOWN_KEY=$(docker logs "$CONTAINER_NAME" 2>&1 | grep -oP 'API [Kk]ey\s*:\s*\K\S+' | head -1 || echo "")
+  if [[ -n "$SHOWN_KEY" ]]; then
+    SHOWN_KEY="$SHOWN_KEY (new)"
+  else
+    SHOWN_KEY="(unchanged — run: docker exec passim passim reset-api-key)"
   fi
 fi
 
@@ -227,19 +241,13 @@ echo -e "${BOLD}═════════════════════�
 echo -e "${BOLD}  Passim installed successfully!${NC}"
 echo -e "${BOLD}═══════════════════════════════════════════════════${NC}"
 echo ""
-
-if [[ "$SSL_MODE" == "off" ]]; then
-  PROTO="http"
-else
-  PROTO="https"
-fi
-
-echo -e "  ${CYAN}URL:${NC}      ${PROTO}://${PUBLIC_IP}:${PORT}"
+echo -e "  ${CYAN}URL:${NC}      ${ACCESS_URL}"
 echo -e "  ${CYAN}API Key:${NC}  ${SHOWN_KEY}"
 echo -e "  ${CYAN}Data:${NC}     ${DATA_DIR}"
 echo ""
 echo -e "  ${BOLD}Useful commands:${NC}"
 echo -e "    docker logs -f passim        # View logs"
 echo -e "    docker restart passim        # Restart"
+echo -e "    docker exec passim passim reset-api-key  # Reset API key"
 echo -e "    bash install.sh --uninstall  # Remove"
 echo ""

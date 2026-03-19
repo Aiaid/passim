@@ -109,11 +109,16 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			tz = time.Now().Location().String()
 		}
 		appPublicIP, _, _, _, _ := readGeo()
+		var sslDomain string
+		if deps.SSL != nil {
+			sslDomain = deps.SSL.GetDomain()
+		}
 		nodeInfo := tmpl.NodeInfo{
 			PublicIP:  appPublicIP,
 			Timezone:  tz,
 			Hostname:  hostname,
 			DataDir:   dataDir,
+			Domain:    sslDomain,
 		}
 		appDir := filepath.Join(dataDir, "apps", t.Name+"-"+appID[:8])
 		rendered, err := tmpl.Render(t, tmpl.RenderData{
@@ -358,6 +363,10 @@ func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[stri
 		tz = time.Now().Location().String()
 	}
 	redeployIP, _, _, _, _ := readGeo()
+	var redeployDomain string
+	if deps.SSL != nil {
+		redeployDomain = deps.SSL.GetDomain()
+	}
 	appDir := filepath.Join(dataDir, "apps", t.Name+"-"+appID[:8])
 	rendered, err := tmpl.Render(t, tmpl.RenderData{
 		Settings: settings,
@@ -366,6 +375,7 @@ func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[stri
 			Timezone:  tz,
 			Hostname:  hostname,
 			DataDir:   dataDir,
+			Domain:    redeployDomain,
 		},
 		Generated: generated,
 		App:       tmpl.AppInfo{Dir: appDir},
