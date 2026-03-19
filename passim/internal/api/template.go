@@ -38,8 +38,16 @@ type settingInfo struct {
 
 // guideInfo is the JSON shape for template guide instructions.
 type guideInfo struct {
-	Setup map[string]string `json:"setup,omitempty"`
-	Usage map[string]string `json:"usage,omitempty"`
+	Setup     map[string]string   `json:"setup,omitempty"`
+	Usage     map[string]string   `json:"usage,omitempty"`
+	Platforms []guidePlatformInfo `json:"platforms,omitempty"`
+}
+
+type guidePlatformInfo struct {
+	Name        string   `json:"name"`
+	StoreURL    string   `json:"store_url,omitempty"`
+	DownloadURL string   `json:"download_url,omitempty"`
+	Steps       []string `json:"steps"`
 }
 
 // sourceInfo is the JSON shape for template source metadata.
@@ -177,10 +185,19 @@ func getTemplateHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		if t.Guide != nil {
-			detail.Guide = &guideInfo{
+			g := &guideInfo{
 				Setup: t.Guide.Setup,
 				Usage: t.Guide.Usage,
 			}
+			for _, p := range t.Guide.Platforms {
+				g.Platforms = append(g.Platforms, guidePlatformInfo{
+					Name:        p.Name,
+					StoreURL:    p.StoreURL,
+					DownloadURL: p.DownloadURL,
+					Steps:       p.Steps,
+				})
+			}
+			detail.Guide = g
 		}
 
 		if t.Source != nil {
