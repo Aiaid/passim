@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, Trash2, Cpu, HardDrive, MemoryStick, Server, AppWindow, AlertCircle, X, Container as ContainerIcon } from 'lucide-react';
+import { ArrowLeft, Trash2, Cpu, HardDrive, MemoryStick, Server, AppWindow, AlertCircle, X, Container as ContainerIcon, RefreshCw, Download } from 'lucide-react';
 import { PageSkeleton } from '@/components/shared/loading-skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { useEventStream } from '@/hooks/use-event-stream';
+import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import {
   useNodes,
@@ -18,8 +19,9 @@ import {
   useNodeStatus,
   useNodeContainers,
   useNodeApps,
+  useNodeUpdate,
 } from './queries';
-import type { RemoteNode, Container, AppResponse } from '@/lib/api-client';
+import type { RemoteNode, Container, AppResponse, UpdateInfo } from '@/lib/api-client';
 import { AppDetailPanel } from '@/features/apps/app-detail-panel';
 
 function countryFlag(code: string): string {
@@ -51,6 +53,69 @@ function MetricGauge({ label, percent, icon: Icon }: { label: string; percent: n
   );
 }
 
+function NodeUpdateCard({ nodeId, currentVersion }: { nodeId: string; currentVersion?: string }) {
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [checking, setChecking] = useState(false);
+  const nodeUpdate = useNodeUpdate();
+
+  const handleCheck = async () => {
+    setChecking(true);
+    try {
+      const info = await api.checkNodeUpdate(nodeId, { force: true });
+      setUpdateInfo(info);
+    } catch {
+      // ignore
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Version</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Current</span>
+          <span className="font-mono text-xs">{currentVersion || 'unknown'}</span>
+        </div>
+
+        {updateInfo?.available ? (
+          <>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Latest</span>
+              <span className="font-mono text-xs text-[oklch(0.65_0.2_145)]">{updateInfo.latest}</span>
+            </div>
+            <Button
+              size="sm"
+              className="w-full gap-1.5"
+              onClick={() => nodeUpdate.mutate({ nodeId, version: updateInfo.latest })}
+              disabled={nodeUpdate.isPending}
+            >
+              <Download className="size-3.5" />
+              {nodeUpdate.isPending ? 'Updating...' : `Update to ${updateInfo.latest}`}
+            </Button>
+          </>
+        ) : updateInfo ? (
+          <p className="text-xs text-muted-foreground">Up to date</p>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5"
+            onClick={handleCheck}
+            disabled={checking}
+          >
+            <RefreshCw className={cn('size-3.5', checking && 'animate-spin')} />
+            {checking ? 'Checking...' : 'Check for updates'}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function OverviewTab({ node, statusData }: { node: RemoteNode; statusData?: import('@/lib/api-client').StatusResponse }) {
   const { t } = useTranslation();
 
@@ -70,6 +135,12 @@ function OverviewTab({ node, statusData }: { node: RemoteNode; statusData?: impo
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Country</span>
               <span>{countryFlag(node.country)} {node.country}</span>
+            </div>
+          )}
+          {node.version && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Version</span>
+              <span className="font-mono text-xs">{node.version}</span>
             </div>
           )}
           {node.last_seen && (
@@ -122,6 +193,9 @@ function OverviewTab({ node, statusData }: { node: RemoteNode; statusData?: impo
           )}
         </CardContent>
       </Card>
+
+      {/* Update card */}
+      <NodeUpdateCard nodeId={node.id} currentVersion={node.version} />
     </div>
   );
 }

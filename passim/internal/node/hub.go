@@ -22,6 +22,7 @@ type NodeInfo struct {
 	Name       string          `json:"name"`
 	Address    string          `json:"address"`
 	Status     string          `json:"status"`
+	Version    string          `json:"version,omitempty"`
 	Country    string          `json:"country,omitempty"`
 	Latitude   float64         `json:"latitude"`
 	Longitude  float64         `json:"longitude"`
@@ -76,6 +77,7 @@ type RemoteConn struct {
 	lastSeen   time.Time
 	latitude   float64
 	longitude  float64
+	version    string // remote node version from SSE status
 	metrics    *NodeMetrics
 	containers []NodeContainer
 	token      string // JWT from remote login
@@ -184,6 +186,7 @@ func (h *Hub) AddNode(ctx context.Context, address, apiKey, name string) (*NodeI
 	var statusResp struct {
 		Node struct {
 			Country string `json:"country"`
+			Version string `json:"version"`
 		} `json:"node"`
 	}
 	_ = json.Unmarshal(body, &statusResp)
@@ -208,6 +211,7 @@ func (h *Hub) AddNode(ctx context.Context, address, apiKey, name string) (*NodeI
 	rc := &RemoteConn{
 		info:       *node,
 		status:     "connecting",
+		version:    statusResp.Node.Version,
 		token:      loginRes.Token,
 		scheme:     loginRes.Scheme,
 		httpClient: client,
@@ -378,6 +382,7 @@ func (h *Hub) buildNodeInfo(rc *RemoteConn) *NodeInfo {
 		Name:      rc.info.Name,
 		Address:   rc.info.Address,
 		Status:    rc.status,
+		Version:   rc.version,
 		Country:   rc.info.Country,
 		Latitude:  rc.latitude,
 		Longitude: rc.longitude,

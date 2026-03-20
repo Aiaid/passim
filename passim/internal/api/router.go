@@ -155,6 +155,16 @@ func NewRouter(deps Deps) http.Handler {
 			protected.GET("/nodes/:id/apps/:appId/configs", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") + "/configs" }))
 			protected.GET("/nodes/:id/apps/:appId/client-config", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") + "/client-config" }))
 
+			// Node update proxy routes
+			protected.GET("/nodes/:id/version/check", nodeProxyHandler(deps, "GET", func(c *gin.Context) string {
+				qs := c.Request.URL.RawQuery
+				if qs != "" {
+					return "/api/version/check?" + qs
+				}
+				return "/api/version/check"
+			}))
+			protected.POST("/nodes/:id/update", nodeProxyHandler(deps, "POST", func(c *gin.Context) string { return "/api/update" }))
+
 			// Node server-side speed test (local → remote, no browser middleman)
 			protected.POST("/nodes/:id/speedtest", nodeSpeedtestHandler(deps))
 

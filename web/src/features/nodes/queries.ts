@@ -82,6 +82,29 @@ export function useNodeApps(id: string) {
   });
 }
 
+export function useNodeUpdateCheck(id: string) {
+  return useQuery({
+    queryKey: ['nodes', id, 'update-check'],
+    queryFn: () => api.checkNodeUpdate(id),
+    enabled: false, // manual trigger only
+    retry: false,
+  });
+}
+
+export function useNodeUpdate() {
+  const { t } = useTranslation();
+  return useMutation({
+    mutationFn: ({ nodeId, version }: { nodeId: string; version: string }) =>
+      api.performNodeUpdate(nodeId, version),
+    onSuccess: () => {
+      toast.success(t('settings.update_started', 'Update started. Node will restart shortly.'));
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
 export function useConnections() {
   return useQuery({
     queryKey: ['connections'],

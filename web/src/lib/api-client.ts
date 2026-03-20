@@ -174,6 +174,20 @@ export const api = {
       `/nodes/${nodeId}/speedtest`, { method: 'POST' },
     ),
 
+  // Node updates
+  checkNodeUpdate: (nodeId: string, opts?: { force?: boolean; prerelease?: boolean }) => {
+    const params = new URLSearchParams();
+    if (opts?.force) params.set('force', 'true');
+    if (opts?.prerelease) params.set('prerelease', 'true');
+    const qs = params.toString();
+    return request<UpdateInfo>(`/nodes/${nodeId}/version/check${qs ? `?${qs}` : ''}`);
+  },
+  performNodeUpdate: (nodeId: string, version: string) =>
+    request<{ status: string; message: string }>(`/nodes/${nodeId}/update`, {
+      method: 'POST',
+      body: JSON.stringify({ version }),
+    }),
+
   // Connections
   getConnections: () => request<ConnectionInfo[]>('/connections'),
   disconnect: (id: string) => request<void>(`/connections/${id}`, { method: 'DELETE' }),
@@ -362,6 +376,7 @@ export interface RemoteNode {
   name: string;
   address: string;
   status: 'connecting' | 'connected' | 'disconnected';
+  version?: string;
   country?: string;
   latitude?: number;
   longitude?: number;

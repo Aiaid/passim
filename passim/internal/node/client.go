@@ -259,12 +259,13 @@ func (h *Hub) handleSSEEvent(rc *RemoteConn, nodeID, eventType, data string) {
 		}
 
 	case "status":
-		// Extract country and coordinates from status event
+		// Extract country, coordinates, and version from status event
 		var statusResp struct {
 			Node struct {
 				Country   string  `json:"country"`
 				Latitude  float64 `json:"latitude"`
 				Longitude float64 `json:"longitude"`
+				Version   string  `json:"version"`
 			} `json:"node"`
 		}
 		if err := json.Unmarshal([]byte(data), &statusResp); err == nil {
@@ -275,6 +276,9 @@ func (h *Hub) handleSSEEvent(rc *RemoteConn, nodeID, eventType, data string) {
 			if statusResp.Node.Latitude != 0 || statusResp.Node.Longitude != 0 {
 				rc.latitude = statusResp.Node.Latitude
 				rc.longitude = statusResp.Node.Longitude
+			}
+			if statusResp.Node.Version != "" {
+				rc.version = statusResp.Node.Version
 			}
 			rc.mu.Unlock()
 			if statusResp.Node.Country != "" {

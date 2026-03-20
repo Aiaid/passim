@@ -65,9 +65,16 @@ export function NodeCard({ node }: NodeCardProps) {
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground truncate">
-            {node.address}
-          </p>
+          <div className="mt-0.5 flex items-center gap-2">
+            <p className="text-xs text-muted-foreground truncate">
+              {node.address}
+            </p>
+            {node.version && (
+              <span className="shrink-0 text-[10px] font-mono text-muted-foreground/60">
+                {node.version}
+              </span>
+            )}
+          </div>
         </div>
         {/* Status indicator */}
         <span className="inline-flex items-center gap-1.5 shrink-0">
