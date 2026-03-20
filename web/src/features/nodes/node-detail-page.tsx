@@ -58,6 +58,11 @@ function NodeUpdateCard({ nodeId, currentVersion }: { nodeId: string; currentVer
   const [checking, setChecking] = useState(false);
   const nodeUpdate = useNodeUpdate();
 
+  const isDev = !currentVersion
+    || currentVersion === 'dev'
+    || currentVersion === 'unknown'
+    || currentVersion.startsWith('dev-');
+
   const handleCheck = async () => {
     setChecking(true);
     try {
@@ -78,7 +83,12 @@ function NodeUpdateCard({ nodeId, currentVersion }: { nodeId: string; currentVer
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Current</span>
-          <span className="font-mono text-xs">{currentVersion || 'unknown'}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs">{currentVersion || 'unknown'}</span>
+            {isDev && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold">DEV</span>
+            )}
+          </div>
         </div>
 
         {updateInfo?.available ? (
@@ -110,6 +120,22 @@ function NodeUpdateCard({ nodeId, currentVersion }: { nodeId: string; currentVer
             <RefreshCw className={cn('size-3.5', checking && 'animate-spin')} />
             {checking ? 'Checking...' : 'Check for updates'}
           </Button>
+        )}
+
+        {/* Dev force update — pull latest dev image */}
+        {isDev && (
+          <div className="pt-2 border-t border-border/50">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5"
+              onClick={() => nodeUpdate.mutate({ nodeId, version: 'dev' })}
+              disabled={nodeUpdate.isPending}
+            >
+              <RefreshCw className={cn('size-3.5', nodeUpdate.isPending && 'animate-spin')} />
+              {nodeUpdate.isPending ? 'Updating...' : 'Force update (pull latest dev)'}
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>
