@@ -75,7 +75,7 @@ export function Header() {
           <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground ml-1">
             <div className="flex items-center gap-1.5">
               <Server className="size-3" />
-              <span>{status.node.name} v{status.node.version}</span>
+              <span>{status.node.name} {status.node.version}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="size-3" />

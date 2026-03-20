@@ -117,7 +117,7 @@ export function NodeDetailPanel({ open, onOpenChange, nodeId, onAppClick }: Node
                 {node.country && <span className="text-sm">{countryFlag(node.country)}</span>}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                v{node.version} &middot; {formatUptime(node.uptime)}
+                {node.version} &middot; {formatUptime(node.uptime)}
               </p>
             </div>
             <Button variant="ghost" size="icon" className="size-8 shrink-0" onClick={() => onOpenChange(false)}>
@@ -181,7 +181,7 @@ function OverviewTab({ node, system, containers, isRemote, remoteAddress }: {
       title: t('dashboard.node_info'), icon: Server,
       fields: [
         { label: t('dashboard.node_name'), value: node.name },
-        { label: t('dashboard.version'), value: `v${node.version}` },
+        { label: t('dashboard.version'), value: node.version },
         { label: t('dashboard.uptime'), value: formatUptime(node.uptime) },
         ...(isRemote && remoteAddress ? [{ label: t('node.address'), value: remoteAddress, mono: true }] : []),
       ],
