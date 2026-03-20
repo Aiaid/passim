@@ -95,8 +95,8 @@ func TestSSEEventParsing(t *testing.T) {
 				return
 			}
 
-			// Emit metrics event
-			metricsData := `{"cpu_percent":45.2,"memory_percent":72.1,"disk_percent":55.0,"containers":{"running":3,"total":5}}`
+			// Emit metrics event (matches metrics.SystemMetrics JSON format)
+			metricsData := `{"cpu_percent":45.2,"mem_percent":72.1,"disk_percent":55.0}`
 			fmt.Fprintf(w, "event: metrics\ndata: %s\n\n", metricsData)
 			flusher.Flush()
 
@@ -195,11 +195,14 @@ func TestSSEEventParsing(t *testing.T) {
 	if metrics.DiskPercent != 55.0 {
 		t.Errorf("disk_percent = %f, want 55.0", metrics.DiskPercent)
 	}
-	if metrics.Containers.Running != 3 {
-		t.Errorf("containers.running = %d, want 3", metrics.Containers.Running)
+
+	// Container counts are computed in buildNodeInfo from the containers list
+	nodeInfo := hub.buildNodeInfo(rc)
+	if nodeInfo.Metrics.Containers.Running != 1 {
+		t.Errorf("containers.running = %d, want 1", nodeInfo.Metrics.Containers.Running)
 	}
-	if metrics.Containers.Total != 5 {
-		t.Errorf("containers.total = %d, want 5", metrics.Containers.Total)
+	if nodeInfo.Metrics.Containers.Total != 2 {
+		t.Errorf("containers.total = %d, want 2", nodeInfo.Metrics.Containers.Total)
 	}
 
 	// Verify cached containers

@@ -395,6 +395,15 @@ func (h *Hub) buildNodeInfo(rc *RemoteConn) *NodeInfo {
 
 	if rc.metrics != nil {
 		m := *rc.metrics
+		// Compute container counts from the containers list
+		if rc.containers != nil {
+			m.Containers.Total = len(rc.containers)
+			for _, c := range rc.containers {
+				if c.State == "running" {
+					m.Containers.Running++
+				}
+			}
+		}
 		info.Metrics = &m
 	}
 
