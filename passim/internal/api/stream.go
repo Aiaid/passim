@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -115,40 +116,60 @@ func unifiedStreamHandler(deps Deps) gin.HandlerFunc {
 			}
 		}()
 
-		// Goroutine: Containers (10s)
+		// Goroutine: Containers (10s + immediate on refresh signal)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			ticker := time.NewTicker(10 * time.Second)
 			defer ticker.Stop()
+
+			var refreshCh <-chan sse.Event
+			var refreshSub *sse.Subscriber
+			if deps.SSE != nil {
+				refreshSub = deps.SSE.Subscribe("_:containers")
+				refreshCh = refreshSub.Chan()
+				defer deps.SSE.Unsubscribe(refreshSub)
+			}
+
 			for {
 				select {
 				case <-done:
 					return
 				case <-ticker.C:
-					data := collectContainersJSON(ctx, deps)
-					if data != nil {
-						writeEvent(sse.Event{Type: "containers", Data: string(data)})
-					}
+				case <-refreshCh:
+				}
+				data := collectContainersJSON(ctx, deps)
+				if data != nil {
+					writeEvent(sse.Event{Type: "containers", Data: string(data)})
 				}
 			}
 		}()
 
-		// Goroutine: Apps (15s)
+		// Goroutine: Apps (15s + immediate on refresh signal)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			ticker := time.NewTicker(15 * time.Second)
 			defer ticker.Stop()
+
+			var refreshCh <-chan sse.Event
+			var refreshSub *sse.Subscriber
+			if deps.SSE != nil {
+				refreshSub = deps.SSE.Subscribe("_:apps")
+				refreshCh = refreshSub.Chan()
+				defer deps.SSE.Unsubscribe(refreshSub)
+			}
+
 			for {
 				select {
 				case <-done:
 					return
 				case <-ticker.C:
-					data := collectAppsJSON(deps.DB)
-					if data != nil {
-						writeEvent(sse.Event{Type: "apps", Data: string(data)})
-					}
+				case <-refreshCh:
+				}
+				data := collectAppsJSON(deps.DB)
+				if data != nil {
+					writeEvent(sse.Event{Type: "apps", Data: string(data)})
 				}
 			}
 		}()
@@ -196,6 +217,10 @@ func unifiedStreamHandler(deps Deps) gin.HandlerFunc {
 					case event, ok := <-brokerSub.Chan():
 						if !ok {
 							return
+						}
+						// Skip internal refresh signals (handled by dedicated goroutines)
+						if strings.HasPrefix(event.Topic, "_:") {
+							continue
 						}
 						// Forward broker events: use topic as SSE event name,
 						// wrap original type + data in the payload.

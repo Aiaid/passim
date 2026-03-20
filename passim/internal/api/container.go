@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/gin-gonic/gin"
+	"github.com/passim/passim/internal/sse"
 )
 
 func requireDocker(deps Deps, c *gin.Context) bool {
@@ -16,6 +17,16 @@ func requireDocker(deps Deps, c *gin.Context) bool {
 		return false
 	}
 	return true
+}
+
+// notifyRefresh sends a refresh signal to trigger immediate SSE updates.
+func notifyRefresh(deps Deps, topics ...string) {
+	if deps.SSE == nil {
+		return
+	}
+	for _, topic := range topics {
+		deps.SSE.Publish(sse.Event{Topic: topic})
+	}
 }
 
 func listContainersHandler(deps Deps) gin.HandlerFunc {
@@ -46,6 +57,7 @@ func startContainerHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		notifyRefresh(deps, "_:containers")
 		c.JSON(http.StatusOK, gin.H{"status": "started"})
 	}
 }
@@ -62,6 +74,7 @@ func stopContainerHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		notifyRefresh(deps, "_:containers")
 		c.JSON(http.StatusOK, gin.H{"status": "stopped"})
 	}
 }
@@ -78,6 +91,7 @@ func restartContainerHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		notifyRefresh(deps, "_:containers")
 		c.JSON(http.StatusOK, gin.H{"status": "restarted"})
 	}
 }
@@ -94,6 +108,7 @@ func removeContainerHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		notifyRefresh(deps, "_:containers")
 		c.JSON(http.StatusOK, gin.H{"status": "removed"})
 	}
 }

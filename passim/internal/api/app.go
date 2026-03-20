@@ -219,6 +219,7 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		notifyRefresh(deps, "_:apps", "_:containers")
 		c.JSON(http.StatusCreated, appResponse{
 			ID:          appID,
 			Template:    t.Name,
@@ -349,6 +350,7 @@ func deleteAppHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		notifyRefresh(deps, "_:apps", "_:containers")
 		c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 	}
 }
@@ -502,6 +504,7 @@ func updateAppHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		_ = db.UpdateApp(deps.DB, id, "running", result.ContainerID)
+		notifyRefresh(deps, "_:apps", "_:containers")
 
 		updated, _ := db.GetApp(deps.DB, id)
 		var settings map[string]interface{}

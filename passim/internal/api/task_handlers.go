@@ -62,6 +62,7 @@ func makeDeployHandler(deps Deps) task.TaskHandler {
 		publishEvent(deps.SSE, "task:"+t.ID, "status", `{"status":"completed"}`)
 		publishEvent(deps.SSE, "app:"+appID, "deploy", `{"status":"running"}`)
 		publishEvent(deps.SSE, "app:"+appID, "progress", `{"status":"running","progress":100}`)
+		notifyRefresh(deps, "_:apps", "_:containers")
 
 		return nil
 	}
@@ -88,6 +89,7 @@ func makeUndeployHandler(deps Deps) task.TaskHandler {
 
 		publishEvent(deps.SSE, "task:"+t.ID, "status", `{"status":"completed"}`)
 		publishEvent(deps.SSE, "app:"+payload.AppID, "deploy", `{"status":"deleted"}`)
+		notifyRefresh(deps, "_:apps", "_:containers")
 
 		return nil
 	}
