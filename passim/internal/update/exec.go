@@ -26,8 +26,14 @@ func ExecSwitch(ctx context.Context, dockerClient docker.DockerClient, targetID,
 		return fmt.Errorf("stop old container: %w", err)
 	}
 
-	// Rename old container so we can reuse the name
+	// Rename old container so we can reuse the name.
+	// Remove any leftover "-old" container from a previous update first.
 	oldName := name + "-old"
+	if existing, inspErr := dockerClient.InspectContainer(ctx, oldName); inspErr == nil {
+		log.Printf("update-exec: removing leftover %s (%s)", oldName, existing.ID[:12])
+		dockerClient.StopContainer(ctx, existing.ID)
+		dockerClient.RemoveContainer(ctx, existing.ID)
+	}
 	log.Printf("update-exec: renaming %s → %s", name, oldName)
 	if err := dockerClient.RenameContainer(ctx, targetID, oldName); err != nil {
 		// Try to restart old container if rename fails
