@@ -88,7 +88,7 @@ func ExecSwitch(ctx context.Context, dockerClient docker.DockerClient, targetID,
 		healthTarget = name // fallback to name (works on user-defined networks)
 	}
 	log.Printf("update-exec: health checking new container %s (ip=%s)", newID, healthTarget)
-	if err := waitForHealthy(ctx, healthTarget, 60*time.Second); err != nil {
+	if err := waitForHealthy(ctx, healthTarget, 180*time.Second); err != nil {
 		log.Printf("update-exec: health check failed, rolling back: %v", err)
 		// Stop and remove the unhealthy new container
 		dockerClient.StopContainer(ctx, newID)
@@ -144,6 +144,7 @@ func waitForHealthy(ctx context.Context, host string, timeout time.Duration) err
 		default:
 		}
 
+		var lastErr string
 		for _, url := range urls {
 			resp, err := client.Get(url)
 			if err == nil {
@@ -151,8 +152,12 @@ func waitForHealthy(ctx context.Context, host string, timeout time.Duration) err
 				if resp.StatusCode == http.StatusOK {
 					return nil
 				}
+				lastErr = fmt.Sprintf("%s returned %d", url, resp.StatusCode)
+			} else {
+				lastErr = fmt.Sprintf("%s: %v", url, err)
 			}
 		}
+		log.Printf("update-exec: health check attempt: %s", lastErr)
 
 		time.Sleep(2 * time.Second)
 	}
