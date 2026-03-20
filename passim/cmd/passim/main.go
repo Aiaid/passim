@@ -106,16 +106,31 @@ func main() {
 		}
 	}
 
+	// Eagerly initialise the ACME HTTP-01 challenge handler so that
+	// autocert.Manager.tryHTTP01 is true before any GetCertificate call.
+	// The returned handler is reused by the port-80 HTTP server below.
+	var acmeHandler http.Handler
+	if sslMgr != nil {
+		acmeHandler = sslMgr.HTTPChallengeHandler()
+	}
+
 	// Export SSL cert to shared directory for child containers
 	if sslMgr != nil {
-		if _, err := sslMgr.ExportToShared(); err != nil {
-			log.Printf("warning: SSL cert export: %v (will retry after server starts)", err)
+		if sslMgr.GetMode() != "auto" {
+			// self-signed / custom: cert is available immediately.
+			if _, err := sslMgr.ExportToShared(); err != nil {
+				log.Printf("warning: SSL cert export: %v", err)
+			}
 		}
 		// Periodic re-export (catches autocert lazy init + renewals)
 		go func() {
-			// Retry soon after startup — autocert obtains cert on first TLS handshake
+			// Wait for the HTTPS + HTTP-01 servers to start so that the
+			// ACME HTTP-01 challenge can be served on port 80.
 			time.Sleep(15 * time.Second)
-			if changed, err := sslMgr.ExportToShared(); err == nil && changed && dockerClient != nil {
+			changed, err := sslMgr.ExportToShared()
+			if err != nil {
+				log.Printf("warning: SSL cert export: %v", err)
+			} else if changed && dockerClient != nil {
 				restartTLSApps(database, dockerClient, dataDir)
 			}
 
@@ -268,9 +283,8 @@ func main() {
 	}()
 
 	// HTTP server on port 80: ACME challenges + health check + redirect to HTTPS (skip in dev mode)
-	if sslMode != "off" {
+	if sslMode != "off" && acmeHandler != nil {
 		go func() {
-			acmeHandler := sslMgr.HTTPChallengeHandler()
 			mux := http.NewServeMux()
 			mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
