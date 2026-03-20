@@ -140,6 +140,28 @@ func shareConfigHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		resp := buildShareResponse(resolved, t)
+
+		// For url-type configs, include aggregated remote node URLs
+		if clientsDef.Type == "url" {
+			for _, rc := range fetchRemoteConfigs(c.Request.Context(), deps, app.Template) {
+				if rc.Type != "url" || len(rc.URLs) == 0 {
+					continue
+				}
+				g := shareRemoteGroup{
+					NodeName:    rc.NodeName,
+					NodeCountry: rc.NodeCountry,
+				}
+				for _, u := range rc.URLs {
+					g.URLs = append(g.URLs, clientConfigURL{
+						Name:   u.Name,
+						Scheme: u.URI,
+						QR:     u.QR,
+					})
+				}
+				resp.RemoteGroups = append(resp.RemoteGroups, g)
+			}
+		}
+
 		c.JSON(http.StatusOK, resp)
 	}
 }
@@ -166,6 +188,7 @@ func shareSubscribeHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		resolved.NodeName = localNodeName(deps)
 		configs := []clientcfg.ResolvedConfig{*resolved}
 		// Aggregate configs from remote nodes running the same template
 		configs = append(configs, fetchRemoteConfigs(c.Request.Context(), deps, app.Template)...)
@@ -250,15 +273,22 @@ func loadShareContext(deps Deps, c *gin.Context, token string) (*db.ShareToken, 
 	return st, app, t, true
 }
 
+type shareRemoteGroup struct {
+	NodeName    string            `json:"node_name"`
+	NodeCountry string           `json:"node_country,omitempty"`
+	URLs        []clientConfigURL `json:"urls"`
+}
+
 type shareResponse struct {
-	Type        string                 `json:"type"`
-	QR          bool                   `json:"qr,omitempty"`
-	Files       []clientConfigFile     `json:"files,omitempty"`
-	Fields      []clientConfigField    `json:"fields,omitempty"`
-	URLs        []clientConfigURL      `json:"urls,omitempty"`
-	ImportURLs  map[string]string      `json:"import_urls,omitempty"`
-	Guide       interface{}            `json:"guide,omitempty"`
-	Limitations []string               `json:"limitations,omitempty"`
+	Type         string              `json:"type"`
+	QR           bool                `json:"qr,omitempty"`
+	Files        []clientConfigFile  `json:"files,omitempty"`
+	Fields       []clientConfigField `json:"fields,omitempty"`
+	URLs         []clientConfigURL   `json:"urls,omitempty"`
+	ImportURLs   map[string]string   `json:"import_urls,omitempty"`
+	RemoteGroups []shareRemoteGroup  `json:"remote_groups,omitempty"`
+	Guide        interface{}         `json:"guide,omitempty"`
+	Limitations  []string            `json:"limitations,omitempty"`
 }
 
 func buildShareResponse(resolved *clientcfg.ResolvedConfig, t *tmpl.Template) shareResponse {

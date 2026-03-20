@@ -215,42 +215,54 @@ function ShareCredentials({ config }: { config: ShareConfigResponse }) {
 
 // ─── URLs ────────────────────────────────────────────────
 
+function countryFlag(code: string): string {
+  return [...code.toUpperCase()]
+    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
+}
+
 function ShareURLs({ token, config }: { token: string; config: ShareConfigResponse }) {
   const [qrURI, setQrURI] = useState<string | null>(null);
   const subscribeURL = `${window.location.origin}/api/s/${token}/subscribe`;
+  const totalNodes = 1 + (config.remote_groups?.length ?? 0);
 
   return (
     <>
       {/* URIs */}
       <div className="share-card space-y-4">
+        {/* Local node URIs */}
         {config.urls?.map((url) => (
-          <div key={url.name}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {url.name}
+          <ShareURIEntry key={url.scheme} url={url} onQR={setQrURI} />
+        ))}
+
+        {/* Remote node URIs */}
+        {config.remote_groups?.map((group) => (
+          <div key={group.node_name}>
+            <div className="flex items-center gap-1.5 mb-2 pt-2 border-t border-border/30">
+              {group.node_country && <span className="text-xs">{countryFlag(group.node_country)}</span>}
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+                {group.node_name}
               </span>
-              <div className="flex items-center gap-0.5">
-                <CopyButton text={url.scheme} />
-                {url.qr && (
-                  <Button variant="ghost" size="icon" className="size-7" onClick={() => setQrURI(url.scheme)}>
-                    <QrCode className="size-3.5" />
-                  </Button>
-                )}
-              </div>
             </div>
-            <div className="cfg-terminal">
-              <span className="cfg-terminal-prompt">$</span>
-              {url.scheme}
-            </div>
+            {group.urls.map((url) => (
+              <ShareURIEntry key={url.scheme} url={url} onQR={setQrURI} />
+            ))}
           </div>
         ))}
 
         {/* Subscription */}
         <div className="pt-3 border-t border-border/50">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Subscription
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Subscription
+              </span>
+              {totalNodes > 1 && (
+                <span className="text-[10px] font-semibold text-muted-foreground/60">
+                  {totalNodes} nodes
+                </span>
+              )}
+            </div>
             <CopyButton text={subscribeURL} />
           </div>
           <p className="text-xs font-mono text-foreground/70 break-all mt-1.5">{subscribeURL}</p>
@@ -278,6 +290,30 @@ function ShareURLs({ token, config }: { token: string; config: ShareConfigRespon
         value={qrURI}
       />
     </>
+  );
+}
+
+function ShareURIEntry({ url, onQR }: { url: { name: string; scheme: string; qr?: boolean }; onQR: (uri: string) => void }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          {url.name}
+        </span>
+        <div className="flex items-center gap-0.5">
+          <CopyButton text={url.scheme} />
+          {url.qr && (
+            <Button variant="ghost" size="icon" className="size-7" onClick={() => onQR(url.scheme)}>
+              <QrCode className="size-3.5" />
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className="cfg-terminal">
+        <span className="cfg-terminal-prompt">$</span>
+        {url.scheme}
+      </div>
+    </div>
   );
 }
 

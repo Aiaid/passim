@@ -107,9 +107,12 @@ func parseHysteria2URI(uri, fallbackName string) (ClashProxy, error) {
 		fmt.Sscanf(p, "%d", &port)
 	}
 
-	name := fallbackName
-	if u.Fragment != "" {
-		name = u.Fragment
+	name := u.Fragment
+	if fallbackName != "" {
+		name = fallbackName
+	}
+	if name == "" {
+		name = host
 	}
 
 	insecure := u.Query().Get("insecure") == "1"
@@ -140,9 +143,12 @@ func parseVMessURI(uri, fallbackName string) (ClashProxy, error) {
 		fmt.Sscanf(p, "%d", &port)
 	}
 
-	name := fallbackName
-	if u.Fragment != "" {
-		name = u.Fragment
+	name := u.Fragment
+	if fallbackName != "" {
+		name = fallbackName
+	}
+	if name == "" {
+		name = host
 	}
 
 	alterID := 0

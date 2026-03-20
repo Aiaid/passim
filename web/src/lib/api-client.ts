@@ -281,6 +281,7 @@ export interface ShareConfigResponse {
   fields?: { key: string; label: Record<string, string>; value: string; secret?: boolean }[];
   urls?: { name: string; scheme: string; qr?: boolean }[];
   import_urls?: Record<string, string>;
+  remote_groups?: { node_name: string; node_country?: string; urls: { name: string; scheme: string; qr?: boolean }[] }[];
   guide?: TemplateGuide;
   limitations?: string[];
 }

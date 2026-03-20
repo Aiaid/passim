@@ -172,6 +172,8 @@ func appSubscribeHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		resolved.NodeName = localNodeName(deps)
+		resolved.NodeCountry = nodeCtx.Country
 		configs := []clientcfg.ResolvedConfig{*resolved}
 
 		// Aggregate configs from remote nodes running the same template
@@ -186,6 +188,20 @@ func appSubscribeHandler(deps Deps) gin.HandlerFunc {
 		c.Header("Content-Disposition", "inline; filename=\"subscribe.yaml\"")
 		c.Data(http.StatusOK, "text/yaml; charset=utf-8", yaml)
 	}
+}
+
+// localNodeName returns the configured node name, falling back to the country
+// code or the OS hostname.
+func localNodeName(deps Deps) string {
+	if name, _ := db.GetConfig(deps.DB, "node_name"); name != "" {
+		return name
+	}
+	geoOnce.Do(discoverGeo)
+	if _, _, cc, _, _ := readGeo(); cc != "" {
+		return cc
+	}
+	h, _ := os.Hostname()
+	return h
 }
 
 // computeSubscribeURL returns the best subscribe URL for an app.

@@ -82,13 +82,14 @@ func TestGenerateClashYAMLSkipsNonURL(t *testing.T) {
 }
 
 func TestParseHysteria2URI(t *testing.T) {
+	// fallbackName (NodeName) takes priority over URI fragment
 	proxy, err := parseHysteria2URI("hysteria2://mypass@example.com:8443/?insecure=1&sni=example.com#my-node", "fallback")
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
 
-	if proxy.Name != "my-node" {
-		t.Errorf("Name = %q, want my-node", proxy.Name)
+	if proxy.Name != "fallback" {
+		t.Errorf("Name = %q, want fallback (fallbackName should override fragment)", proxy.Name)
 	}
 	if proxy.Type != "hysteria2" {
 		t.Errorf("Type = %q, want hysteria2", proxy.Type)
@@ -110,14 +111,37 @@ func TestParseHysteria2URI(t *testing.T) {
 	}
 }
 
+func TestParseHysteria2URI_NoFallback(t *testing.T) {
+	// When fallbackName is empty, use URI fragment
+	proxy, err := parseHysteria2URI("hysteria2://mypass@example.com:8443/?insecure=1#my-node", "")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if proxy.Name != "my-node" {
+		t.Errorf("Name = %q, want my-node (should use fragment when no fallback)", proxy.Name)
+	}
+}
+
+func TestParseHysteria2URI_NoFallbackNoFragment(t *testing.T) {
+	// When both are empty, use host
+	proxy, err := parseHysteria2URI("hysteria2://mypass@example.com:8443/?insecure=1", "")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if proxy.Name != "example.com" {
+		t.Errorf("Name = %q, want example.com (should use host as last resort)", proxy.Name)
+	}
+}
+
 func TestParseVMessURI(t *testing.T) {
+	// fallbackName takes priority over URI fragment
 	proxy, err := parseVMessURI("vmess://550e8400-e29b-41d4-a716-446655440000@10.0.0.1:10086?alterId=0#v2ray-node", "fallback")
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
 
-	if proxy.Name != "v2ray-node" {
-		t.Errorf("Name = %q", proxy.Name)
+	if proxy.Name != "fallback" {
+		t.Errorf("Name = %q, want fallback", proxy.Name)
 	}
 	if proxy.Type != "vmess" {
 		t.Errorf("Type = %q", proxy.Type)
