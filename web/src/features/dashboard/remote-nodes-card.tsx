@@ -23,6 +23,21 @@ interface SpeedResult {
   jitter: number;
 }
 
+function MetricBar({ value, color }: { value: number; color: string }) {
+  const clamped = Math.min(Math.max(value, 0), 100);
+  return (
+    <div className="h-1 w-full rounded-full bg-muted/50 overflow-hidden">
+      <div
+        className="h-full rounded-full transition-all duration-500"
+        style={{
+          width: `${clamped}%`,
+          backgroundColor: clamped >= 90 ? 'oklch(0.577 0.245 27)' : clamped >= 75 ? 'oklch(0.75 0.18 60)' : color,
+        }}
+      />
+    </div>
+  );
+}
+
 function NodeRow({ node, onClick }: { node: RemoteNode; onClick?: () => void }) {
   const isConnected = node.status === 'connected';
   const [testing, setTesting] = useState(false);
@@ -46,6 +61,8 @@ function NodeRow({ node, onClick }: { node: RemoteNode; onClick?: () => void }) 
     }
   };
 
+  const m = node.metrics;
+
   return (
     <div className="rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50">
       <div
@@ -63,11 +80,6 @@ function NodeRow({ node, onClick }: { node: RemoteNode; onClick?: () => void }) 
           {node.name || node.address}
         </span>
         {node.country && <span className="text-sm">{countryFlag(node.country)}</span>}
-        {isConnected && node.metrics && (
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {node.metrics.cpu_percent.toFixed(0)}%
-          </span>
-        )}
         {isConnected && (
           <Button
             variant="ghost"
@@ -84,6 +96,26 @@ function NodeRow({ node, onClick }: { node: RemoteNode; onClick?: () => void }) 
           </Button>
         )}
       </div>
+      {/* Metrics bars */}
+      {isConnected && m && (
+        <div className="mt-1.5 pl-[18px] space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground w-6 shrink-0">CPU</span>
+            <MetricBar value={m.cpu_percent} color="var(--color-chart-1)" />
+            <span className="text-[10px] text-muted-foreground tabular-nums w-7 text-right">{m.cpu_percent.toFixed(0)}%</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground w-6 shrink-0">MEM</span>
+            <MetricBar value={m.memory_percent} color="var(--color-chart-2)" />
+            <span className="text-[10px] text-muted-foreground tabular-nums w-7 text-right">{m.memory_percent.toFixed(0)}%</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground w-6 shrink-0">DISK</span>
+            <MetricBar value={m.disk_percent} color="var(--color-chart-4)" />
+            <span className="text-[10px] text-muted-foreground tabular-nums w-7 text-right">{m.disk_percent.toFixed(0)}%</span>
+          </div>
+        </div>
+      )}
       {result && (
         <div className="flex items-center gap-3 mt-1 pl-[18px] text-[10px] text-muted-foreground tabular-nums">
           <span>↓ {result.download.toFixed(0)} Mbps</span>

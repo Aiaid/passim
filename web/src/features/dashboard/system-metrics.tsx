@@ -85,9 +85,9 @@ function GaugeCard({ label, percent, detail, icon: Icon, color }: GaugeCardProps
 
 export function SystemMetrics() {
   const { t } = useTranslation();
-  const { metrics: latest, isConnected } = useEventStream();
+  const { metrics: latest } = useEventStream();
 
-  if (!isConnected || !latest) {
+  if (!latest) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
