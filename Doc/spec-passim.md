@@ -207,6 +207,8 @@ data: {"type":"deploy","data":{"status":"running"}}
 ```
 
 > 后端使用 `http.ResponseController` 禁用 SSE 连接的 WriteDeadline。metrics 收集在独立 goroutine 中运行（~1s 阻塞不影响其他事件推送）。status 事件复用 metrics 缓存避免重复采集。
+>
+> **即时刷新**: 容器/应用操作 (start/stop/restart/deploy/undeploy) 完成后，后端立即触发一次全量推送 (containers + apps 事件)，不等待定时周期。确保 UI 在操作后即时反映最新状态。
 
 #### `GET /api/metrics/stream` (SSE, legacy) ✅ Phase 1
 
@@ -422,7 +424,7 @@ data: {"status":"running"}
 
 #### `GET /api/apps/:id/subscribe`
 
-生成 Clash/Stash 兼容的订阅 YAML（仅 `url` 类型）。聚合本地及远程节点的同模板应用。
+生成 Clash/Stash 兼容的订阅 YAML（仅 `url` 类型）。自动聚合本地及所有已连接远程节点部署的同模板应用，节点名称作为代理名前缀（如 `tokyo-1`、`singapore-2`）。
 
 > **认证与订阅 URL**：此端点需要 JWT 认证。对于外部客户端（Clash/Stash/Shadowrocket），应优先使用 share token 路径 `/api/s/:token/subscribe`（永久、无需认证）。前端在展示订阅 URL 时，如果 app 已有 share token，自动使用 share 路径；否则回退到带 `?token=<jwt>` 的认证路径。
 >
@@ -607,7 +609,9 @@ auto 模式触发证书续期（删除缓存强制重签），其他模式返回
 }
 ```
 
-添加后自动建立 WebSocket 连接，连接成功后 status → `connected`。
+添加后自动建立 SSE 连接（订阅远程节点的 `/api/stream`），连接成功后 status → `connected`。
+
+> **注**: 实际实现采用 SSE + REST 代理替代了原计划的 WebSocket。Hub 订阅远程节点的 `/api/stream` SSE 获取实时数据（metrics/status/containers/apps），操作通过 `ProxyRequest` 转发 REST API。
 
 #### `GET /api/nodes`
 
@@ -631,7 +635,19 @@ auto 模式触发证书续期（删除缓存强制重签），其他模式返回
 
 #### `GET /api/nodes/:id/status|containers|apps|...`
 
-通过 WebSocket 代理请求到远程节点，返回格式与本地 API 一致。
+通过 REST 代理请求到远程节点，返回格式与本地 API 一致。
+
+#### 远程容器管理 ✅ Phase 4
+
+```
+POST   /api/nodes/:id/containers/:name/start
+POST   /api/nodes/:id/containers/:name/stop
+POST   /api/nodes/:id/containers/:name/restart
+DELETE /api/nodes/:id/containers/:name
+GET    /api/nodes/:id/containers/:name/logs
+```
+
+通过 ProxyRequest 转发到远程节点的本地容器 API。
 
 #### `POST /api/nodes/:id/apps` (远程部署)
 
@@ -639,7 +655,15 @@ auto 模式触发证书续期（删除缓存强制重签），其他模式返回
 { "template": "wireguard", "settings": { "peers": 3 } }
 ```
 
-通过 WebSocket 发送部署任务到远程节点，进度通过 SSE 推送。
+通过 REST 代理发送部署任务到远程节点，进度通过 SSE 推送。
+
+#### `POST /api/nodes/:id/update` (远程更新) ✅ Phase 4
+
+```json
+{ "version": "v1.3.0" }
+```
+
+通过 Hub 触发远程节点自我更新。Hub 代理到远程节点的 `POST /api/update`。响应包含远程更新状态。远程节点版本信息通过 SSE status 事件的 `node.version` 字段实时追踪。
 
 #### 批量部署
 

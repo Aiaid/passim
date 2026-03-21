@@ -407,8 +407,14 @@ passim/
 └── go.sum
 
 .github/workflows/
-├── ci.yml                           # CI: Go test + 前端 lint/test + Docker build
+├── ci.yml                           # CI: 路径过滤 + Go test + 前端 lint/test + Docker build
 └── release.yml                      # CD: v* tag → 多架构镜像 + GitHub Release
+
+site/                                # 营销落地页 (独立部署，不嵌入 Passim)
+├── src/app/[locale]/                # Next.js 15 App Router + i18n
+├── src/components/                  # Hero, Features, Comparison, TechStack, etc.
+├── messages/                        # en.json, zh.json
+└── package.json                     # next + next-intl + motion + tailwindcss v4
 ```
 
 ### 应用模板 (不变)
@@ -861,19 +867,31 @@ Phase 2 完成后的密集打磨期（~30 commits），包含重大 UI 重设计
 - [ ] MongoDB → SQLite 数据迁移脚本
 - [ ] 旧 Passim → 新 Passim 替换脚本
 - [x] 版本基础设施 (`internal/version` + ldflags 注入 + `GET /api/version` + `--version` flag)
-- [x] CI 流水线 (`.github/workflows/ci.yml` — Go test + 前端 lint/test + Docker build)
+- [x] CI 流水线 (`.github/workflows/ci.yml` — Go test + 前端 lint/test + Docker build，`dorny/paths-filter` 按路径触发)
 - [x] Release 流水线 (`.github/workflows/release.yml` — 多架构 Docker 镜像 + GitHub Release)
 - [x] 自我更新机制 (`internal/update` — 版本检查 + 镜像拉取 + helper 容器切换 + 回滚)
+  - [x] 更新成功/回滚 toast 通知
+  - [x] TLS 健康检查修复 + 超时增至 180s + 诊断日志
+  - [x] 自动清理残留 passim-old / stale updater 容器
+- [x] 远程节点容器管理 (从 hub UI start/stop/restart/remove 远程容器 + "Open UI" 按钮跳转远程节点面板)
+- [x] 远程节点版本追踪 + 通过 hub 触发远程更新 (含 dev 强制更新按钮)
+- [x] 远程节点指标条 (NodeCard 显示 CPU/MEM 小条)
+- [x] 应用商店隐藏已部署模板 (marketplace 只显示未部署的模板)
+- [x] SSE 即时刷新 (容器/应用操作后立即触发 SSE 推送，不等定时周期)
+- [x] SSE 重连骨架屏闪烁修复 (断线重连不再 flash skeleton)
+- [x] 订阅聚合 (跨节点聚合所有远程节点 VPN 配置到单一订阅 URL，节点名称作为代理名前缀)
+- [x] 分享页面 (`/share/:token` 公开页面，显示配置/二维码/订阅链接)
 - [x] 模板驱动客户端配置导出 (`clients` 三种类型: file_per_user/credentials/url + 解析引擎 + API + 前端)
 - [x] 分享机制 (share token 创建/撤销 + 公开访问端点 `/api/s/:token`)
 - [x] Clash/Stash 订阅生成 (`/api/apps/:id/subscribe` + URI 解析 + 跨节点聚合)
 - [x] 配置 ZIP 打包下载 (支持多节点国旗前缀)
 - [x] 模板 YAML 迁移 (7 个模板: clients + share + guide.platforms)
 - [x] 容器 Web 终端 (WebSocket + xterm.js，交互式 shell 到运行中容器)
+- [x] 一键安装脚本 (`install.sh` — 自动装 Docker + DNS 反射器 HTTPS，无需域名)
+- [x] 营销落地页 (`site/` — Next.js 15 + next-intl 中英双语)
 - [ ] 容器日志 (Sheet + 实时尾随 + 搜索)
 - [ ] 监控历史图表 (最近 1h/6h/24h)
 - [ ] 性能优化 + 安全审查
-- [x] 一键安装脚本 (`install.sh` — 自动装 Docker + DNS 反射器 HTTPS，无需域名)
 - [ ] 文档
 
 **交付物**: 可从旧系统迁移的生产版本

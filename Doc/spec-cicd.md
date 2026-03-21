@@ -102,6 +102,8 @@ main ─────●────●────●────●────
 
 **触发条件**: push 到 `main`、所有 PR
 
+**路径过滤**: 使用 `dorny/paths-filter` 实现 monorepo 按路径触发，只有相关代码变动时才运行对应 job。修改 `Doc/`、`DNS/`、`_legacy/` 等目录不会触发任何 CI job。
+
 ```yaml
 name: CI
 
@@ -112,8 +114,27 @@ on:
     branches: [main]
 
 jobs:
-  # ── Go 后端测试 ──────────────────────────────────────
+  # ── 路径变动检测 ────────────────────────────────────
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'passim/**'
+            frontend:
+              - 'web/**'
+
+  # ── Go 后端测试 (仅 passim/** 变动时) ────────────────
   go-test:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -131,8 +152,10 @@ jobs:
       - name: Integration tests
         run: go test -tags=integration -race ./...
 
-  # ── 前端测试 ─────────────────────────────────────────
+  # ── 前端测试 (仅 web/** 变动时) ─────────────────────
   web-test:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -156,19 +179,30 @@ jobs:
       - name: Unit tests
         run: pnpm vitest run
 
-  # ── Docker 构建测试 ──────────────────────────────────
+  # ── Docker 构建 (前端或后端变动时) ───────────────────
   docker-build:
     runs-on: ubuntu-latest
-    needs: [go-test, web-test]
+    needs: [changes, go-test, web-test]
+    if: |
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled') &&
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true')
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Build (no push)
+      - name: Build and push dev image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: passim/Dockerfile
-          push: false
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/aiaid/passim:dev
+            ghcr.io/aiaid/passim:dev-${{ github.sha }}
+          build-args: |
+            VERSION=dev-${{ github.sha }}
+            COMMIT=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 ```

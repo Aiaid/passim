@@ -94,6 +94,14 @@ web/src/
 │   │   ├── deploy-wizard-page.tsx
 │   │   ├── dynamic-form.tsx
 │   │   └── deploy-progress.tsx
+│   ├── nodes/                            # 远程节点管理
+│   │   ├── nodes-page.tsx                # 节点列表页
+│   │   ├── node-detail-page.tsx          # 节点详情 (Overview/Containers/Apps tabs)
+│   │   ├── node-card.tsx                 # 节点卡片 (国旗/CPU·MEM 条/状态动画)
+│   │   ├── add-node-dialog.tsx           # 添加远程节点弹窗
+│   │   └── queries.ts                    # 节点相关查询和 mutations
+│   ├── share/                            # 公开分享页
+│   │   └── share-page.tsx                # /share/:token 公开页面 (配置/二维码/订阅链接)
 │   ├── speedtest/                        # 网络测速
 │   │   ├── speed-test.tsx                # 测速 UI (下载/上传/延迟/抖动)
 │   │   └── use-speedtest.ts              # 测速逻辑 hook
@@ -131,6 +139,7 @@ web/src/
 ```tsx
 <Routes>
   <Route path="/login" element={<LoginPage />} />
+  <Route path="/share/:token" element={<SharePage />} />  {/* 公开，无需认证 */}
   <Route element={<AppLayout />}>            {/* 需要认证 (AuthGuard) */}
     <Route path="/" element={<DashboardPage />} />
     <Route path="/containers" element={<ContainersPage />} />
@@ -138,12 +147,14 @@ web/src/
     <Route path="/apps/new" element={<MarketplacePage />} />
     <Route path="/apps/new/:template" element={<DeployWizardPage />} />
     <Route path="/apps/:id" element={<AppDetailPage />} />
+    <Route path="/nodes" element={<NodesPage />} />
+    <Route path="/nodes/:id" element={<NodeDetailPage />} />
     <Route path="/settings" element={<SettingsPage />} />
   </Route>
 </Routes>
 ```
 
-> `/nodes`, `/nodes/:id`, `/storage` 移至 Phase 3+。
+> `/nodes`, `/nodes/:id` 在 Phase 3 实现。`/share/:token` 在 Phase 4 实现。
 > `/apps/new/:template` 为部署向导独立页面。
 
 ---
@@ -168,7 +179,7 @@ web/src/
 └────────────┴─────────────────────────────────────────────────────────────┘
 ```
 
-Header 显示节点信息 (名称/版本/运行时间/公网 IPv4/IPv6+国家/SSL 模式+域名/容器数)。IPv6 截短显示后 4 组，hover 显示完整地址。侧边栏含: Dashboard, Containers, Apps, Settings。远程节点管理 Phase 3 后加入。
+Header 显示节点信息 (名称/版本/运行时间/公网 IPv4/IPv6+国家/SSL 模式+域名/容器数)。IPv6 截短显示后 4 组，hover 显示完整地址。侧边栏含: Dashboard, Containers, Apps, Nodes, Settings。
 
 ### 登录页 `/login`
 
@@ -260,9 +271,30 @@ Header 显示节点信息 (名称/版本/运行时间/公网 IPv4/IPv6+国家/SS
   - Dev 通道: 强制拉取 main 分支最新构建 (`:dev` Docker tag)
   - Dev 版本 (`dev-<sha>`) 显示为"最新发布版"而非"有更新"，用户自行决定是否切换
 
-### 远程节点 — Phase 3
+### 远程节点 `/nodes` — Phase 3 ✅
 
-远程节点详情 (`/nodes/:id`) 与本地管理界面结构一致 (指标 + 容器 + 应用)，但数据来源是远程。应用部署时如果有远程节点，显示 "Deploy to" 选择器。
+节点列表页显示所有已添加的远程节点卡片，每张 `NodeCard` 包含: 国旗 emoji、节点名称、CPU/MEM 迷你进度条、连接状态动画 (connected 脉动绿点 / disconnected 灰点)、版本号。右上角 "Add Node" 按钮打开 `AddNodeDialog`。
+
+节点详情页 (`/nodes/:id`) 三个 Tab:
+- **Overview**: 系统指标 (同 Dashboard 的 gauges) + 版本信息 + "Open UI" 按钮 (跳转远程节点自己的 Web UI) + "Update" 按钮 (通过 hub 触发远程节点更新，含 dev 强制更新)
+- **Containers**: 远程容器列表 (卡片网格) + Sheet 详情面板 (Info/Logs tabs) + 操作 (start/stop/restart/remove)
+- **Apps**: 远程应用列表 + `AppDetailPanel` 侧边面板 (客户端配置/分享)
+
+应用部署时如果有远程节点，部署向导显示 "Deploy to" 目标选择器 (`selectedTargets`)，支持批量部署到多节点。
+
+Dashboard 地球仪上标记所有远程节点位置，`MultiNodePanel` 在 Dashboard 侧栏显示本地 + 远程节点概览。
+
+### 分享页 `/share/:token` — Phase 4 ✅
+
+公开页面 (无需登录)，通过分享 token 访问。显示:
+- 应用名称 + 节点名称
+- 客户端配置 (文件下载 / 凭证 / 订阅链接)
+- 二维码 (配置文件 / 订阅 URL)
+- 跨节点聚合: 如果 hub 连接了多个远程节点部署同一应用，分享页自动聚合所有节点的配置到单一订阅 URL，节点名称作为代理名前缀
+
+### 应用商店增强 — Phase 4 ✅
+
+应用商店 (`/apps/new`) 自动隐藏本地已部署的模板，仅显示未部署的模板供选择。
 
 ---
 
@@ -335,15 +367,28 @@ export const api = {
   removeApp: (id: string) => request('/apps/' + id, { method: 'DELETE' }),
   getAppConfigs: (id: string) => request<{configs: ConfigFile[]}>('/apps/' + id + '/configs'),
 
+  // Client Config & Share
+  getClientConfig: (id: string) => request<ClientConfig>('/apps/' + id + '/client-config'),
+  getClientConfigFile: (id: string, index: number) => /* binary download */,
+  getClientConfigZip: (id: string) => /* binary download */,
+  createShare: (id: string, userIndex?: number) => request('/apps/' + id + '/share', { method: 'POST', body: JSON.stringify({ user_index: userIndex }) }),
+  deleteShare: (id: string) => request('/apps/' + id + '/share', { method: 'DELETE' }),
+
   // Remote Nodes
   getNodes: () => request<{nodes: RemoteNode[]}>('/nodes'),
   addNode: (address: string, apiKey: string, name?: string) => request('/nodes', { method: 'POST', body: JSON.stringify({ address, api_key: apiKey, name }) }),
   removeNode: (id: string) => request('/nodes/' + id, { method: 'DELETE' }),
+  renameNode: (id: string, name: string) => request('/nodes/' + id, { method: 'PATCH', body: JSON.stringify({ name }) }),
   // 远程代理
   getNodeStatus: (id: string) => request<NodeStatus>('/nodes/' + id + '/status'),
   getNodeContainers: (id: string) => request<{containers: Container[]}>('/nodes/' + id + '/containers'),
+  startNodeContainer: (id: string, name: string) => request('/nodes/' + id + '/containers/' + name + '/start', { method: 'POST' }),
+  stopNodeContainer: (id: string, name: string) => request('/nodes/' + id + '/containers/' + name + '/stop', { method: 'POST' }),
+  restartNodeContainer: (id: string, name: string) => request('/nodes/' + id + '/containers/' + name + '/restart', { method: 'POST' }),
+  removeNodeContainer: (id: string, name: string) => request('/nodes/' + id + '/containers/' + name, { method: 'DELETE' }),
   getNodeApps: (id: string) => request<{apps: App[]}>('/nodes/' + id + '/apps'),
   deployNodeApp: (id: string, template: string, settings: Record<string, any>) => request('/nodes/' + id + '/apps', { method: 'POST', body: JSON.stringify({ template, settings }) }),
+  updateNode: (id: string, version: string) => request('/nodes/' + id + '/update', { method: 'POST', body: JSON.stringify({ version }) }),
 
   // Batch
   batchDeploy: (template: string, settings: Record<string, any>, targets: string[]) => request('/batch/deploy', { method: 'POST', body: JSON.stringify({ template, settings, targets }) }),
@@ -371,7 +416,9 @@ useResourceEvents('app:abc-123', (data) => { /* handle */ });
 useResourceEvents('task:xyz-789', (data) => { /* handle */ });
 ```
 
-SSE 数据同时通过 `queryClient.setQueryData()` 写入 React Query 缓存，确保 mutation 的 `invalidateQueries` 仍然生效。断线 3s 后自动重连。
+SSE 数据同时通过 `queryClient.setQueryData()` 写入 React Query 缓存，确保 mutation 的 `invalidateQueries` 仍然生效。断线 3s 后自动重连，重连时不触发骨架屏闪烁 (保留上一次缓存数据)。
+
+容器/应用操作 (start/stop/restart/deploy/undeploy) 完成后，后端立即触发一次 SSE 全量推送，不等待定时周期，确保 UI 即时反映最新状态。
 
 ### 动态表单 `components/app/app-form.tsx`
 

@@ -13,12 +13,12 @@ Full rewrite in progress: legacy multi-component architecture → single Go bina
 | Directory | Description | Status |
 |-----------|-------------|--------|
 | `passim/` | Go backend (Gin + SQLite + Docker SDK) | Active — Phase 4 |
-| `web/` | Vite + React 19 + shadcn/ui frontend | Complete — Phase 2 |
+| `web/` | Vite + React 19 + shadcn/ui embedded frontend | Active — Phase 4 |
+| `site/` | Next.js 15 + next-intl marketing landing page | Active |
 | `.github/` | GitHub Actions CI/CD workflows | Active |
 | `app/` | Expo mobile app (iOS + Android) | Planned — Phase 5 |
 | `DNS/` | Python nserver DNS server (kept as-is) | Maintained |
 | `Doc/` | Design docs, specs, user stories | Active |
-| `_legacy/` | Old code (Web/Passim/Updater/IoC/FIlestash) | Archived |
 
 ## Development Workflow
 
@@ -145,11 +145,12 @@ Public endpoint `GET /api/version` returns version/commit/build_time (no auth). 
 
 ### CI Pipeline (`.github/workflows/ci.yml`)
 
-Triggers on push to `main` and all PRs. Three jobs:
+Triggers on push to `main` and all PRs. Uses `dorny/paths-filter` for monorepo path-based filtering — only runs jobs when relevant files change:
 
-1. **go-test** — `go test -race -cover ./...` + integration tests
-2. **web-test** — `pnpm lint` + `pnpm tsc -b` + `pnpm vitest run`
-3. **docker-build** — Build Dockerfile (no push), depends on jobs 1+2
+1. **changes** — Detects which paths changed (`passim/**` → backend, `web/**` → frontend)
+2. **go-test** — Runs only when `passim/**` changes. `go test -race -cover ./...` + integration tests
+3. **web-test** — Runs only when `web/**` changes. `pnpm lint` + `pnpm tsc -b` + `pnpm vitest run`
+4. **docker-build** — Runs when backend or frontend changes, after tests pass. Builds + pushes dev image on main push
 
 ### Release Pipeline (`.github/workflows/release.yml`)
 
