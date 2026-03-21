@@ -10,6 +10,7 @@ export default function WelcomeScreen() {
       </Text>
 
       <Pressable
+        testID="btn-scan-qr"
         className="w-full bg-primary rounded-2xl py-4 mb-4"
         onPress={() => router.push('/(auth)/scan')}
       >
@@ -19,6 +20,7 @@ export default function WelcomeScreen() {
       </Pressable>
 
       <Pressable
+        testID="btn-manual-entry"
         className="w-full border border-gray-700 rounded-2xl py-4"
         onPress={() => router.push('/(auth)/add-node')}
       >

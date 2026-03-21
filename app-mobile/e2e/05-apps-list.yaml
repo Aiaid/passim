@@ -1,0 +1,26 @@
+# US-10.3: Apps list screen
+# Verifies the Apps tab shows either a list of deployed apps
+# or an empty state, plus the deploy button.
+
+appId: io.passim.app
+env:
+  TEST_HOST: "localhost:8443"
+  TEST_API_KEY: ""
+---
+# Start from a connected dashboard
+- runFlow: helpers/setup-node.yaml
+
+# Navigate to the Apps tab
+- tapOn: "Apps"
+
+# The deploy button should always be visible
+- assertVisible:
+    id: "btn-deploy"
+
+# Either the app list or the empty state should be visible
+- assertVisible:
+    id: "app-list"
+    optional: true
+- assertVisible:
+    id: "apps-empty"
+    optional: true

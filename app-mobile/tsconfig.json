@@ -3,7 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./src/*"],
+      "@/*": ["./*"],
       "@passim/shared": ["../packages/shared/src"],
       "@passim/shared/*": ["../packages/shared/src/*"]
     }

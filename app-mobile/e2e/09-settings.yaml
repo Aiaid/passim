@@ -1,0 +1,59 @@
+# US-10.4: Settings screen verification
+# Verifies that all expected settings sections and items
+# are present on the Settings tab.
+
+appId: io.passim.app
+env:
+  TEST_HOST: "localhost:8443"
+  TEST_API_KEY: ""
+---
+# Start from a connected dashboard
+- runFlow: helpers/setup-node.yaml
+
+# Navigate to the Settings tab
+- tapOn: "Settings"
+
+# General section — visible without scrolling
+- assertVisible:
+    id: "setting-node-name"
+- assertVisible:
+    id: "setting-language"
+- assertVisible:
+    id: "setting-theme"
+
+# Security section
+- assertVisible:
+    id: "switch-app-lock"
+    optional: true
+
+# Scroll down to reveal lower sections
+- scrollUntilVisible:
+    element:
+      id: "setting-ssl"
+    direction: DOWN
+    timeout: 5000
+
+- assertVisible:
+    id: "setting-ssl"
+
+# System section
+- scrollUntilVisible:
+    element:
+      id: "setting-version"
+    direction: DOWN
+    timeout: 5000
+
+- assertVisible:
+    id: "setting-version"
+- assertVisible:
+    id: "btn-check-updates"
+
+# Push notifications toggle
+- scrollUntilVisible:
+    element:
+      id: "switch-push"
+    direction: DOWN
+    timeout: 5000
+
+- assertVisible:
+    id: "switch-push"

@@ -1,38 +1,242 @@
-import { View, Text, ScrollView } from 'react-native';
+import { useCallback, useMemo } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useSSE } from '@/hooks/use-sse';
+import { useStatus } from '@/hooks/use-node';
+import { useApps } from '@/hooks/use-apps';
+import { useNodeStore } from '@/stores/node-store';
+import { MetricRing } from '@/components/MetricRing';
+import { AppCard } from '@/components/AppCard';
+import { EmptyState } from '@/components/EmptyState';
+import { StatusDot } from '@/components/StatusDot';
+import { formatBytes, formatUptime, formatNetworkRate, countryFlag } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n';
+import { router } from 'expo-router';
+import type { AppResponse } from '@passim/shared/types';
 
 export default function DashboardScreen() {
+  const { t } = useTranslation();
+  const { nodes, activeNodeId, setActiveNode, activeNode } = useNodeStore();
+  const { metrics, isConnected } = useSSE();
+  const statusQuery = useStatus();
+  const appsQuery = useApps();
+
+  const status = statusQuery.data;
+  const apps = appsQuery.data;
+
+  // Compute metric values from SSE (primary) or status query (fallback)
+  const cpuPercent = metrics?.cpu_percent ?? status?.system?.cpu?.usage_percent ?? 0;
+  const memUsed = metrics?.mem_used ?? 0;
+  const memTotal = metrics?.mem_total ?? 0;
+  const memPercent = memTotal > 0 ? Math.round((memUsed / memTotal) * 100) : 0;
+  const diskUsed = metrics?.disk_used ?? 0;
+  const diskTotal = metrics?.disk_total ?? 0;
+  const diskPercent = diskTotal > 0 ? Math.round((diskUsed / diskTotal) * 100) : 0;
+  const netSent = metrics?.net_bytes_sent ?? 0;
+  const netRecv = metrics?.net_bytes_recv ?? 0;
+
+  const containersRunning = status?.containers?.running ?? 0;
+  const containersTotal = status?.containers?.total ?? 0;
+
+  const isRefreshing = statusQuery.isRefetching || appsQuery.isRefetching;
+
+  const onRefresh = useCallback(() => {
+    statusQuery.refetch();
+    appsQuery.refetch();
+  }, [statusQuery, appsQuery]);
+
+  const handleAppPress = useCallback((app: AppResponse) => {
+    router.push(`/(tabs)/apps?appId=${app.id}`);
+  }, []);
+
+  const hasMultipleNodes = nodes.length > 1;
+
+  const nodeInfo = useMemo(() => ({
+    name: status?.node?.name ?? activeNode?.name ?? '--',
+    flag: status?.node?.country ? countryFlag(status.node.country) : '',
+    version: status?.node?.version ?? '--',
+    uptime: status?.node?.uptime != null ? formatUptime(status.node.uptime) : '--',
+    ip: status?.node?.public_ip ?? '--',
+  }), [status, activeNode]);
+
   return (
     <SafeAreaView className="flex-1 bg-black">
-      <ScrollView className="flex-1 px-4">
-        <Text className="text-2xl font-bold text-white mt-4 mb-6">Dashboard</Text>
-
-        {/* Globe placeholder — will be replaced with R3F Native Canvas */}
-        <View className="h-72 bg-gray-900 rounded-2xl items-center justify-center mb-6">
-          <Text className="text-gray-500">3D Globe</Text>
+      <ScrollView
+        className="flex-1 px-4"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor="#30d158"
+          />
+        }
+      >
+        {/* Header */}
+        <View className="flex-row items-center justify-between mt-4 mb-4">
+          <Text testID="dashboard-title" className="text-2xl font-bold text-white">Dashboard</Text>
+          <StatusDot status={isConnected ? 'connected' : 'disconnected'} size={10} />
         </View>
 
-        {/* Metrics placeholder */}
+        {/* Node picker pills */}
+        {hasMultipleNodes && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="mb-4"
+          >
+            <View className="flex-row gap-2">
+              {nodes.map((node) => (
+                <TouchableOpacity
+                  key={node.id}
+                  onPress={() => setActiveNode(node.id)}
+                  className={`px-4 py-2 rounded-full ${
+                    node.id === activeNodeId
+                      ? 'bg-green-600'
+                      : 'bg-gray-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-medium ${
+                      node.id === activeNodeId
+                        ? 'text-white'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    {node.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        )}
+
+        {/* Globe placeholder / Node info card */}
+        <View testID="node-info-card" className="h-48 bg-gray-900 rounded-2xl p-5 justify-between mb-6">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-2">
+              {nodeInfo.flag ? (
+                <Text className="text-2xl">{nodeInfo.flag}</Text>
+              ) : null}
+              <Text className="text-xl font-bold text-white">
+                {nodeInfo.name}
+              </Text>
+            </View>
+            <StatusDot status={isConnected ? 'connected' : 'disconnected'} />
+          </View>
+
+          <View>
+            <View className="flex-row items-center gap-2 mb-1">
+              <Ionicons name="globe-outline" size={14} color="#9ca3af" />
+              <Text className="text-gray-400 text-sm">{nodeInfo.ip}</Text>
+            </View>
+            <View className="flex-row items-center gap-2 mb-1">
+              <Ionicons name="time-outline" size={14} color="#9ca3af" />
+              <Text className="text-gray-400 text-sm">
+                Uptime: {nodeInfo.uptime}
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="code-slash-outline" size={14} color="#9ca3af" />
+              <Text className="text-gray-400 text-sm">
+                v{nodeInfo.version}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Metric Rings */}
+        <View className="flex-row justify-between mb-6">
+          <View testID="metric-cpu">
+            <MetricRing
+              label="CPU"
+              value={Math.round(cpuPercent)}
+              color="#30d158"
+            />
+          </View>
+          <View testID="metric-memory">
+            <MetricRing
+              label="Memory"
+              value={memPercent}
+              color="#5e5ce6"
+            />
+          </View>
+          <View testID="metric-disk">
+            <MetricRing
+              label="Disk"
+              value={diskPercent}
+              color="#ff9f0a"
+            />
+          </View>
+        </View>
+
+        {/* Network section */}
         <View className="flex-row gap-3 mb-6">
           <View className="flex-1 bg-gray-900 rounded-xl p-4">
-            <Text className="text-gray-400 text-sm">CPU</Text>
-            <Text className="text-white text-2xl font-bold">--%</Text>
+            <View className="flex-row items-center gap-2 mb-2">
+              <Ionicons name="arrow-up-outline" size={16} color="#30d158" />
+              <Text className="text-gray-400 text-sm">Upload</Text>
+            </View>
+            <Text testID="net-upload" className="text-white text-lg font-bold">
+              {formatNetworkRate(netSent)}
+            </Text>
           </View>
           <View className="flex-1 bg-gray-900 rounded-xl p-4">
-            <Text className="text-gray-400 text-sm">Memory</Text>
-            <Text className="text-white text-2xl font-bold">--%</Text>
-          </View>
-          <View className="flex-1 bg-gray-900 rounded-xl p-4">
-            <Text className="text-gray-400 text-sm">Disk</Text>
-            <Text className="text-white text-2xl font-bold">--%</Text>
+            <View className="flex-row items-center gap-2 mb-2">
+              <Ionicons name="arrow-down-outline" size={16} color="#5e5ce6" />
+              <Text className="text-gray-400 text-sm">Download</Text>
+            </View>
+            <Text testID="net-download" className="text-white text-lg font-bold">
+              {formatNetworkRate(netRecv)}
+            </Text>
           </View>
         </View>
 
-        {/* Apps overview placeholder */}
-        <Text className="text-lg font-semibold text-white mb-3">Apps</Text>
-        <View className="bg-gray-900 rounded-xl p-6 items-center mb-6">
-          <Text className="text-gray-500">No apps deployed</Text>
+        {/* Container summary */}
+        <View testID="container-summary" className="bg-gray-900 rounded-xl p-4 mb-6">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="cube-outline" size={20} color="#9ca3af" />
+              <Text className="text-white font-semibold">Containers</Text>
+            </View>
+            <Text className="text-gray-400">
+              <Text className="text-green-500 font-bold">
+                {containersRunning}
+              </Text>
+              {' '}running / {containersTotal} total
+            </Text>
+          </View>
         </View>
+
+        {/* Apps section */}
+        <Text testID="apps-section" className="text-lg font-semibold text-white mb-3">Apps</Text>
+        {apps && apps.length > 0 ? (
+          <View className="gap-3 mb-8">
+            {apps.map((app) => (
+              <AppCard
+                key={app.id}
+                app={app}
+                onPress={() => handleAppPress(app)}
+              />
+            ))}
+          </View>
+        ) : (
+          <View className="mb-8">
+            <EmptyState
+              icon="apps-outline"
+              title="No apps deployed"
+              subtitle="Deploy your first app from the Apps tab"
+              actionLabel="Browse Apps"
+              onAction={() => router.push('/(tabs)/apps')}
+            />
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

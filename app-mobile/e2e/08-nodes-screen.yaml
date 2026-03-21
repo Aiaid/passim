@@ -1,0 +1,45 @@
+# US-10.1/10.2: Nodes screen
+# Verifies the Nodes tab shows the local node card, the add-node button,
+# and that tapping the local node opens its detail view.
+
+appId: io.passim.app
+env:
+  TEST_HOST: "localhost:8443"
+  TEST_API_KEY: ""
+---
+# Start from a connected dashboard
+- runFlow: helpers/setup-node.yaml
+
+# Navigate to the Nodes tab
+- tapOn: "Nodes"
+
+# The local node card and add-node button should be visible
+- assertVisible:
+    id: "local-node-card"
+- assertVisible:
+    id: "btn-add-node"
+
+# Tap the local node card to view details
+- tapOn:
+    id: "local-node-card"
+
+# Node detail screen should show the node name
+- extendedWaitUntil:
+    visible:
+      id: "node-detail-name"
+    timeout: 5000
+
+# Verify metrics are displayed in the detail view
+- assertVisible:
+    id: "metric-cpu"
+- assertVisible:
+    id: "metric-memory"
+- assertVisible:
+    id: "metric-disk"
+
+# Navigate back to the nodes list
+- back
+
+# Verify we're back on the nodes list
+- assertVisible:
+    id: "local-node-card"

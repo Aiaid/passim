@@ -1,13 +1,171 @@
-import { View, Text } from 'react-native';
+import { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { useAddRemoteNode } from '@/hooks/use-node';
+
+type Mode = 'choose' | 'manual';
 
 export default function AddNodeScreen() {
+  const [mode, setMode] = useState<Mode>('choose');
+  const [host, setHost] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const addNode = useAddRemoteNode();
+
+  const canSubmit = host.trim().length > 0 && apiKey.trim().length > 0;
+
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    addNode.mutate(
+      { address: host.trim(), api_key: apiKey.trim() },
+      {
+        onSuccess: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          router.back();
+        },
+        onError: (error: Error) => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          Alert.alert('Connection Failed', error.message || 'Could not connect to the node.');
+        },
+      },
+    );
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-black">
-      <View className="flex-1 items-center justify-center">
-        <Text className="text-white text-lg">Add Node</Text>
-        <Text className="text-gray-500 mt-2">QR scan + manual entry</Text>
+      {/* Header */}
+      <View className="flex-row items-center px-4 py-3 gap-3">
+        <Pressable
+          onPress={() => {
+            if (mode === 'manual') {
+              setMode('choose');
+            } else {
+              router.back();
+            }
+          }}
+          className="w-10 h-10 items-center justify-center rounded-full bg-gray-900 active:opacity-70"
+        >
+          <Ionicons name="chevron-back" size={20} color="#fff" />
+        </Pressable>
+        <Text className="text-white text-lg font-semibold flex-1">Add Node</Text>
       </View>
+
+      {mode === 'choose' ? (
+        <View className="flex-1 px-4 pt-8">
+          {/* Scan QR Code */}
+          <Pressable
+            testID="btn-scan-qr"
+            className="bg-gray-900 rounded-xl p-5 flex-row items-center gap-4 mb-4 active:opacity-70"
+            onPress={() => router.push('/(auth)/scan')}
+          >
+            <View className="w-12 h-12 rounded-full bg-gray-800 items-center justify-center">
+              <Ionicons name="qr-code" size={24} color="#30d158" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-white font-semibold text-base">Scan QR Code</Text>
+              <Text className="text-gray-400 text-sm mt-0.5">
+                Scan the QR code shown on your node
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#666" />
+          </Pressable>
+
+          {/* Enter Manually */}
+          <Pressable
+            testID="btn-manual-entry"
+            className="bg-gray-900 rounded-xl p-5 flex-row items-center gap-4 active:opacity-70"
+            onPress={() => setMode('manual')}
+          >
+            <View className="w-12 h-12 rounded-full bg-gray-800 items-center justify-center">
+              <Ionicons name="create-outline" size={24} color="#5e5ce6" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-white font-semibold text-base">Enter Manually</Text>
+              <Text className="text-gray-400 text-sm mt-0.5">
+                Type in the host address and API key
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#666" />
+          </Pressable>
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          className="flex-1 px-4 pt-6"
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          {/* Host Input */}
+          <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+            Host Address
+          </Text>
+          <TextInput
+            testID="input-remote-host"
+            className="bg-gray-900 rounded-xl px-4 py-3.5 text-white text-base mb-4"
+            placeholder="e.g. 192.168.1.100:8443"
+            placeholderTextColor="#555"
+            value={host}
+            onChangeText={setHost}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            returnKeyType="next"
+          />
+
+          {/* API Key Input */}
+          <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+            API Key
+          </Text>
+          <TextInput
+            testID="input-remote-key"
+            className="bg-gray-900 rounded-xl px-4 py-3.5 text-white text-base mb-6"
+            placeholder="Paste your API key"
+            placeholderTextColor="#555"
+            value={apiKey}
+            onChangeText={setApiKey}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            returnKeyType="done"
+            onSubmitEditing={handleSubmit}
+          />
+
+          {/* Error */}
+          {addNode.isError ? (
+            <View className="bg-red-500/10 rounded-xl px-4 py-3 mb-4">
+              <Text className="text-red-400 text-sm">
+                {addNode.error?.message || 'Connection failed. Check the address and API key.'}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Submit */}
+          <Pressable
+            testID="btn-add-remote"
+            className={`rounded-xl py-4 items-center ${canSubmit ? 'bg-primary active:opacity-70' : 'bg-gray-800'}`}
+            onPress={handleSubmit}
+            disabled={!canSubmit || addNode.isPending}
+          >
+            {addNode.isPending ? (
+              <ActivityIndicator size="small" color="#000" />
+            ) : (
+              <Text className={`font-semibold text-base ${canSubmit ? 'text-black' : 'text-gray-500'}`}>
+                Connect
+              </Text>
+            )}
+          </Pressable>
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }

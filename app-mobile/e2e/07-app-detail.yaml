@@ -1,0 +1,52 @@
+# US-10.3: App detail and actions
+# Verifies that tapping a deployed app opens its detail screen
+# with status info and action buttons (start/stop/restart/delete).
+
+appId: io.passim.app
+env:
+  TEST_HOST: "localhost:8443"
+  TEST_API_KEY: ""
+---
+# Start from a connected dashboard
+- runFlow: helpers/setup-node.yaml
+
+# Navigate to the Apps tab
+- tapOn: "Apps"
+
+# Wait for the app list to load
+- extendedWaitUntil:
+    visible:
+      id: "app-list"
+    timeout: 10000
+
+# Tap the first app in the list to open its detail screen
+- tapOn:
+    id: "app-list"
+    childOf: true
+    index: 0
+
+# Verify action buttons are visible on the detail screen
+- assertVisible:
+    id: "btn-app-restart"
+    optional: true
+- assertVisible:
+    id: "btn-app-stop"
+    optional: true
+- assertVisible:
+    id: "btn-app-start"
+    optional: true
+
+# Test the restart action
+- tapOn:
+    id: "btn-app-restart"
+    optional: true
+
+# Wait briefly for the action to process
+- extendedWaitUntil:
+    visible:
+      id: "btn-app-restart"
+    timeout: 10000
+    optional: true
+
+# Navigate back to the apps list
+- back

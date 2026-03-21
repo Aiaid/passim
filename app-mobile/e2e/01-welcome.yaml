@@ -1,0 +1,17 @@
+# US-10.1: Welcome screen appears on first launch
+# Verifies that a fresh install shows the welcome/auth screen
+# with options to scan QR or enter node details manually.
+
+appId: io.passim.app
+---
+- launchApp:
+    clearState: true
+
+# The app title should be visible on the welcome screen
+- assertVisible: "Passim"
+
+# Both auth entry points must be present
+- assertVisible:
+    id: "btn-scan-qr"
+- assertVisible:
+    id: "btn-manual-entry"

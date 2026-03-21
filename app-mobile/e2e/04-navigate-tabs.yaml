@@ -1,0 +1,35 @@
+# US-10.2/10.3: Tab navigation works
+# Verifies that all four tabs (Home, Apps, Nodes, Settings)
+# are accessible and show their expected content.
+
+appId: io.passim.app
+env:
+  TEST_HOST: "localhost:8443"
+  TEST_API_KEY: ""
+---
+# Start from a connected dashboard
+- runFlow: helpers/setup-node.yaml
+
+# We should start on the Home/Dashboard tab
+- assertVisible:
+    id: "dashboard-title"
+
+# Navigate to Apps tab
+- tapOn: "Apps"
+- assertVisible:
+    id: "btn-deploy"
+
+# Navigate to Nodes tab
+- tapOn: "Nodes"
+- assertVisible:
+    id: "btn-add-node"
+
+# Navigate to Settings tab
+- tapOn: "Settings"
+- assertVisible:
+    id: "setting-node-name"
+
+# Navigate back to Home tab
+- tapOn: "Home"
+- assertVisible:
+    id: "dashboard-title"

@@ -1,0 +1,51 @@
+# US-10.1: Add node via manual entry
+# Verifies the full manual node-add flow:
+# Welcome → Enter Manually → fill host + API key → connect → Dashboard
+
+appId: io.passim.app
+env:
+  TEST_HOST: "localhost:8443"
+  TEST_API_KEY: ""
+---
+- launchApp:
+    clearState: true
+
+# Welcome screen should appear on fresh launch
+- assertVisible: "Passim"
+
+# Tap "Enter Manually" to open the add-node form
+- tapOn:
+    id: "btn-manual-entry"
+
+# Verify the add-node form fields are visible
+- assertVisible:
+    id: "input-host"
+- assertVisible:
+    id: "input-api-key"
+- assertVisible:
+    id: "btn-connect"
+
+# Fill in the node connection details
+- tapOn:
+    id: "input-host"
+- inputText: ${TEST_HOST}
+
+- tapOn:
+    id: "input-api-key"
+- inputText: ${TEST_API_KEY}
+
+# Submit the connection form
+- tapOn:
+    id: "btn-connect"
+
+# Wait for the connection to establish and navigate to dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-title"
+    timeout: 10000
+
+# Verify we landed on the dashboard with node info
+- assertVisible:
+    id: "dashboard-title"
+- assertVisible:
+    id: "node-info-card"

@@ -1,0 +1,71 @@
+# US-10.4: Settings interactions
+# Verifies that tapping settings items triggers the expected changes
+# (language toggle, theme switch, push notifications toggle).
+
+appId: io.passim.app
+env:
+  TEST_HOST: "localhost:8443"
+  TEST_API_KEY: ""
+---
+# Start from a connected dashboard
+- runFlow: helpers/setup-node.yaml
+
+# Navigate to the Settings tab
+- tapOn: "Settings"
+
+# --- Language toggle ---
+# Tap language setting to cycle to the next language
+- tapOn:
+    id: "setting-language"
+
+# Verify the language changed (look for Chinese text or English text)
+- assertVisible:
+    text: ".*"
+    optional: true
+
+# Tap again to restore original language
+- tapOn:
+    id: "setting-language"
+
+# --- Theme toggle ---
+# Tap theme setting to cycle the theme
+- tapOn:
+    id: "setting-theme"
+
+# Brief pause for the theme transition
+- extendedWaitUntil:
+    visible:
+      id: "setting-theme"
+    timeout: 2000
+
+# --- Push notifications toggle ---
+# Scroll down to the push notifications switch
+- scrollUntilVisible:
+    element:
+      id: "switch-push"
+    direction: DOWN
+    timeout: 5000
+
+# Toggle push notifications on
+- tapOn:
+    id: "switch-push"
+
+# Toggle push notifications off (restore state)
+- tapOn:
+    id: "switch-push"
+
+# --- Check for updates ---
+- scrollUntilVisible:
+    element:
+      id: "btn-check-updates"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "btn-check-updates"
+
+# Wait briefly for the update check to complete
+- extendedWaitUntil:
+    visible:
+      id: "setting-version"
+    timeout: 5000

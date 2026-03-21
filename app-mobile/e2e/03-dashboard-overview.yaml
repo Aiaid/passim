@@ -1,0 +1,46 @@
+# US-10.2: Dashboard displays metrics
+# Verifies that the dashboard shows all expected metric widgets
+# after a node has been connected.
+
+appId: io.passim.app
+env:
+  TEST_HOST: "localhost:8443"
+  TEST_API_KEY: ""
+---
+# Set up a connected node first
+- runFlow: helpers/setup-node.yaml
+
+# Dashboard title should be visible
+- assertVisible:
+    id: "dashboard-title"
+
+# CPU, Memory, and Disk metric rings
+- assertVisible:
+    id: "metric-cpu"
+- assertVisible:
+    id: "metric-memory"
+- assertVisible:
+    id: "metric-disk"
+
+# Network throughput indicators
+- assertVisible:
+    id: "net-upload"
+- assertVisible:
+    id: "net-download"
+
+# Container summary and apps section
+- assertVisible:
+    id: "container-summary"
+- assertVisible:
+    id: "apps-section"
+
+# Test pull-to-refresh: swipe down from the middle of the screen
+- swipe:
+    direction: DOWN
+    duration: 500
+
+# After refresh, metrics should still be visible
+- extendedWaitUntil:
+    visible:
+      id: "metric-cpu"
+    timeout: 5000

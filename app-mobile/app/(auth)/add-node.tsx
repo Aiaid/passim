@@ -40,6 +40,7 @@ export default function AddNodeScreen() {
 
       <Text className="text-gray-400 mb-2">Server Address</Text>
       <TextInput
+        testID="input-host"
         className="bg-gray-900 text-white rounded-xl px-4 py-3 mb-4 text-base"
         placeholder="host:8443"
         placeholderTextColor="#666"
@@ -51,6 +52,7 @@ export default function AddNodeScreen() {
 
       <Text className="text-gray-400 mb-2">API Key</Text>
       <TextInput
+        testID="input-api-key"
         className="bg-gray-900 text-white rounded-xl px-4 py-3 mb-6 text-base"
         placeholder="ak_..."
         placeholderTextColor="#666"
@@ -62,10 +64,11 @@ export default function AddNodeScreen() {
       />
 
       {error ? (
-        <Text className="text-red-400 mb-4 text-center">{error}</Text>
+        <Text testID="error-message" className="text-red-400 mb-4 text-center">{error}</Text>
       ) : null}
 
       <Pressable
+        testID="btn-connect"
         className="bg-primary rounded-2xl py-4"
         onPress={handleConnect}
         disabled={loading}
