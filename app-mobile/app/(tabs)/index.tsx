@@ -4,12 +4,14 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMultiNodeSSE } from '@/hooks/use-sse';
 import { useStatus } from '@/hooks/use-node';
 import { useApps } from '@/hooks/use-apps';
+import { useSpeedTest } from '@/hooks/use-speedtest';
 import { useNodeStore } from '@/stores/node-store';
 import { MetricRing } from '@/components/MetricRing';
 import { StatusDot } from '@/components/StatusDot';
@@ -55,6 +57,8 @@ export default function DashboardScreen() {
   const diskPercent = diskTotal > 0 ? Math.round((diskUsed / diskTotal) * 100) : 0;
   const netSent = metrics?.net_bytes_sent ?? 0;
   const netRecv = metrics?.net_bytes_recv ?? 0;
+
+  const speedTest = useSpeedTest(nodeId);
 
   const containersRunning = status?.containers?.running ?? 0;
   const containersTotal = status?.containers?.total ?? 0;
@@ -124,74 +128,113 @@ export default function DashboardScreen() {
 
           {/* Bottom: Stats */}
           <View pointerEvents="auto">
-            {/* Metric Rings */}
+            {/* Node info bar */}
+            {status ? (
+              <View className="bg-gray-900/80 rounded-xl px-3 py-2 mb-2">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center gap-1.5 flex-1">
+                    <Ionicons name="globe-outline" size={12} color="#888" />
+                    <Text className="text-gray-300 text-xs font-medium" numberOfLines={1}>
+                      {activeNode?.host?.replace(/:.*/, '') ?? '--'}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center gap-1.5">
+                    <Ionicons name="time-outline" size={11} color="#888" />
+                    <Text className="text-gray-400 text-xs">{nodeInfo.uptime}</Text>
+                  </View>
+                  <View className="flex-row items-center gap-1.5 ml-3">
+                    <Text className="text-gray-500 text-xs">{nodeInfo.version}</Text>
+                  </View>
+                </View>
+                <View className="flex-row items-center mt-1 gap-3">
+                  {status.node.public_ip ? (
+                    <Text className="text-gray-500 text-xs font-mono">{status.node.public_ip}</Text>
+                  ) : null}
+                  {status.node.public_ip6 ? (
+                    <Text className="text-gray-500 text-xs font-mono" numberOfLines={1} style={{ flex: 1 }}>
+                      {status.node.public_ip6}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+
+            {/* CPU / MEM / Disk / Net — one row */}
             <View className="flex-row justify-between mb-3">
-              <View testID="metric-cpu">
-                <MetricRing
-                  label={t('dashboard.cpu')}
-                  value={Math.round(cpuPercent)}
-                  color="#30d158"
-                />
-              </View>
-              <View testID="metric-memory">
-                <MetricRing
-                  label={t('dashboard.memory')}
-                  value={memPercent}
-                  color="#5e5ce6"
-                />
-              </View>
-              <View testID="metric-disk">
-                <MetricRing
-                  label={t('dashboard.disk')}
-                  value={diskPercent}
-                  color="#ff9f0a"
-                />
+              <MetricRing label={t('dashboard.cpu')} value={Math.round(cpuPercent)} color="#30d158" size={68} />
+              <MetricRing label={t('dashboard.memory')} value={memPercent} color="#5e5ce6" size={68} />
+              <MetricRing label={t('dashboard.disk')} value={diskPercent} color="#ff9f0a" size={68} />
+              <View className="items-center" style={{ width: 68 }}>
+                <View className="bg-gray-900/80 rounded-xl w-full items-center justify-center" style={{ height: 68 }}>
+                  <View className="flex-row items-center gap-0.5">
+                    <Ionicons name="arrow-up" size={10} color="#30d158" />
+                    <Text className="text-white text-xs font-bold">{formatNetworkRate(netSent)}</Text>
+                  </View>
+                  <View className="flex-row items-center gap-0.5 mt-1">
+                    <Ionicons name="arrow-down" size={10} color="#5e5ce6" />
+                    <Text className="text-white text-xs font-bold">{formatNetworkRate(netRecv)}</Text>
+                  </View>
+                </View>
+                <Text className="text-gray-400 text-xs mt-1">Net</Text>
               </View>
             </View>
 
-            {/* Network row */}
-            <View className="flex-row gap-3 mb-3">
-              <View className="flex-1 bg-gray-900/80 rounded-xl p-3">
-                <View className="flex-row items-center gap-1.5 mb-1">
-                  <Ionicons name="arrow-up-outline" size={14} color="#30d158" />
-                  <Text className="text-gray-400 text-xs">{t('speedtest.upload')}</Text>
-                </View>
-                <Text testID="net-upload" className="text-white text-base font-bold">
-                  {formatNetworkRate(netSent)}
-                </Text>
-              </View>
-              <View className="flex-1 bg-gray-900/80 rounded-xl p-3">
-                <View className="flex-row items-center gap-1.5 mb-1">
-                  <Ionicons name="arrow-down-outline" size={14} color="#5e5ce6" />
-                  <Text className="text-gray-400 text-xs">{t('speedtest.download')}</Text>
-                </View>
-                <Text testID="net-download" className="text-white text-base font-bold">
-                  {formatNetworkRate(netRecv)}
-                </Text>
-              </View>
-            </View>
-
-            {/* Apps + Containers row */}
+            {/* Speed Test + Summary row */}
             <View className="flex-row gap-3 mb-20">
-              <View testID="container-summary" className="flex-1 bg-gray-900/80 rounded-xl p-3">
-                <View className="flex-row items-center gap-1.5 mb-1">
-                  <Ionicons name="cube-outline" size={14} color="#ff9f0a" />
-                  <Text className="text-gray-400 text-xs">{t('dashboard.containers')}</Text>
+              {/* Speed test */}
+              <TouchableOpacity
+                className="flex-1 bg-gray-900/80 rounded-xl p-3"
+                onPress={speedTest.isRunning ? speedTest.cancel : speedTest.run}
+                activeOpacity={0.7}
+              >
+                {speedTest.phase === 'idle' ? (
+                  <View className="flex-row items-center justify-center gap-2">
+                    <Ionicons name="speedometer-outline" size={16} color="#30d158" />
+                    <Text className="text-white text-sm font-semibold">{t('speedtest.start')}</Text>
+                  </View>
+                ) : speedTest.phase === 'done' && speedTest.result ? (
+                  <View>
+                    <View className="flex-row justify-between">
+                      <View className="items-center flex-1">
+                        <Text className="text-white text-sm font-bold">{speedTest.result.download}</Text>
+                        <Text className="text-gray-500 text-xs">↓ Mbps</Text>
+                      </View>
+                      <View className="items-center flex-1">
+                        <Text className="text-white text-sm font-bold">{speedTest.result.upload}</Text>
+                        <Text className="text-gray-500 text-xs">↑ Mbps</Text>
+                      </View>
+                      <View className="items-center flex-1">
+                        <Text className="text-white text-sm font-bold">{speedTest.result.latency}</Text>
+                        <Text className="text-gray-500 text-xs">ms</Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View className="flex-row items-center justify-center gap-2">
+                    <ActivityIndicator size="small" color="#30d158" />
+                    <Text className="text-gray-400 text-sm">
+                      {speedTest.phase === 'latency' ? 'Ping...' : speedTest.phase === 'download' ? '↓ ...' : '↑ ...'}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* Containers + Apps summary */}
+              <View className="flex-1 bg-gray-900/80 rounded-xl p-3 flex-row justify-around">
+                <View className="items-center">
+                  <Text className="text-white text-sm font-bold">
+                    <Text className="text-green-500">{containersRunning}</Text>
+                    <Text className="text-gray-500">/{containersTotal}</Text>
+                  </Text>
+                  <Text className="text-gray-500 text-xs">{t('dashboard.containers')}</Text>
                 </View>
-                <Text className="text-white text-base font-bold">
-                  <Text className="text-green-500">{containersRunning}</Text>
-                  <Text className="text-gray-500"> / {containersTotal}</Text>
-                </Text>
-              </View>
-              <View className="flex-1 bg-gray-900/80 rounded-xl p-3">
-                <View className="flex-row items-center gap-1.5 mb-1">
-                  <Ionicons name="grid-outline" size={14} color="#bf5af2" />
-                  <Text className="text-gray-400 text-xs">{t('nav.apps')}</Text>
+                <View className="items-center">
+                  <Text className="text-white text-sm font-bold">
+                    <Text className="text-green-500">{appsRunning}</Text>
+                    <Text className="text-gray-500">/{appsCount}</Text>
+                  </Text>
+                  <Text className="text-gray-500 text-xs">{t('nav.apps')}</Text>
                 </View>
-                <Text className="text-white text-base font-bold">
-                  <Text className="text-green-500">{appsRunning}</Text>
-                  <Text className="text-gray-500"> / {appsCount}</Text>
-                </Text>
               </View>
             </View>
           </View>

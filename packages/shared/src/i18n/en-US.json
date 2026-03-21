@@ -315,6 +315,7 @@
   },
   "mobile": {
     "welcome_subtitle": "Your personal cloud, in your pocket.",
+    "app_settings": "App Settings",
     "app_lock": "App Lock",
     "push_notifications": "Push Notifications",
     "camera_required": "Camera Access Required",

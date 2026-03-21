@@ -315,6 +315,7 @@
   },
   "mobile": {
     "welcome_subtitle": "你的私有云，触手可及。",
+    "app_settings": "应用设置",
     "app_lock": "应用锁",
     "push_notifications": "推送通知",
     "camera_required": "需要相机权限",

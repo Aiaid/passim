@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -302,11 +303,17 @@ export default function SettingsScreen() {
     );
   };
 
+  const [apiKeyRevealed, setApiKeyRevealed] = useState(false);
+
+  const handleCopyApiKey = useCallback(async () => {
+    if (activeNode?.token) {
+      await Clipboard.setStringAsync(activeNode.token);
+      Alert.alert(t('common.copied') ?? 'Copied');
+    }
+  }, [activeNode, t]);
+
   // Derived data
   const nodeName = settingsQuery.data?.node_name ?? '--';
-  const maskedToken = activeNode?.token
-    ? `${activeNode.token.slice(0, 8)}...`
-    : '--';
 
   const ssl = sslQuery.data;
   const version = versionQuery.data;
@@ -322,37 +329,48 @@ export default function SettingsScreen() {
       <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingTop: top, paddingBottom: 48 }}>
         <Text className="text-2xl font-bold text-white mt-4 mb-6">{t('settings.title')}</Text>
 
-        {/* General */}
+        {/* ── Nodes ── top, visually separated */}
+        <SettingsSection title={t('mobile.nodes')}>
+          {nodes.map((node) => (
+            <SettingsRow
+              key={node.id}
+              label={node.name}
+              value={node.id === activeNodeId ? t('mobile.active') : undefined}
+              onPress={() => setActiveNode(node.id)}
+              right={
+                node.id === activeNodeId ? (
+                  <Ionicons name="checkmark-circle" size={20} color="#30d158" />
+                ) : undefined
+              }
+            />
+          ))}
+          <SettingsRow
+            label={t('mobile.add_node_btn')}
+            onPress={() => router.push('/nodes/add')}
+            chevron
+          />
+        </SettingsSection>
+
+        {/* ── Node settings ── changes per active node */}
+        <Text className="text-gray-500 text-xs uppercase tracking-wider mb-3 px-1">
+          {activeNode?.name ?? '--'}
+        </Text>
+
         <SettingsSection title={t('settings.general')}>
           <SettingsRow testID="setting-node-name" label={t('settings.node_name')} value={nodeName} onPress={handleEditNodeName} chevron />
           <SettingsRow
-            testID="setting-language"
-            label={t('settings.language')}
-            value={LANGUAGE_LABELS[language]}
-            onPress={cycleLanguage}
-          />
-          <SettingsRow testID="setting-theme" label={t('settings.theme')} value={THEME_LABELS[theme]} onPress={cycleTheme} />
-        </SettingsSection>
-
-        {/* Security */}
-        <SettingsSection title={t('settings.security')}>
-          <SettingsRow label={t('settings.passkeys')} onPress={() => router.push('/settings/passkeys')} chevron />
-          <SettingsRow label={t('settings.api_key')} value={maskedToken} />
-          <SettingsRow
-            testID="switch-app-lock"
-            label={t('mobile.app_lock')}
+            label={t('settings.api_key')}
+            value={apiKeyRevealed ? activeNode?.token ?? '--' : '••••••••'}
+            onPress={handleCopyApiKey}
             right={
-              <Switch
-                value={biometricEnabled}
-                onValueChange={setBiometricEnabled}
-                trackColor={{ false: '#333', true: '#30d158' }}
-                thumbColor="#fff"
-              />
+              <Pressable onPress={() => setApiKeyRevealed(!apiKeyRevealed)} hitSlop={8}>
+                <Ionicons name={apiKeyRevealed ? 'eye-off-outline' : 'eye-outline'} size={18} color="#666" />
+              </Pressable>
             }
           />
+          <SettingsRow label={t('settings.passkeys')} onPress={() => router.push('/settings/passkeys')} chevron />
         </SettingsSection>
 
-        {/* SSL */}
         <SettingsSection title={t('settings.ssl')}>
           <SettingsRow
             testID="setting-ssl"
@@ -379,9 +397,9 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
-        {/* System */}
         <SettingsSection title={t('settings.system')}>
           <SettingsRow testID="setting-version" label={t('settings.current_version')} value={version?.version ?? '--'} />
+          <SettingsRow label={t('settings.commit')} value={version?.commit ?? '--'} />
           <SettingsRow
             testID="btn-check-updates"
             label={t('settings.check_update')}
@@ -393,6 +411,28 @@ export default function SettingsScreen() {
             }
             chevron
           />
+        </SettingsSection>
+
+        <SettingsSection title={t('mobile.danger_zone')}>
+          <SettingsRow
+            testID="btn-remove-node"
+            label={t('mobile.remove_current_node')}
+            onPress={handleRemoveNode}
+            danger
+          />
+        </SettingsSection>
+
+        {/* ── App settings ── independent of node */}
+        <View className="border-b border-gray-800 mb-6 mt-2" />
+
+        <SettingsSection title={t('mobile.app_settings') ?? 'App'}>
+          <SettingsRow
+            testID="setting-language"
+            label={t('settings.language')}
+            value={LANGUAGE_LABELS[language]}
+            onPress={cycleLanguage}
+          />
+          <SettingsRow testID="setting-theme" label={t('settings.theme')} value={THEME_LABELS[theme]} onPress={cycleTheme} />
           <SettingsRow
             testID="switch-push"
             label={t('mobile.push_notifications')}
@@ -405,56 +445,22 @@ export default function SettingsScreen() {
               />
             }
           />
-        </SettingsSection>
-
-        {/* Nodes */}
-        <SettingsSection title={t('mobile.nodes')}>
-          {nodes.map((node) => (
-            <SettingsRow
-              key={node.id}
-              label={node.name}
-              value={node.id === activeNodeId ? t('mobile.active') : undefined}
-              onPress={() => setActiveNode(node.id)}
-              right={
-                node.id === activeNodeId ? (
-                  <Ionicons name="checkmark-circle" size={20} color="#30d158" />
-                ) : undefined
-              }
-            />
-          ))}
           <SettingsRow
-            label={t('mobile.add_node_btn')}
-            onPress={() => router.push('/nodes/add')}
-            chevron
-          />
-        </SettingsSection>
-
-        {/* About */}
-        <SettingsSection title={t('mobile.about')}>
-          <SettingsRow label={t('settings.current_version')} value={version?.version ?? '--'} />
-          <SettingsRow label={t('settings.commit')} value={version?.commit ?? '--'} />
-          <SettingsRow
-            label={t('settings.build_time')}
-            value={
-              version?.build_time
-                ? new Date(version.build_time).toLocaleDateString()
-                : '--'
+            testID="switch-app-lock"
+            label={t('mobile.app_lock')}
+            right={
+              <Switch
+                value={biometricEnabled}
+                onValueChange={setBiometricEnabled}
+                trackColor={{ false: '#333', true: '#30d158' }}
+                thumbColor="#fff"
+              />
             }
           />
           <SettingsRow
             label="Passim"
             onPress={() => Linking.openURL('https://passim.io')}
             chevron
-          />
-        </SettingsSection>
-
-        {/* Danger Zone */}
-        <SettingsSection title={t('mobile.danger_zone')}>
-          <SettingsRow
-            testID="btn-remove-node"
-            label={t('mobile.remove_current_node')}
-            onPress={handleRemoveNode}
-            danger
           />
         </SettingsSection>
       </ScrollView>

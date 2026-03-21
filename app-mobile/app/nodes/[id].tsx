@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Pressable,
+  TouchableOpacity,
   ScrollView,
   Alert,
   ActivityIndicator,
@@ -12,11 +13,13 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import type { Container, AppResponse } from '@passim/shared/types';
+import { useMultiNodeSSE } from '@/hooks/use-sse';
 import { useStatus } from '@/hooks/use-node';
 import { useContainers } from '@/hooks/use-containers';
 import { useApps } from '@/hooks/use-apps';
+import { useSpeedTest } from '@/hooks/use-speedtest';
 import { useNodeStore } from '@/stores/node-store';
-import { countryFlag, formatUptime, formatBytes } from '@/lib/utils';
+import { countryFlag, formatUptime, formatBytes, formatNetworkRate } from '@/lib/utils';
 import { StatusDot } from '@/components/StatusDot';
 import { MetricRing } from '@/components/MetricRing';
 import { ContainerCard } from '@/components/ContainerCard';
@@ -41,9 +44,15 @@ export default function NodeDetailScreen() {
 
   const node = useNodeStore((s) => s.nodes.find((n) => n.id === id));
   const removeNode = useNodeStore((s) => s.removeNode);
+  const { getNodeSSE } = useMultiNodeSSE();
+  const sse = getNodeSSE(id);
   const { data: status, isLoading } = useStatus(id);
   const { data: containers } = useContainers(id);
   const { data: apps } = useApps(id);
+  const speedTest = useSpeedTest(id);
+  const sseMetrics = sse.metrics;
+  const netSent = sseMetrics?.net_bytes_sent ?? 0;
+  const netRecv = sseMetrics?.net_bytes_recv ?? 0;
 
   const nodeName = status?.node.name ?? node?.name ?? t('nav.nodes');
   const flag = status?.node.country ? countryFlag(status.node.country) : '';
@@ -117,25 +126,64 @@ export default function NodeDetailScreen() {
             )}
           </View>
 
-          {/* Metric Rings */}
+          {/* Metric Rings: CPU / MEM / Disk / Net */}
           {status ? (
-            <View className="flex-row justify-around mb-6">
-              <MetricRing
-                label="CPU"
-                value={status.system.cpu.usage_percent}
-                color="#30d158"
-              />
-              <MetricRing
-                label="Memory"
-                value={status.system.memory.usage_percent}
-                color="#5e5ce6"
-              />
-              <MetricRing
-                label="Disk"
-                value={status.system.disk.usage_percent}
-                color="#0a84ff"
-              />
-            </View>
+            <>
+              <View className="flex-row justify-between mb-4">
+                <MetricRing label="CPU" value={status.system.cpu.usage_percent} color="#30d158" size={68} />
+                <MetricRing label="Memory" value={status.system.memory.usage_percent} color="#5e5ce6" size={68} />
+                <MetricRing label="Disk" value={status.system.disk.usage_percent} color="#0a84ff" size={68} />
+                <View className="items-center" style={{ width: 68 }}>
+                  <View className="bg-gray-800 rounded-xl w-full items-center justify-center" style={{ height: 68 }}>
+                    <View className="flex-row items-center gap-0.5">
+                      <Ionicons name="arrow-up" size={10} color="#30d158" />
+                      <Text className="text-white text-xs font-bold">{formatNetworkRate(netSent)}</Text>
+                    </View>
+                    <View className="flex-row items-center gap-0.5 mt-1">
+                      <Ionicons name="arrow-down" size={10} color="#5e5ce6" />
+                      <Text className="text-white text-xs font-bold">{formatNetworkRate(netRecv)}</Text>
+                    </View>
+                  </View>
+                  <Text className="text-gray-400 text-xs mt-1">Net</Text>
+                </View>
+              </View>
+
+              {/* Speed Test */}
+              <TouchableOpacity
+                className="bg-gray-900 rounded-xl p-4 mb-4"
+                onPress={speedTest.isRunning ? speedTest.cancel : speedTest.run}
+                activeOpacity={0.7}
+              >
+                {speedTest.phase === 'idle' ? (
+                  <View className="flex-row items-center justify-center gap-2">
+                    <Ionicons name="speedometer-outline" size={18} color="#30d158" />
+                    <Text className="text-white text-base font-semibold">{t('speedtest.start')}</Text>
+                  </View>
+                ) : speedTest.phase === 'done' && speedTest.result ? (
+                  <View className="flex-row justify-around">
+                    <View className="items-center">
+                      <Text className="text-white text-lg font-bold">{speedTest.result.download}</Text>
+                      <Text className="text-gray-500 text-xs">↓ Mbps</Text>
+                    </View>
+                    <View className="items-center">
+                      <Text className="text-white text-lg font-bold">{speedTest.result.upload}</Text>
+                      <Text className="text-gray-500 text-xs">↑ Mbps</Text>
+                    </View>
+                    <View className="items-center">
+                      <Text className="text-white text-lg font-bold">{speedTest.result.latency}</Text>
+                      <Text className="text-gray-500 text-xs">ms</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View className="flex-row items-center justify-center gap-2">
+                    <ActivityIndicator size="small" color="#30d158" />
+                    <Text className="text-gray-400 text-sm">
+                      {speedTest.phase === 'latency' ? t('speedtest.phase_latency') : speedTest.phase === 'download' ? t('speedtest.phase_download') : t('speedtest.phase_upload')}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </>
           ) : null}
 
           {/* Containers */}
