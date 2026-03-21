@@ -42,8 +42,6 @@ export default function DashboardScreen() {
   const containersRunning = status?.containers?.running ?? 0;
   const containersTotal = status?.containers?.total ?? 0;
 
-  const hasMultipleNodes = nodes.length > 1;
-
   const nodeInfo = useMemo(() => ({
     name: status?.node?.name ?? activeNode?.name ?? '--',
     flag: status?.node?.country ? countryFlag(status.node.country) : '',
@@ -53,17 +51,25 @@ export default function DashboardScreen() {
   }), [status, activeNode]);
 
   return (
-    <SafeAreaView className="flex-1 bg-black">
-      <View className="flex-1 px-4 justify-between">
-        {/* Top: Header + Node picker */}
-        <View>
-          <View className="flex-row items-center justify-between mt-4 mb-2">
-            <Text testID="dashboard-title" className="text-2xl font-bold text-white">{t('dashboard.title')}</Text>
-            <StatusDot status={isConnected ? 'connected' : 'disconnected'} size={10} />
-          </View>
+    <View className="flex-1 bg-black">
+      {/* Full-screen 3D globe background */}
+      <GlobeView
+        localStatus={status}
+        remoteNodes={nodesQuery.data ?? undefined}
+        fullscreen
+      />
 
-          {/* Node picker pills */}
-          {hasMultipleNodes && (
+      {/* UI overlay */}
+      <SafeAreaView className="flex-1" pointerEvents="box-none">
+        <View className="flex-1 px-4 justify-between" pointerEvents="box-none">
+          {/* Top: Header + Node picker */}
+          <View pointerEvents="auto">
+            <View className="flex-row items-center justify-between mt-4 mb-2">
+              <Text testID="dashboard-title" className="text-2xl font-bold text-white">{t('dashboard.title')}</Text>
+              <StatusDot status={isConnected ? 'connected' : 'disconnected'} size={10} />
+            </View>
+
+            {/* Node picker pills */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -77,7 +83,7 @@ export default function DashboardScreen() {
                     className={`px-4 py-2 rounded-full ${
                       node.id === activeNodeId
                         ? 'bg-green-600'
-                        : 'bg-gray-800'
+                        : 'bg-gray-800/70'
                     }`}
                   >
                     <Text
@@ -93,102 +99,86 @@ export default function DashboardScreen() {
                 ))}
               </View>
             </ScrollView>
-          )}
-        </View>
+          </View>
 
-        {/* Center: 3D Globe */}
-        <View testID="node-info-card">
-          <GlobeView
-            localStatus={status}
-            remoteNodes={nodesQuery.data ?? undefined}
-          />
-          {/* Node info overlay */}
-          <View className="flex-row items-center justify-between mt-2 px-1">
-            <View className="flex-row items-center gap-2">
-              {nodeInfo.flag ? (
-                <Text className="text-lg">{nodeInfo.flag}</Text>
-              ) : null}
-              <Text className="text-white font-semibold">{nodeInfo.name}</Text>
-              <Text className="text-gray-500 text-xs">v{nodeInfo.version}</Text>
-            </View>
-            <Text className="text-gray-400 text-xs">{nodeInfo.ip} · {nodeInfo.uptime}</Text>
-          </View>
-        </View>
+          {/* Center spacer — let touch pass through to globe */}
+          <View className="flex-1" pointerEvents="none" />
 
-        {/* Bottom: Stats */}
-        <View>
-        {/* Metric Rings */}
-        <View className="flex-row justify-between mb-3">
-          <View testID="metric-cpu">
-            <MetricRing
-              label={t('dashboard.cpu')}
-              value={Math.round(cpuPercent)}
-              color="#30d158"
-            />
-          </View>
-          <View testID="metric-memory">
-            <MetricRing
-              label={t('dashboard.memory')}
-              value={memPercent}
-              color="#5e5ce6"
-            />
-          </View>
-          <View testID="metric-disk">
-            <MetricRing
-              label={t('dashboard.disk')}
-              value={diskPercent}
-              color="#ff9f0a"
-            />
-          </View>
-        </View>
+          {/* Bottom: Stats */}
+          <View pointerEvents="auto">
+            {/* Metric Rings */}
+            <View className="flex-row justify-between mb-3">
+              <View testID="metric-cpu">
+                <MetricRing
+                  label={t('dashboard.cpu')}
+                  value={Math.round(cpuPercent)}
+                  color="#30d158"
+                />
+              </View>
+              <View testID="metric-memory">
+                <MetricRing
+                  label={t('dashboard.memory')}
+                  value={memPercent}
+                  color="#5e5ce6"
+                />
+              </View>
+              <View testID="metric-disk">
+                <MetricRing
+                  label={t('dashboard.disk')}
+                  value={diskPercent}
+                  color="#ff9f0a"
+                />
+              </View>
+            </View>
 
-        {/* Network row */}
-        <View className="flex-row gap-3 mb-3">
-          <View className="flex-1 bg-gray-900 rounded-xl p-3">
-            <View className="flex-row items-center gap-1.5 mb-1">
-              <Ionicons name="arrow-up-outline" size={14} color="#30d158" />
-              <Text className="text-gray-400 text-xs">{t('speedtest.upload')}</Text>
+            {/* Network row */}
+            <View className="flex-row gap-3 mb-3">
+              <View className="flex-1 bg-gray-900/80 rounded-xl p-3">
+                <View className="flex-row items-center gap-1.5 mb-1">
+                  <Ionicons name="arrow-up-outline" size={14} color="#30d158" />
+                  <Text className="text-gray-400 text-xs">{t('speedtest.upload')}</Text>
+                </View>
+                <Text testID="net-upload" className="text-white text-base font-bold">
+                  {formatNetworkRate(netSent)}
+                </Text>
+              </View>
+              <View className="flex-1 bg-gray-900/80 rounded-xl p-3">
+                <View className="flex-row items-center gap-1.5 mb-1">
+                  <Ionicons name="arrow-down-outline" size={14} color="#5e5ce6" />
+                  <Text className="text-gray-400 text-xs">{t('speedtest.download')}</Text>
+                </View>
+                <Text testID="net-download" className="text-white text-base font-bold">
+                  {formatNetworkRate(netRecv)}
+                </Text>
+              </View>
             </View>
-            <Text testID="net-upload" className="text-white text-base font-bold">
-              {formatNetworkRate(netSent)}
-            </Text>
-          </View>
-          <View className="flex-1 bg-gray-900 rounded-xl p-3">
-            <View className="flex-row items-center gap-1.5 mb-1">
-              <Ionicons name="arrow-down-outline" size={14} color="#5e5ce6" />
-              <Text className="text-gray-400 text-xs">{t('speedtest.download')}</Text>
-            </View>
-            <Text testID="net-download" className="text-white text-base font-bold">
-              {formatNetworkRate(netRecv)}
-            </Text>
-          </View>
-        </View>
 
-        {/* Apps + Containers row */}
-        <View className="flex-row gap-3">
-          <View testID="container-summary" className="flex-1 bg-gray-900 rounded-xl p-3">
-            <View className="flex-row items-center gap-1.5 mb-1">
-              <Ionicons name="cube-outline" size={14} color="#ff9f0a" />
-              <Text className="text-gray-400 text-xs">{t('dashboard.containers')}</Text>
+            {/* Apps + Containers row */}
+            <View className="flex-row gap-3 mb-1">
+              <View testID="container-summary" className="flex-1 bg-gray-900/80 rounded-xl p-3">
+                <View className="flex-row items-center gap-1.5 mb-1">
+                  <Ionicons name="cube-outline" size={14} color="#ff9f0a" />
+                  <Text className="text-gray-400 text-xs">{t('dashboard.containers')}</Text>
+                </View>
+                <Text className="text-white text-base font-bold">
+                  <Text className="text-green-500">{containersRunning}</Text>
+                  <Text className="text-gray-500"> / {containersTotal}</Text>
+                </Text>
+              </View>
+              <View className="flex-1 bg-gray-900/80 rounded-xl p-3">
+                <View className="flex-row items-center gap-1.5 mb-1">
+                  <Ionicons name="grid-outline" size={14} color="#bf5af2" />
+                  <Text className="text-gray-400 text-xs">{t('nav.apps')}</Text>
+                </View>
+                <Text className="text-white text-base font-bold">
+                  <Text className="text-green-500">{appsRunning}</Text>
+                  <Text className="text-gray-500"> / {appsCount}</Text>
+                </Text>
+              </View>
             </View>
-            <Text className="text-white text-base font-bold">
-              <Text className="text-green-500">{containersRunning}</Text>
-              <Text className="text-gray-500"> / {containersTotal}</Text>
-            </Text>
-          </View>
-          <View className="flex-1 bg-gray-900 rounded-xl p-3">
-            <View className="flex-row items-center gap-1.5 mb-1">
-              <Ionicons name="grid-outline" size={14} color="#bf5af2" />
-              <Text className="text-gray-400 text-xs">{t('nav.apps')}</Text>
-            </View>
-            <Text className="text-white text-base font-bold">
-              <Text className="text-green-500">{appsRunning}</Text>
-              <Text className="text-gray-500"> / {appsCount}</Text>
-            </Text>
           </View>
         </View>
-        </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }

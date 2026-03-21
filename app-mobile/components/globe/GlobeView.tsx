@@ -1,5 +1,5 @@
-import { useRef, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { useRef, useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
 import { Renderer, loadTextureAsync } from 'expo-three';
 import { Asset } from 'expo-asset';
@@ -23,40 +23,69 @@ function latLonToPos(lat: number, lon: number, radius = EARTH_RADIUS): Vec3Tuple
   ];
 }
 
+interface BillboardData {
+  x: number;
+  y: number;
+  visible: boolean;
+  name: string;
+  flag: string;
+  cpu: string;
+  mem: string;
+  containers: number;
+  ip: string;
+  uptime: string;
+  type: 'local' | 'remote';
+}
+
 interface GlobeViewProps {
   localStatus?: StatusResponse | null;
   remoteNodes?: RemoteNode[];
+  fullscreen?: boolean;
 }
 
-export function GlobeView({ localStatus, remoteNodes }: GlobeViewProps) {
+export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewProps) {
   const { panResponder, getRotation, getVelocity } = useGlobeGesture();
   const propsRef = useRef({ localStatus, remoteNodes });
   propsRef.current = { localStatus, remoteNodes };
 
+  const [billboards, setBillboards] = useState<BillboardData[]>([]);
+  const billboardRef = useRef<BillboardData[]>([]);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const sizeRef = useRef({ w: 0, h: 0 });
+
+  // Periodically sync projected billboard positions to React state
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setBillboards([...billboardRef.current]);
+    }, 50); // 20fps for overlay updates
+    return () => clearInterval(interval);
+  }, []);
+
   const onContextCreate = useCallback((gl: ExpoWebGLRenderingContext) => {
     const renderer = new Renderer({ gl });
-    renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    renderer.setSize(w, h);
     renderer.setClearColor(0x000000, 1);
+    sizeRef.current = { w, h };
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      45, gl.drawingBufferWidth / gl.drawingBufferHeight, 0.1, 100,
-    );
-    camera.position.set(0, 0, 4.2);
+    const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
+    camera.position.set(0, 0, 8.0);
+    cameraRef.current = camera;
 
     const globe = new THREE.Group();
     scene.add(globe);
 
     const sunDir = getSunDirection();
 
-    // Earth — fallback color, then upgrade to shared day/night shader
+    // Earth
     const earthMesh = new THREE.Mesh(
       new THREE.SphereGeometry(EARTH_RADIUS, 48, 48),
       new THREE.MeshBasicMaterial({ color: 0x1a3a5c }),
     );
     globe.add(earthMesh);
 
-    // Load 3 textures → shared earth shader (day/night + specular)
     Promise.all(
       [
         'https://unpkg.com/three-globe@2.41.2/example/img/earth-blue-marble.jpg',
@@ -97,7 +126,7 @@ export function GlobeView({ localStatus, remoteNodes }: GlobeViewProps) {
       })
       .catch(() => {});
 
-    // Atmosphere — shared atmos shader
+    // Atmosphere
     globe.add(new THREE.Mesh(
       new THREE.SphereGeometry(EARTH_RADIUS * 1.04, 48, 48),
       new THREE.ShaderMaterial({
@@ -116,7 +145,7 @@ export function GlobeView({ localStatus, remoteNodes }: GlobeViewProps) {
       }),
     ));
 
-    // Stars (InstancedMesh — expo-gl doesn't support GL_POINTS)
+    // Stars
     const starGeo = new THREE.SphereGeometry(0.015, 4, 4);
     const starMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const stars = new THREE.InstancedMesh(starGeo, starMat, 200);
@@ -138,24 +167,78 @@ export function GlobeView({ localStatus, remoteNodes }: GlobeViewProps) {
     // Node markers
     const markerGroup = new THREE.Group();
     globe.add(markerGroup);
+
+    interface MarkerEntry {
+      pos: Vec3Tuple;
+      color: number;
+      type: 'local' | 'remote';
+      name: string;
+      flag: string;
+      cpu: string;
+      mem: string;
+      containers: number;
+      ip: string;
+      uptime: string;
+    }
+
     let lastMarkersKey = '';
+    let markerEntries: MarkerEntry[] = [];
 
     function syncMarkers() {
       const { localStatus: ls, remoteNodes: rn } = propsRef.current;
-      const entries: { pos: Vec3Tuple; color: number }[] = [];
+      const entries: MarkerEntry[] = [];
+
       if (ls?.node?.country) {
         const cc = COUNTRY_COORDS[ls.node.country.toUpperCase()];
-        if (cc) entries.push({ pos: latLonToPos(cc[0], cc[1], EARTH_RADIUS * 1.01), color: 0x30d158 });
+        if (cc) {
+          const flag = [...ls.node.country.toUpperCase()]
+            .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+            .join('');
+          entries.push({
+            pos: latLonToPos(cc[0], cc[1], EARTH_RADIUS * 1.01),
+            color: 0x30d158,
+            type: 'local',
+            name: ls.node.name ?? 'Local',
+            flag,
+            cpu: `${ls.system.cpu.usage_percent.toFixed(0)}%`,
+            mem: `${ls.system.memory.usage_percent.toFixed(0)}%`,
+            containers: ls.containers.running,
+            ip: ls.node.public_ip ?? '--',
+            uptime: formatUptime(ls.node.uptime),
+          });
+        }
       }
+
       if (rn) {
         for (const node of rn) {
           const coords = resolveNodeCoords(node);
-          if (coords) entries.push({ pos: latLonToPos(coords[0], coords[1], EARTH_RADIUS * 1.01), color: 0xbf5af2 });
+          if (coords) {
+            const flag = node.country
+              ? [...node.country.toUpperCase()]
+                  .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+                  .join('')
+              : '';
+            entries.push({
+              pos: latLonToPos(coords[0], coords[1], EARTH_RADIUS * 1.01),
+              color: 0xbf5af2,
+              type: 'remote',
+              name: node.name ?? node.id,
+              flag,
+              cpu: '--',
+              mem: '--',
+              containers: 0,
+              ip: node.address ?? '--',
+              uptime: '--',
+            });
+          }
         }
       }
+
       const key = entries.map(e => e.pos.join(',')).join(';');
       if (key === lastMarkersKey) return;
       lastMarkersKey = key;
+      markerEntries = entries;
+
       while (markerGroup.children.length) {
         const c = markerGroup.children[0] as THREE.Mesh;
         markerGroup.remove(c);
@@ -175,8 +258,8 @@ export function GlobeView({ localStatus, remoteNodes }: GlobeViewProps) {
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.15));
 
-    // Camera orbits around the globe (like web version)
-    const camRadius = 4.2;
+    const camRadius = 8.0;
+    const projVec = new THREE.Vector3();
 
     const animate = () => {
       requestAnimationFrame(animate);
@@ -194,11 +277,53 @@ export function GlobeView({ localStatus, remoteNodes }: GlobeViewProps) {
       camera.position.z = camRadius * Math.cos(rot.y) * Math.cos(rot.x);
       camera.lookAt(0, 0, 0);
 
-      // Pulse markers
       const t = Date.now() * 0.003;
       for (const m of markerGroup.children) m.scale.setScalar(1 + 0.3 * Math.sin(t));
 
       syncMarkers();
+
+      // Project marker positions to screen coordinates for billboards
+      const viewW = sizeRef.current.w;
+      const viewH = sizeRef.current.h;
+      // GLView pixel ratio: screen coords = projected * cssSize
+      // We need CSS size, not drawingBuffer size
+      const dpr = viewW > 0 ? viewW / (styles.canvas.flex * 1) : 1; // approximate
+
+      camera.updateMatrixWorld();
+      const newBillboards: BillboardData[] = [];
+      for (const entry of markerEntries) {
+        projVec.set(...entry.pos);
+        projVec.project(camera);
+
+        // Check if behind camera
+        const isBehind = projVec.z > 1;
+        // Check if occluded by earth (dot product between camera→marker and camera→origin)
+        const markerVec = new THREE.Vector3(...entry.pos).sub(camera.position);
+        const originVec = new THREE.Vector3(0, 0, 0).sub(camera.position);
+        const markerDist = markerVec.length();
+        const originDist = originVec.length();
+        markerVec.normalize();
+        originVec.normalize();
+        const behindEarth = markerDist > originDist && markerVec.dot(originVec) > 0.85;
+
+        newBillboards.push({
+          // Map from NDC [-1,1] to container pixels [0, containerSize]
+          // Container is 260px tall, width is full screen
+          x: (projVec.x * 0.5 + 0.5) * 100, // percentage
+          y: (-projVec.y * 0.5 + 0.5) * 100,
+          visible: !isBehind && !behindEarth,
+          name: entry.name,
+          flag: entry.flag,
+          cpu: entry.cpu,
+          mem: entry.mem,
+          containers: entry.containers,
+          ip: entry.ip,
+          uptime: entry.uptime,
+          type: entry.type,
+        });
+      }
+      billboardRef.current = newBillboards;
+
       renderer.render(scene, camera);
       gl.endFrameEXP();
     };
@@ -207,10 +332,60 @@ export function GlobeView({ localStatus, remoteNodes }: GlobeViewProps) {
   }, []);
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View style={fullscreen ? styles.fullscreen : styles.container} {...panResponder.panHandlers}>
       <GLView style={styles.canvas} onContextCreate={onContextCreate} />
+      {/* Billboard overlays */}
+      {billboards.map((b, i) => (
+        <View
+          key={i}
+          pointerEvents="none"
+          style={[
+            styles.billboard,
+            {
+              left: `${b.x}%` as unknown as number,
+              top: `${b.y}%` as unknown as number,
+              opacity: b.visible ? 1 : 0,
+            },
+          ]}
+        >
+          <View style={styles.billboardCard}>
+            {/* Header */}
+            <View style={styles.billboardHeader}>
+              <View style={[styles.pingDot, { backgroundColor: b.type === 'local' ? '#30d158' : '#bf5af2' }]} />
+              <Text style={styles.billboardName} numberOfLines={1}>{b.name}</Text>
+              {b.flag ? <Text style={styles.billboardFlag}>{b.flag}</Text> : null}
+            </View>
+            {/* Stats */}
+            <View style={styles.billboardStats}>
+              <View style={styles.billboardStat}>
+                <Text style={styles.billboardValue}>{b.cpu}</Text>
+                <Text style={styles.billboardLabel}>CPU</Text>
+              </View>
+              <View style={styles.billboardDivider} />
+              <View style={styles.billboardStat}>
+                <Text style={styles.billboardValue}>{b.mem}</Text>
+                <Text style={styles.billboardLabel}>MEM</Text>
+              </View>
+              <View style={styles.billboardDivider} />
+              <View style={styles.billboardStat}>
+                <Text style={styles.billboardValue}>{b.containers}</Text>
+                <Text style={styles.billboardLabel}>CTR</Text>
+              </View>
+            </View>
+            {/* Arrow */}
+            <View style={styles.billboardArrow} />
+          </View>
+        </View>
+      ))}
     </View>
   );
+}
+
+function formatUptime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+  return `${Math.floor(seconds / 86400)}d`;
 }
 
 const styles = StyleSheet.create({
@@ -219,6 +394,81 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#000',
+    position: 'relative',
+  },
+  fullscreen: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
   },
   canvas: { flex: 1 },
+  billboard: {
+    position: 'absolute',
+    transform: [{ translateX: -60 }, { translateY: -75 }],
+  },
+  billboardCard: {
+    backgroundColor: 'rgba(20, 20, 30, 0.92)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    width: 120,
+    alignItems: 'center',
+  },
+  billboardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  pingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  billboardName: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+  },
+  billboardFlag: {
+    fontSize: 12,
+  },
+  billboardStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  billboardStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  billboardValue: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  billboardLabel: {
+    color: '#888',
+    fontSize: 8,
+  },
+  billboardDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  billboardArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 5,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: 'rgba(20, 20, 30, 0.92)',
+    marginTop: -1,
+    position: 'absolute',
+    bottom: -5,
+  },
 });
