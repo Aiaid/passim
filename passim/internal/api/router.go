@@ -20,6 +20,7 @@ type Deps struct {
 	DB        *sql.DB
 	JWT       *auth.JWTManager
 	WebAuthn  *auth.WebAuthnManager
+	Pairing   *auth.PairingStore
 	Docker    docker.DockerClient
 	Templates *template.Registry
 	SSL       *ssl.SSLManager
@@ -41,7 +42,7 @@ func NewRouter(deps Deps) http.Handler {
 	r.Use(corsMiddleware())
 	r.Use(gin.Logger())
 
-	ah := &authHandler{database: deps.DB, jwt: deps.JWT}
+	ah := &authHandler{database: deps.DB, jwt: deps.JWT, pairing: deps.Pairing}
 
 	api := r.Group("/api")
 	{
@@ -92,6 +93,8 @@ func NewRouter(deps Deps) http.Handler {
 				protected.GET("/auth/passkeys", ph.listPasskeys)
 				protected.DELETE("/auth/passkeys/:id", ph.deletePasskey)
 			}
+
+			protected.POST("/auth/pairing", ah.createPairing)
 
 			protected.GET("/status", statusHandler(deps))
 			protected.GET("/settings", getSettingsHandler(deps))

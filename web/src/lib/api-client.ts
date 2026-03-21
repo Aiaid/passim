@@ -81,6 +81,10 @@ export const api = {
   listPasskeys: () => request<{ id: string; name: string; created_at: string; last_used_at: string }[]>('/auth/passkeys'),
   deletePasskey: (id: string) => request<void>(`/auth/passkeys/${id}`, { method: 'DELETE' }),
 
+  // Auth - Pairing
+  createPairing: () =>
+    request<{ token: string; name: string; expires_in: number }>('/auth/pairing', { method: 'POST' }),
+
   // Status
   getStatus: () => request<StatusResponse>('/status'),
 

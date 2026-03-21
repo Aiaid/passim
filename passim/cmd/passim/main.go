@@ -215,10 +215,13 @@ func main() {
 		updater = update.NewUpdater(dockerClient, imageName)
 	}
 
+	pairingStore := auth.NewPairingStore()
+
 	deps := api.Deps{
 		DB:         database,
 		JWT:        jwtMgr,
 		WebAuthn:   webauthnMgr,
+		Pairing:    pairingStore,
 		Docker:     dockerClient,
 		Templates:  registry,
 		SSL:        sslMgr,

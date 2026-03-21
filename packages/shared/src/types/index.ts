@@ -174,6 +174,12 @@ export interface UpdateInfo {
   prerelease?: boolean;
 }
 
+export interface PairingInfo {
+  token: string;
+  name: string;
+  expires_in: number;
+}
+
 export interface PublicKeyCredentialRequestOptionsJSON {
   challenge: string;
   timeout?: number;

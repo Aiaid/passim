@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/auth"
@@ -13,6 +14,7 @@ import (
 type authHandler struct {
 	database *sql.DB
 	jwt      *auth.JWTManager
+	pairing  *auth.PairingStore
 }
 
 type loginRequest struct {
@@ -33,8 +35,11 @@ func (h *authHandler) login(c *gin.Context) {
 	}
 
 	if !auth.VerifyAPIKey(req.APIKey, hash) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid api key"})
-		return
+		// Fall back to pairing token check.
+		if h.pairing == nil || !h.pairing.Verify(req.APIKey) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid api key"})
+			return
+		}
 	}
 
 	version, err := h.authVersion()
@@ -92,6 +97,31 @@ func (h *authHandler) refresh(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"token":      token,
 		"expires_at": exp,
+	})
+}
+
+const pairingTTL = 5 * time.Minute
+
+func (h *authHandler) createPairing(c *gin.Context) {
+	if h.pairing == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "pairing not available"})
+		return
+	}
+
+	token, err := auth.GeneratePairingToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+
+	h.pairing.Store(token, pairingTTL)
+
+	nodeName, _ := db.GetConfig(h.database, "node_name")
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":      token,
+		"name":       nodeName,
+		"expires_in": int(pairingTTL.Seconds()),
 	})
 }
 

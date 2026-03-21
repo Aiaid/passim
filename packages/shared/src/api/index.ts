@@ -10,6 +10,7 @@ import type {
   SSLStatus,
   VersionInfo,
   UpdateInfo,
+  PairingInfo,
   RemoteNode,
   ConnectionInfo,
   PublicKeyCredentialRequestOptionsJSON,
@@ -61,6 +62,9 @@ export function createApi(request: <T>(path: string, options?: RequestInit) => P
       }),
     listPasskeys: () => request<{ id: string; name: string; created_at: string; last_used_at: string }[]>('/auth/passkeys'),
     deletePasskey: (id: string) => request<void>(`/auth/passkeys/${id}`, { method: 'DELETE' }),
+
+    // Auth - Pairing
+    createPairing: () => request<PairingInfo>('/auth/pairing', { method: 'POST' }),
 
     // Status
     getStatus: () => request<StatusResponse>('/status'),

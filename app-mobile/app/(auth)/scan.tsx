@@ -40,7 +40,7 @@ async function loginToNode(host: string, key: string): Promise<{ token: string; 
   const res = await fetch(`https://${host}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key }),
+    body: JSON.stringify({ api_key: key }),
   });
 
   if (!res.ok) {
