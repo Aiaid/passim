@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import i18next from 'i18next';
 import { useAuthStore } from '@/stores/auth-store';
 import type { StatusResponse, Container, AppResponse, RemoteNode } from '@/lib/api-client';
 
@@ -60,20 +62,46 @@ export function EventStreamProvider({ children }: { children: React.ReactNode })
       source.onopen = () => {
         setIsConnected(true);
 
-        // After an update, the new container serves new frontend assets.
-        // Reload the page so the browser picks up the new JS/CSS bundle.
-        const pendingTs = sessionStorage.getItem('passim-update-pending');
-        if (pendingTs) {
-          const elapsed = Date.now() - Number(pendingTs);
-          if (elapsed > 5_000 && elapsed < 10 * 60_000) {
-            sessionStorage.removeItem('passim-update-pending');
-            window.location.reload();
-            return;
-          }
+        // After an update, detect whether it succeeded or rolled back.
+        const pendingStr = sessionStorage.getItem('passim-update-pending');
+        if (!pendingStr) return;
+
+        try {
+          const pending = JSON.parse(pendingStr);
+          const elapsed = Date.now() - pending.ts;
+
           // Stale flag (> 10 min), clean up
           if (elapsed >= 10 * 60_000) {
             sessionStorage.removeItem('passim-update-pending');
+            return;
           }
+          // Too early (< 5s) — initial connection, not a reconnect after update
+          if (elapsed < 5_000) return;
+
+          // Fetch current version to determine outcome
+          fetch('/api/version')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+              sessionStorage.removeItem('passim-update-pending');
+              if (!data) return;
+
+              const changed = data.version !== pending.fromVersion
+                || data.commit !== pending.fromCommit;
+
+              if (changed) {
+                // Update succeeded — reload to pick up new frontend assets
+                sessionStorage.setItem('passim-update-result', 'success');
+                window.location.reload();
+              } else {
+                // Version unchanged — rollback happened
+                toast.error(i18next.t('settings.update_rollback'));
+              }
+            })
+            .catch(() => {
+              sessionStorage.removeItem('passim-update-pending');
+            });
+        } catch {
+          sessionStorage.removeItem('passim-update-pending');
         }
       };
 

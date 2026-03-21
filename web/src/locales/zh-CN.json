@@ -96,7 +96,9 @@
     "dev_channel_desc": "强制拉取 main 分支最新构建 (ghcr.io/aiaid/passim:dev)",
     "pull_latest_dev": "拉取最新 dev",
     "changelog": "更新日志",
-    "published_at": "发布于 {{date}}"
+    "published_at": "发布于 {{date}}",
+    "update_success": "更新成功，已切换到新版本",
+    "update_rollback": "更新失败，已自动回滚到之前的版本"
   },
   "auth": {
     "sign_in": "登录",

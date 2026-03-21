@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, Download, CheckCircle, Info, GitBranch } from 'lucide-react';
@@ -39,8 +39,12 @@ export function UpdateSettings() {
     onMutate: () => setUpdating(true),
     onSuccess: () => {
       toast.success(t('settings.update_started'));
-      // Signal SSE reconnect handler to reload the page when the new container is ready
-      sessionStorage.setItem('passim-update-pending', String(Date.now()));
+      // Signal SSE reconnect handler to detect update outcome
+      sessionStorage.setItem('passim-update-pending', JSON.stringify({
+        ts: Date.now(),
+        fromVersion: versionInfo?.version ?? '',
+        fromCommit: versionInfo?.commit ?? '',
+      }));
     },
     onError: (err) => {
       setUpdating(false);
@@ -56,6 +60,18 @@ export function UpdateSettings() {
     setPrerelease(checked);
     // queryKey changes will trigger refetch automatically
   }
+
+  // Show toast after page reload following a successful update
+  useEffect(() => {
+    const result = sessionStorage.getItem('passim-update-result');
+    if (result) {
+      sessionStorage.removeItem('passim-update-result');
+      if (result === 'success') {
+        toast.success(t('settings.update_success'));
+      }
+      setUpdating(false);
+    }
+  }, [t]);
 
   const isDev = !versionInfo?.version
     || versionInfo.version === 'dev'

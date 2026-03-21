@@ -96,7 +96,9 @@
     "dev_channel_desc": "Force pull the latest main branch build (ghcr.io/aiaid/passim:dev)",
     "pull_latest_dev": "Pull latest dev",
     "changelog": "Changelog",
-    "published_at": "Published {{date}}"
+    "published_at": "Published {{date}}",
+    "update_success": "Update successful, switched to new version",
+    "update_rollback": "Update failed, automatically rolled back to previous version"
   },
   "auth": {
     "sign_in": "Sign In",
