@@ -14,4 +14,12 @@ config.watchFolders = [
 // Allow Metro to resolve symlinked packages
 config.resolver.unstable_enableSymlinks = true;
 
+// Force single Three.js instance to prevent "Multiple instances" warning
+// which causes __r3f reconciler failures in pnpm monorepos
+const threeResolve = path.resolve(__dirname, 'node_modules', 'three');
+config.resolver.extraNodeModules = {
+  ...config.resolver.extraNodeModules,
+  three: threeResolve,
+};
+
 module.exports = withNativeWind(config, { input: './global.css' });
