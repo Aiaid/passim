@@ -6,6 +6,7 @@ import { PageSkeleton } from '@/components/shared/loading-skeleton';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CATEGORY_ICONS } from '@/lib/constants';
+import { useEventStream } from '@/hooks/use-event-stream';
 import { TemplateGrid } from './template-grid';
 import { useTemplates } from './queries';
 
@@ -14,6 +15,7 @@ const CATEGORIES = ['all', 'vpn', 'storage', 'proxy', 'remote', 'tools'] as cons
 export function MarketplacePage() {
   const { t } = useTranslation();
   const { data: templates, isLoading } = useTemplates();
+  const { apps } = useEventStream();
 
   const [category, setCategory] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -21,13 +23,17 @@ export function MarketplacePage() {
   const filtered = useMemo(() => {
     if (!templates) return [];
 
+    // Hide templates that are already deployed
+    const deployedTemplates = new Set(apps?.map((a) => a.template));
+
     return templates.filter((tpl) => {
+      if (deployedTemplates.has(tpl.name)) return false;
       const matchCategory = category === 'all' || tpl.category === category;
       const matchSearch =
         !search || tpl.name.toLowerCase().includes(search.toLowerCase());
       return matchCategory && matchSearch;
     });
-  }, [templates, category, search]);
+  }, [templates, category, search, apps]);
 
   if (isLoading) {
     return <PageSkeleton />;
