@@ -1,7 +1,9 @@
 import { useLocation, Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Container, AppWindow, Globe, Settings, LogOut } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { LayoutDashboard, Container, AppWindow, Globe, Settings, LogOut, ArrowUpCircle } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { api } from '@/lib/api-client';
 import {
   Sidebar,
   SidebarContent,
@@ -33,6 +35,21 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const logout = useAuthStore((s) => s.logout);
   const { state } = useSidebar();
+
+  const { data: versionInfo } = useQuery({
+    queryKey: ['version'],
+    queryFn: () => api.getVersion(),
+    staleTime: Infinity,
+  });
+
+  const { data: updateInfo } = useQuery({
+    queryKey: ['update-check', false],
+    queryFn: () => api.checkUpdate(),
+    staleTime: 10 * 60_000,
+    retry: false,
+  });
+
+  const hasUpdate = updateInfo?.available ?? false;
 
   return (
     <Sidebar>
@@ -69,6 +86,24 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          {/* Update available indicator */}
+          {hasUpdate && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                size="lg"
+                className="text-base text-[oklch(0.65_0.2_145)] hover:text-[oklch(0.7_0.2_145)]"
+              >
+                <Link to="/settings">
+                  <ArrowUpCircle className="size-5" />
+                  <span className="flex items-center gap-2">
+                    {t('settings.update_available')}
+                    <span className="text-xs font-mono opacity-70">{updateInfo?.latest}</span>
+                  </span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           {bottomItems.map((item) => (
             <SidebarMenuItem key={item.key}>
               <SidebarMenuButton asChild isActive={location.pathname === item.path} size="lg" className="text-base">
@@ -79,6 +114,16 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
+          {/* Version display */}
+          {state !== 'collapsed' && versionInfo?.version && (
+            <SidebarMenuItem>
+              <div className="px-3 py-1.5">
+                <span className="text-xs font-mono text-muted-foreground/50">
+                  {versionInfo.version}
+                </span>
+              </div>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"

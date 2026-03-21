@@ -34,6 +34,7 @@ interface BillboardData {
   containers: number;
   ip: string;
   uptime: string;
+  version: string;
   type: 'local' | 'remote';
 }
 
@@ -72,6 +73,8 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
     camera.position.set(0, 0, 9.0);
+    // Shift viewport up so globe appears in upper portion — pure 2D offset, no effect on rotation
+    camera.setViewOffset(w, h, 0, h * 0.12, w, h);
     cameraRef.current = camera;
 
     const globe = new THREE.Group();
@@ -180,6 +183,7 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
       containers: number;
       ip: string;
       uptime: string;
+      version: string;
     }
 
     let lastMarkersKey = '';
@@ -206,6 +210,7 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
             containers: ls.containers.running,
             ip: ls.node.public_ip ?? '--',
             uptime: formatUptime(ls.node.uptime),
+            version: ls.node.version ?? '',
           });
         }
       }
@@ -225,11 +230,12 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
               type: 'remote',
               name: node.name ?? node.id,
               flag,
-              cpu: '--',
-              mem: '--',
-              containers: 0,
+              cpu: node.metrics ? `${node.metrics.cpu_percent.toFixed(0)}%` : '--',
+              mem: node.metrics ? `${node.metrics.memory_percent.toFixed(0)}%` : '--',
+              containers: node.metrics?.containers?.running ?? 0,
               ip: node.address ?? '--',
               uptime: '--',
+              version: node.version ?? '',
             });
           }
         }
@@ -276,7 +282,7 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
       camera.position.x = camRadius * Math.sin(rot.y) * Math.cos(rot.x);
       camera.position.y = camRadius * Math.sin(rot.x);
       camera.position.z = camRadius * Math.cos(rot.y) * Math.cos(rot.x);
-      camera.lookAt(0, -1.03, 0);
+      camera.lookAt(0, 0, 0);
 
       const t = Date.now() * 0.003;
       for (const m of markerGroup.children) m.scale.setScalar(1 + 0.3 * Math.sin(t));
@@ -320,6 +326,7 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
           containers: entry.containers,
           ip: entry.ip,
           uptime: entry.uptime,
+          version: entry.version,
           type: entry.type,
         });
       }

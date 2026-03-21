@@ -42,6 +42,9 @@ function NodeCard({ nodeId, onPress }: { nodeId: string; onPress: () => void }) 
           <Text className="text-white font-semibold text-base" numberOfLines={1}>
             {nodeName}
           </Text>
+          {nodeStatus?.node?.version ? (
+            <Text className="text-gray-600 text-[10px] font-mono">{nodeStatus.node.version}</Text>
+          ) : null}
         </View>
         <StatusDot status={connected ? 'connected' : 'disconnected'} />
       </View>
