@@ -1,13 +1,5 @@
-import { useEffect } from 'react';
-import { View } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  cancelAnimation,
-} from 'react-native-reanimated';
+import { useEffect, useRef } from 'react';
+import { View, Animated } from 'react-native';
 
 export interface StatusDotProps {
   status: 'running' | 'connected' | 'stopped' | 'disconnected' | 'deploying' | 'error';
@@ -24,33 +16,27 @@ const STATUS_COLORS: Record<StatusDotProps['status'], string> = {
 };
 
 export function StatusDot({ status, size = 8 }: StatusDotProps) {
-  const opacity = useSharedValue(1);
+  const opacity = useRef(new Animated.Value(1)).current;
   const shouldPulse = status === 'running' || status === 'connected' || status === 'deploying';
   const duration = status === 'deploying' ? 500 : 1000;
 
   useEffect(() => {
     if (shouldPulse) {
-      opacity.value = withRepeat(
-        withSequence(
-          withTiming(0.4, { duration }),
-          withTiming(1, { duration }),
-        ),
-        -1,
-        false,
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(opacity, { toValue: 0.4, duration, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 1, duration, useNativeDriver: true }),
+        ]),
       );
+      animation.start();
+      return () => animation.stop();
     } else {
-      cancelAnimation(opacity);
-      opacity.value = 1;
+      opacity.setValue(1);
     }
-    return () => cancelAnimation(opacity);
   }, [shouldPulse, duration, opacity]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
   return (
-    <Animated.View style={animatedStyle}>
+    <Animated.View style={{ opacity }}>
       <View
         style={{
           width: size,

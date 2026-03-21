@@ -1,21 +1,17 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const { withNativeWind } = require('nativewind/metro');
 const path = require('path');
 
-const projectRoot = __dirname;
-const monorepoRoot = path.resolve(projectRoot, '..');
+const config = getDefaultConfig(__dirname);
 
-const config = getDefaultConfig(projectRoot);
-
-// Watch the shared package
-config.watchFolders = [monorepoRoot];
-
-// Let Metro resolve packages from the monorepo root
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, 'node_modules'),
-  path.resolve(monorepoRoot, 'node_modules'),
+// pnpm uses symlinks — Metro needs to follow them and watch the real .pnpm store
+const monorepoRoot = path.resolve(__dirname, '..');
+config.watchFolders = [
+  path.resolve(monorepoRoot, 'node_modules', '.pnpm'),
+  path.resolve(monorepoRoot, 'packages'),
 ];
 
-// Resolve .native.tsx before .tsx for platform-specific files
-config.resolver.sourceExts = ['native.tsx', 'native.ts', ...config.resolver.sourceExts];
+// Allow Metro to resolve symlinked packages
+config.resolver.unstable_enableSymlinks = true;
 
-module.exports = config;
+module.exports = withNativeWind(config, { input: './global.css' });
