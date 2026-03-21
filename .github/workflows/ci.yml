@@ -50,9 +50,6 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -62,15 +59,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
       - name: Lint
-        run: pnpm lint
+        run: pnpm --filter web lint
       - name: Type check
-        run: pnpm tsc -b
+        run: pnpm --filter web tsc -b
       - name: Unit tests
-        run: pnpm vitest run
+        run: pnpm --filter web vitest run
 
   docker-build:
     runs-on: ubuntu-latest
