@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "scripts": {
+    "web:dev": "pnpm --filter web dev",
+    "web:build": "pnpm --filter web build",
+    "web:test": "pnpm --filter web test:run",
+    "app:start": "pnpm --filter app-mobile start",
+    "app:ios": "pnpm --filter app-mobile ios",
+    "app:android": "pnpm --filter app-mobile android",
+    "site:dev": "pnpm --filter passim-site dev",
+    "site:build": "pnpm --filter passim-site build",
+    "shared:build": "pnpm --filter @passim/shared build",
+    "typecheck": "pnpm -r run typecheck"
+  }
+}
