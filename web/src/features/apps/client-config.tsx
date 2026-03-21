@@ -70,7 +70,7 @@ export function ClientConfig({ appId, templateName }: ClientConfigProps) {
 
       {/* Share */}
       {config.share_supported && (
-        <ShareSection appId={appId} shareToken={config.share_token} />
+        <ShareSection appId={appId} config={config} />
       )}
     </div>
   );
@@ -442,14 +442,88 @@ function countryFlag(code: string): string {
 
 // ─── Share Section ────────────────────────────────────────
 
-function ShareSection({ appId, shareToken }: { appId: string; shareToken?: string }) {
+function ShareSection({ appId, config }: { appId: string; config: ClientConfigResponse }) {
   const createShare = useCreateShare();
   const revokeShare = useRevokeShare();
-  const [showQR, setShowQR] = useState(false);
+  const [qrValue, setQrValue] = useState<string | null>(null);
+  const shareTokens = config.share_tokens ?? {};
 
-  const shareURL = shareToken
-    ? `${window.location.origin}/s/${shareToken}`
-    : null;
+  // For file_per_user, show per-peer share links
+  if (config.type === 'file_per_user' && config.files && config.files.length > 0) {
+    const activeCount = config.files.filter((f) => shareTokens[f.index]).length;
+
+    return (
+      <div className="cfg-share-panel">
+        <div className="flex items-center gap-2 mb-3">
+          <Share2 className="size-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-foreground tracking-tight">Share</h3>
+          {activeCount > 0 && (
+            <span className="text-[10px] text-muted-foreground">
+              {activeCount}/{config.files.length} active
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          {config.files.map((file) => {
+            const token = shareTokens[file.index];
+            const url = token ? `${window.location.origin}/s/${token}` : null;
+
+            return (
+              <div key={file.index} className="flex items-center gap-2 py-1">
+                <div className="cfg-idx cfg-accent-file-bg shrink-0">{file.index}</div>
+                <span className="text-xs font-medium font-mono text-muted-foreground w-20 truncate shrink-0">
+                  {file.name}
+                </span>
+
+                {url ? (
+                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                    <code className="flex-1 rounded bg-muted/60 px-2 py-1 text-[10px] break-all font-mono border border-border/50 truncate">
+                      {url}
+                    </code>
+                    <CopyButton text={url} />
+                    <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => setQrValue(url)}>
+                      <QrCode className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost" size="icon"
+                      className="size-7 shrink-0 text-destructive hover:text-destructive"
+                      onClick={() => revokeShare.mutate({ id: appId, userIndex: file.index })}
+                      disabled={revokeShare.isPending}
+                      title="Revoke"
+                    >
+                      <Unlink className="size-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline" size="sm"
+                    className="h-7 text-xs gap-1.5"
+                    onClick={() => createShare.mutate({ id: appId, userIndex: file.index })}
+                    disabled={createShare.isPending}
+                  >
+                    <Share2 className="size-3" />
+                    Share
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <QRSpotlight
+          open={!!qrValue}
+          onClose={() => setQrValue(null)}
+          title="Share Link"
+          value={qrValue}
+        />
+      </div>
+    );
+  }
+
+  // For other types, keep single share link behavior
+  const shareToken = config.share_token;
+  const shareURL = shareToken ? `${window.location.origin}/s/${shareToken}` : null;
 
   return (
     <div className="cfg-share-panel">
@@ -466,7 +540,7 @@ function ShareSection({ appId, shareToken }: { appId: string; shareToken?: strin
               {shareURL}
             </code>
             <CopyButton text={shareURL} />
-            <Button variant="ghost" size="icon" className="size-8" onClick={() => setShowQR(true)}>
+            <Button variant="ghost" size="icon" className="size-8" onClick={() => setQrValue(shareURL)}>
               <QrCode className="size-4" />
             </Button>
           </div>
@@ -474,7 +548,7 @@ function ShareSection({ appId, shareToken }: { appId: string; shareToken?: strin
             variant="outline"
             size="sm"
             className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
-            onClick={() => revokeShare.mutate(appId)}
+            onClick={() => revokeShare.mutate({ id: appId })}
             disabled={revokeShare.isPending}
           >
             <Unlink className="size-3.5" />
@@ -482,8 +556,8 @@ function ShareSection({ appId, shareToken }: { appId: string; shareToken?: strin
           </Button>
 
           <QRSpotlight
-            open={showQR}
-            onClose={() => setShowQR(false)}
+            open={!!qrValue}
+            onClose={() => setQrValue(null)}
             title="Share Link"
             value={shareURL}
           />

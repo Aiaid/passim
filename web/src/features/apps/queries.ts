@@ -74,9 +74,10 @@ export function useRevokeShare() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => api.revokeShare(id),
-    onSuccess: (_data, id) => {
-      queryClient.invalidateQueries({ queryKey: ['app-client-config', id] });
+    mutationFn: ({ id, userIndex }: { id: string; userIndex?: number }) =>
+      api.revokeShare(id, userIndex),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['app-client-config', variables.id] });
       toast.success('Share link revoked');
     },
   });

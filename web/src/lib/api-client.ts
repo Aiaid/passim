@@ -125,8 +125,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ user_index: userIndex ?? 0 }),
     }),
-  revokeShare: (id: string) =>
-    request<{ ok: boolean }>(`/apps/${id}/share`, { method: 'DELETE' }),
+  revokeShare: (id: string, userIndex?: number) =>
+    request<{ ok: boolean }>(`/apps/${id}/share${userIndex != null ? `?user_index=${userIndex}` : ''}`, { method: 'DELETE' }),
 
   // Public share (no auth)
   getShareConfig: (token: string) => request<ShareConfigResponse>(`/s/${token}`),
@@ -301,6 +301,7 @@ export interface ClientConfigResponse {
   import_urls?: Record<string, string>;
   share_supported: boolean;
   share_token?: string;
+  share_tokens?: Record<number, string>;
 }
 
 export interface ShareConfigResponse {

@@ -46,8 +46,11 @@ func createShareHandler(deps Deps) gin.HandlerFunc {
 			}
 		}
 
-		// Check for existing active token
-		existing, _ := db.GetShareTokenByApp(deps.DB, id)
+		var req createShareRequest
+		c.ShouldBindJSON(&req)
+
+		// Check for existing active token with same user_index
+		existing, _ := db.GetShareTokenByAppAndUser(deps.DB, id, req.UserIndex)
 		if existing != nil {
 			scheme := "https"
 			host := c.Request.Host
@@ -57,9 +60,6 @@ func createShareHandler(deps Deps) gin.HandlerFunc {
 			})
 			return
 		}
-
-		var req createShareRequest
-		c.ShouldBindJSON(&req)
 
 		token := uuid.New().String()
 		st := &db.ShareToken{
@@ -86,6 +86,22 @@ func createShareHandler(deps Deps) gin.HandlerFunc {
 func revokeShareHandler(deps Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
+
+		// If user_index query param is provided, revoke only that peer's share
+		if uiStr := c.Query("user_index"); uiStr != "" {
+			ui, err := strconv.Atoi(uiStr)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_index"})
+				return
+			}
+			if err := db.RevokeShareTokenByUserIndex(deps.DB, id, ui); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"ok": true})
+			return
+		}
+
 		if err := db.RevokeShareTokens(deps.DB, id); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

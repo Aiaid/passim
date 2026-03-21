@@ -206,12 +206,58 @@ func GetShareTokenByApp(database *sql.DB, appID string) (*ShareToken, error) {
 	return &st, nil
 }
 
+func GetShareTokensByApp(database *sql.DB, appID string) ([]ShareToken, error) {
+	rows, err := database.Query(
+		`SELECT id, app_id, user_index, token, COALESCE(created_at,''), revoked
+		 FROM share_tokens WHERE app_id = ? AND revoked = 0 ORDER BY user_index`, appID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get share tokens by app: %w", err)
+	}
+	defer rows.Close()
+
+	var tokens []ShareToken
+	for rows.Next() {
+		var st ShareToken
+		if err := rows.Scan(&st.ID, &st.AppID, &st.UserIndex, &st.Token, &st.CreatedAt, &st.Revoked); err != nil {
+			return nil, fmt.Errorf("scan share token: %w", err)
+		}
+		tokens = append(tokens, st)
+	}
+	return tokens, rows.Err()
+}
+
+func GetShareTokenByAppAndUser(database *sql.DB, appID string, userIndex int) (*ShareToken, error) {
+	var st ShareToken
+	err := database.QueryRow(
+		`SELECT id, app_id, user_index, token, COALESCE(created_at,''), revoked
+		 FROM share_tokens WHERE app_id = ? AND user_index = ? AND revoked = 0 LIMIT 1`, appID, userIndex,
+	).Scan(&st.ID, &st.AppID, &st.UserIndex, &st.Token, &st.CreatedAt, &st.Revoked)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get share token by app and user: %w", err)
+	}
+	return &st, nil
+}
+
 func RevokeShareTokens(database *sql.DB, appID string) error {
 	_, err := database.Exec(
 		`UPDATE share_tokens SET revoked = 1 WHERE app_id = ? AND revoked = 0`, appID,
 	)
 	if err != nil {
 		return fmt.Errorf("revoke share tokens: %w", err)
+	}
+	return nil
+}
+
+func RevokeShareTokenByUserIndex(database *sql.DB, appID string, userIndex int) error {
+	_, err := database.Exec(
+		`UPDATE share_tokens SET revoked = 1 WHERE app_id = ? AND user_index = ? AND revoked = 0`, appID, userIndex,
+	)
+	if err != nil {
+		return fmt.Errorf("revoke share token by user: %w", err)
 	}
 	return nil
 }

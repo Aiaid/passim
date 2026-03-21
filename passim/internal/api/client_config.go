@@ -27,8 +27,9 @@ type clientConfigResponse struct {
 	Fields         []clientConfigField       `json:"fields,omitempty"`
 	URLs           []clientConfigURL         `json:"urls,omitempty"`
 	ImportURLs     map[string]string         `json:"import_urls,omitempty"`
-	ShareSupported bool                      `json:"share_supported"`
-	ShareToken     string                    `json:"share_token,omitempty"`
+	ShareSupported bool              `json:"share_supported"`
+	ShareToken     string            `json:"share_token,omitempty"`
+	ShareTokens    map[int]string    `json:"share_tokens,omitempty"`
 }
 
 type clientConfigFile struct {
@@ -399,11 +400,16 @@ func buildClientConfigResponse(resolved *clientcfg.ResolvedConfig, t *tmpl.Templ
 		resp.ImportURLs = resolved.ImportURLs
 	}
 
-	// Check if there's an existing share token
+	// Check if there are existing share tokens
 	if resp.ShareSupported {
-		st, _ := db.GetShareTokenByApp(database, appID)
-		if st != nil {
-			resp.ShareToken = st.Token
+		tokens, _ := db.GetShareTokensByApp(database, appID)
+		if len(tokens) > 0 {
+			resp.ShareTokens = make(map[int]string, len(tokens))
+			for _, st := range tokens {
+				resp.ShareTokens[st.UserIndex] = st.Token
+			}
+			// Backward compat: set share_token to first token found
+			resp.ShareToken = tokens[0].Token
 		}
 	}
 
