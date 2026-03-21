@@ -1,61 +1,64 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getNodeApi } from '@/lib/api';
+import { qk } from '@/lib/query-keys';
 
-export function useApps() {
+export function useApps(nodeId: string) {
   return useQuery({
-    queryKey: ['apps'],
-    queryFn: () => getNodeApi().getApps(),
+    queryKey: qk.apps(nodeId),
+    queryFn: () => getNodeApi(nodeId).getApps(),
+    enabled: !!nodeId,
   });
 }
 
-export function useApp(id: string) {
+export function useApp(nodeId: string, id: string) {
   return useQuery({
-    queryKey: ['apps', id],
-    queryFn: () => getNodeApi().getApp(id),
-    enabled: !!id,
+    queryKey: qk.app(nodeId, id),
+    queryFn: () => getNodeApi(nodeId).getApp(id),
+    enabled: !!nodeId && !!id,
   });
 }
 
-export function useTemplates() {
+export function useTemplates(nodeId: string) {
   return useQuery({
-    queryKey: ['templates'],
-    queryFn: () => getNodeApi().getTemplates(),
+    queryKey: qk.templates(nodeId),
+    queryFn: () => getNodeApi(nodeId).getTemplates(),
+    enabled: !!nodeId,
   });
 }
 
-export function useTemplate(name: string) {
+export function useTemplate(nodeId: string, name: string) {
   return useQuery({
-    queryKey: ['templates', name],
-    queryFn: () => getNodeApi().getTemplate(name),
-    enabled: !!name,
+    queryKey: qk.template(nodeId, name),
+    queryFn: () => getNodeApi(nodeId).getTemplate(name),
+    enabled: !!nodeId && !!name,
   });
 }
 
-export function useDeployApp() {
+export function useDeployApp(nodeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: { template: string; settings: Record<string, unknown> }) =>
-      getNodeApi().deployApp(data.template, data.settings),
+      getNodeApi(nodeId).deployApp(data.template, data.settings),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['apps'] });
+      queryClient.invalidateQueries({ queryKey: qk.apps(nodeId) });
     },
   });
 }
 
-export function useDeleteApp() {
+export function useDeleteApp(nodeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => getNodeApi().deleteApp(id),
+    mutationFn: (id: string) => getNodeApi(nodeId).deleteApp(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['apps'] });
+      queryClient.invalidateQueries({ queryKey: qk.apps(nodeId) });
     },
   });
 }
 
-export function useAppClientConfig(id: string) {
+export function useAppClientConfig(nodeId: string, id: string) {
   return useQuery({
-    queryKey: ['apps', id, 'client-config'],
-    queryFn: () => getNodeApi().getAppClientConfig(id),
-    enabled: !!id,
+    queryKey: qk.appClientConfig(nodeId, id),
+    queryFn: () => getNodeApi(nodeId).getAppClientConfig(id),
+    enabled: !!nodeId && !!id,
   });
 }

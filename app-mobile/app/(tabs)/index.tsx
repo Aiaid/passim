@@ -7,8 +7,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useSSE } from '@/hooks/use-sse';
-import { useStatus, useNodes } from '@/hooks/use-node';
+import { useMultiNodeSSE } from '@/hooks/use-sse';
+import { useStatus } from '@/hooks/use-node';
 import { useApps } from '@/hooks/use-apps';
 import { useNodeStore } from '@/stores/node-store';
 import { MetricRing } from '@/components/MetricRing';
@@ -20,12 +20,15 @@ import { useTranslation } from '@/lib/i18n';
 export default function DashboardScreen() {
   const { t } = useTranslation();
   const { nodes, activeNodeId, setActiveNode, activeNode } = useNodeStore();
-  const { metrics, isConnected } = useSSE();
-  const statusQuery = useStatus();
-  const nodesQuery = useNodes();
-  const appsQuery = useApps();
+  const nodeId = activeNodeId ?? '';
+  const { getNodeSSE } = useMultiNodeSSE();
+  const sse = getNodeSSE(nodeId);
+  const statusQuery = useStatus(nodeId);
+  const appsQuery = useApps(nodeId);
 
-  const status = statusQuery.data;
+  const status = sse.status ?? statusQuery.data;
+  const metrics = sse.metrics;
+  const isConnected = sse.isConnected;
   const appsCount = appsQuery.data?.length ?? 0;
   const appsRunning = appsQuery.data?.filter((a) => a.status === 'running').length ?? 0;
 
@@ -55,7 +58,6 @@ export default function DashboardScreen() {
       {/* Full-screen 3D globe background */}
       <GlobeView
         localStatus={status}
-        remoteNodes={nodesQuery.data ?? undefined}
         fullscreen
       />
 
@@ -154,7 +156,7 @@ export default function DashboardScreen() {
             </View>
 
             {/* Apps + Containers row */}
-            <View className="flex-row gap-3 mb-1">
+            <View className="flex-row gap-3 mb-20">
               <View testID="container-summary" className="flex-1 bg-gray-900/80 rounded-xl p-3">
                 <View className="flex-row items-center gap-1.5 mb-1">
                   <Ionicons name="cube-outline" size={14} color="#ff9f0a" />

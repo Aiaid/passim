@@ -12,7 +12,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import type { Container, AppResponse } from '@passim/shared/types';
-import { useStatus, useNodeStatus, useRemoveRemoteNode } from '@/hooks/use-node';
+import { useStatus } from '@/hooks/use-node';
 import { useContainers } from '@/hooks/use-containers';
 import { useApps } from '@/hooks/use-apps';
 import { useNodeStore } from '@/stores/node-store';
@@ -38,19 +38,14 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
 export default function NodeDetailScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const isLocal = id === 'local';
 
-  const activeNode = useNodeStore((s: { activeNode: unknown }) => s.activeNode) as { name: string; host: string } | null;
-  const { data: localStatus, isLoading: localLoading } = useStatus();
-  const { data: remoteStatus, isLoading: remoteLoading } = useNodeStatus(isLocal ? '' : id);
-  const { data: containers } = useContainers();
-  const { data: apps } = useApps();
-  const removeMutation = useRemoveRemoteNode();
+  const node = useNodeStore((s) => s.nodes.find((n) => n.id === id));
+  const removeNode = useNodeStore((s) => s.removeNode);
+  const { data: status, isLoading } = useStatus(id);
+  const { data: containers } = useContainers(id);
+  const { data: apps } = useApps(id);
 
-  const status = isLocal ? localStatus : remoteStatus;
-  const isLoading = isLocal ? localLoading : remoteLoading;
-
-  const nodeName = status?.node.name ?? (isLocal ? activeNode?.name : id) ?? t('nav.nodes');
+  const nodeName = status?.node.name ?? node?.name ?? t('nav.nodes');
   const flag = status?.node.country ? countryFlag(status.node.country) : '';
 
   const handleRemove = useCallback(() => {
@@ -63,15 +58,19 @@ export default function NodeDetailScreen() {
         {
           text: t('common.delete'),
           style: 'destructive',
-          onPress: () => {
-            removeMutation.mutate(id, {
-              onSuccess: () => router.back(),
-            });
+          onPress: async () => {
+            await removeNode(id);
+            const remaining = useNodeStore.getState().nodes;
+            if (remaining.length === 0) {
+              router.replace('/(auth)/welcome');
+            } else {
+              router.back();
+            }
           },
         },
       ],
     );
-  }, [id, nodeName, removeMutation]);
+  }, [id, nodeName, removeNode, t]);
 
   return (
     <SafeAreaView className="flex-1 bg-black">
@@ -100,7 +99,7 @@ export default function NodeDetailScreen() {
             {status ? (
               <>
                 <InfoRow label={t('dashboard.version')} value={status.node.version} />
-                {!isLocal && <InfoRow label={t('node.address')} value={activeNode?.host} />}
+                <InfoRow label={t('node.address')} value={node?.host} />
                 <InfoRow label={t('dashboard.uptime')} value={formatUptime(status.node.uptime)} />
                 <InfoRow label="IP" value={status.node.public_ip} />
                 <InfoRow label={t('dashboard.os')} value={status.system.os} />
@@ -171,21 +170,14 @@ export default function NodeDetailScreen() {
             </>
           ) : null}
 
-          {/* Remove Button (remote nodes only) */}
-          {!isLocal ? (
-            <Pressable
-              testID="btn-remove-node"
-              className="bg-gray-900 rounded-xl py-4 items-center active:opacity-70 mt-4"
-              onPress={handleRemove}
-              disabled={removeMutation.isPending}
-            >
-              {removeMutation.isPending ? (
-                <ActivityIndicator size="small" color="#ff453a" />
-              ) : (
-                <Text className="text-red-500 font-semibold">{t('node.remove')}</Text>
-              )}
-            </Pressable>
-          ) : null}
+          {/* Remove Button */}
+          <Pressable
+            testID="btn-remove-node"
+            className="bg-gray-900 rounded-xl py-4 items-center active:opacity-70 mt-4"
+            onPress={handleRemove}
+          >
+            <Text className="text-red-500 font-semibold">{t('node.remove')}</Text>
+          </Pressable>
         </ScrollView>
       )}
     </SafeAreaView>

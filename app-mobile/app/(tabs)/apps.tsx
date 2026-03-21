@@ -7,17 +7,20 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppResponse } from '@passim/shared/types';
 import { useApps } from '@/hooks/use-apps';
+import { useNodeStore } from '@/stores/node-store';
 import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
 import { useTranslation } from '@/lib/i18n';
 
 export default function AppsScreen() {
   const { t } = useTranslation();
-  const { data: apps, isLoading, refetch } = useApps();
+  const { top } = useSafeAreaInsets();
+  const nodeId = useNodeStore((s) => s.activeNodeId) ?? '';
+  const { data: apps, isLoading, refetch } = useApps(nodeId);
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
@@ -36,7 +39,7 @@ export default function AppsScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-black">
+    <View className="flex-1 bg-black">
       <FlatList
         testID="app-list"
         className="flex-1 px-4"
@@ -78,8 +81,8 @@ export default function AppsScreen() {
             ) : null}
           </>
         }
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingTop: top, paddingBottom: 32 }}
       />
-    </SafeAreaView>
+    </View>
   );
 }

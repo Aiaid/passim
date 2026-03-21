@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import type { TemplateSummary, SettingInfo } from '@passim/shared/types';
 import { useTemplates, useTemplate, useDeployApp } from '@/hooks/use-apps';
+import { useNodeStore } from '@/stores/node-store';
 import { localized } from '@/lib/utils';
 import { useTranslation } from '@/lib/i18n';
 
@@ -172,9 +173,10 @@ export default function DeployScreen() {
   const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const { data: templates, isLoading: templatesLoading } = useTemplates();
-  const { data: templateDetail, isLoading: detailLoading } = useTemplate(selectedTemplate);
-  const deployApp = useDeployApp();
+  const nodeId = useNodeStore((s) => s.activeNodeId) ?? '';
+  const { data: templates, isLoading: templatesLoading } = useTemplates(nodeId);
+  const { data: templateDetail, isLoading: detailLoading } = useTemplate(nodeId, selectedTemplate);
+  const deployApp = useDeployApp(nodeId);
 
   // Initialize settings from template defaults when moving to step 2
   const initSettings = useCallback(

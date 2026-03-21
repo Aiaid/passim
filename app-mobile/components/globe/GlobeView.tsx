@@ -71,7 +71,7 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
-    camera.position.set(0, 0, 8.0);
+    camera.position.set(0, 0, 9.0);
     cameraRef.current = camera;
 
     const globe = new THREE.Group();
@@ -96,6 +96,7 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
       ),
     ).then(([dayTex, nightTex, specTex]) => {
       earthMesh.material.dispose();
+      // @ts-expect-error ShaderMaterial is compatible at runtime
       earthMesh.material = new THREE.ShaderMaterial({
         vertexShader: earthVert,
         fragmentShader: earthFrag,
@@ -258,7 +259,7 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.15));
 
-    const camRadius = 8.0;
+    const camRadius = 9.0;
     const projVec = new THREE.Vector3();
 
     const animate = () => {
@@ -275,7 +276,7 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
       camera.position.x = camRadius * Math.sin(rot.y) * Math.cos(rot.x);
       camera.position.y = camRadius * Math.sin(rot.x);
       camera.position.z = camRadius * Math.cos(rot.y) * Math.cos(rot.x);
-      camera.lookAt(0, 0, 0);
+      camera.lookAt(0, -1.03, 0);
 
       const t = Date.now() * 0.003;
       for (const m of markerGroup.children) m.scale.setScalar(1 + 0.3 * Math.sin(t));

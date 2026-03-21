@@ -66,7 +66,7 @@ export const useNodeStore = create<NodeState>((set, get) => ({
 
   loadNodes: async () => {
     const raw = await SecureStore.getItemAsync('passim-nodes');
-    if (!raw) return;
+if (!raw) return;
     try {
       const nodes: NodeInfo[] = JSON.parse(raw);
       const activeNodeId = nodes[0]?.id ?? null;

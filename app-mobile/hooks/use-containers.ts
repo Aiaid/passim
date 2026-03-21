@@ -1,57 +1,59 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getNodeApi } from '@/lib/api';
+import { qk } from '@/lib/query-keys';
 
-export function useContainers() {
+export function useContainers(nodeId: string) {
   return useQuery({
-    queryKey: ['containers'],
-    queryFn: () => getNodeApi().getContainers(),
+    queryKey: qk.containers(nodeId),
+    queryFn: () => getNodeApi(nodeId).getContainers(),
+    enabled: !!nodeId,
   });
 }
 
-export function useStartContainer() {
+export function useStartContainer(nodeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => getNodeApi().startContainer(id),
+    mutationFn: (id: string) => getNodeApi(nodeId).startContainer(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['containers'] });
+      queryClient.invalidateQueries({ queryKey: qk.containers(nodeId) });
     },
   });
 }
 
-export function useStopContainer() {
+export function useStopContainer(nodeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => getNodeApi().stopContainer(id),
+    mutationFn: (id: string) => getNodeApi(nodeId).stopContainer(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['containers'] });
+      queryClient.invalidateQueries({ queryKey: qk.containers(nodeId) });
     },
   });
 }
 
-export function useRestartContainer() {
+export function useRestartContainer(nodeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => getNodeApi().restartContainer(id),
+    mutationFn: (id: string) => getNodeApi(nodeId).restartContainer(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['containers'] });
+      queryClient.invalidateQueries({ queryKey: qk.containers(nodeId) });
     },
   });
 }
 
-export function useRemoveContainer() {
+export function useRemoveContainer(nodeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => getNodeApi().removeContainer(id),
+    mutationFn: (id: string) => getNodeApi(nodeId).removeContainer(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['containers'] });
+      queryClient.invalidateQueries({ queryKey: qk.containers(nodeId) });
     },
   });
 }
 
-export function useContainerLogs(id: string) {
+export function useContainerLogs(nodeId: string, id: string) {
   return useQuery({
-    queryKey: ['containers', id, 'logs'],
-    queryFn: () => getNodeApi().getContainerLogs(id),
-    enabled: !!id,
+    queryKey: qk.containerLogs(nodeId, id),
+    queryFn: () => getNodeApi(nodeId).getContainerLogs(id),
+    enabled: !!nodeId && !!id,
   });
 }

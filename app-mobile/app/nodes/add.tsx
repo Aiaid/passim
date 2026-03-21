@@ -13,36 +13,62 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useAddRemoteNode } from '@/hooks/use-node';
+import { useNodeStore } from '@/stores/node-store';
 import { useTranslation } from '@/lib/i18n';
 
 type Mode = 'choose' | 'manual';
 
 export default function AddNodeScreen() {
   const { t } = useTranslation();
+  const addNode = useNodeStore((s) => s.addNode);
   const [mode, setMode] = useState<Mode>('choose');
   const [host, setHost] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const addNode = useAddRemoteNode();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const canSubmit = host.trim().length > 0 && apiKey.trim().length > 0;
 
-  const handleSubmit = () => {
-    if (!canSubmit) return;
+  const handleSubmit = async () => {
+    if (!canSubmit || loading) return;
+    setError(null);
+    setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    addNode.mutate(
-      { address: host.trim(), api_key: apiKey.trim() },
-      {
-        onSuccess: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.back();
-        },
-        onError: (error: Error) => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert(t('mobile.connection_failed'), error.message || t('mobile.connection_failed'));
-        },
-      },
-    );
+
+    try {
+      // Login directly to the node
+      const trimmedHost = host.trim();
+      const res = await fetch(`https://${trimmedHost}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey.trim() }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Connection failed' }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const token = data.token ?? apiKey.trim();
+
+      // Fetch node name from status
+      const statusRes = await fetch(`https://${trimmedHost}/api/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const status = statusRes.ok ? await statusRes.json() : null;
+      const name = status?.node?.name || trimmedHost;
+
+      await addNode({ host: trimmedHost, token, name });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t('mobile.connection_failed');
+      setError(msg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -53,6 +79,7 @@ export default function AddNodeScreen() {
           onPress={() => {
             if (mode === 'manual') {
               setMode('choose');
+              setError(null);
             } else {
               router.back();
             }
@@ -143,11 +170,9 @@ export default function AddNodeScreen() {
           />
 
           {/* Error */}
-          {addNode.isError ? (
+          {error ? (
             <View className="bg-red-500/10 rounded-xl px-4 py-3 mb-4">
-              <Text className="text-red-400 text-sm">
-                {addNode.error?.message || t('mobile.connection_failed')}
-              </Text>
+              <Text className="text-red-400 text-sm">{error}</Text>
             </View>
           ) : null}
 
@@ -156,9 +181,9 @@ export default function AddNodeScreen() {
             testID="btn-add-remote"
             className={`rounded-xl py-4 items-center ${canSubmit ? 'bg-primary active:opacity-70' : 'bg-gray-800'}`}
             onPress={handleSubmit}
-            disabled={!canSubmit || addNode.isPending}
+            disabled={!canSubmit || loading}
           >
-            {addNode.isPending ? (
+            {loading ? (
               <ActivityIndicator size="small" color="#000" />
             ) : (
               <Text className={`font-semibold text-base ${canSubmit ? 'text-black' : 'text-gray-500'}`}>

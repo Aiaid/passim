@@ -1,19 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getNodeApi } from '@/lib/api';
+import { qk } from '@/lib/query-keys';
 
-export function usePasskeys() {
+export function usePasskeys(nodeId: string) {
   return useQuery({
-    queryKey: ['passkeys'],
-    queryFn: () => getNodeApi().listPasskeys(),
+    queryKey: qk.passkeys(nodeId),
+    queryFn: () => getNodeApi(nodeId).listPasskeys(),
+    enabled: !!nodeId,
   });
 }
 
-export function useDeletePasskey() {
+export function useDeletePasskey(nodeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => getNodeApi().deletePasskey(id),
+    mutationFn: (id: string) => getNodeApi(nodeId).deletePasskey(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['passkeys'] });
+      queryClient.invalidateQueries({ queryKey: qk.passkeys(nodeId) });
     },
   });
 }

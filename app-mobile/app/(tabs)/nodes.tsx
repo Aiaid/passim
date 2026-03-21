@@ -7,17 +7,62 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import type { RemoteNode } from '@passim/shared/types';
-import { useStatus, useNodes } from '@/hooks/use-node';
+import { useStatus } from '@/hooks/use-node';
 import { useNodeStore } from '@/stores/node-store';
+import { useMultiNodeSSE } from '@/hooks/use-sse';
 import { countryFlag } from '@/lib/utils';
 import { StatusDot } from '@/components/StatusDot';
-import { NodeCard } from '@/components/NodeCard';
-import { EmptyState } from '@/components/EmptyState';
 import { useTranslation } from '@/lib/i18n';
+
+function NodeCard({ nodeId, onPress }: { nodeId: string; onPress: () => void }) {
+  const { t } = useTranslation();
+  const node = useNodeStore((s) => s.nodes.find((n) => n.id === nodeId));
+  const activeNodeId = useNodeStore((s) => s.activeNodeId);
+  const { data: status, isLoading } = useStatus(nodeId);
+  const { getNodeSSE } = useMultiNodeSSE();
+  const sse = getNodeSSE(nodeId);
+
+  const isActive = nodeId === activeNodeId;
+  const connected = sse.isConnected;
+  const nodeStatus = sse.status ?? status;
+  const flag = nodeStatus?.node?.country ? countryFlag(nodeStatus.node.country) : '';
+  const nodeName = nodeStatus?.node?.name ?? node?.name ?? nodeId;
+
+  return (
+    <Pressable
+      className={`bg-gray-900 rounded-xl p-4 active:opacity-70 ${isActive ? 'border border-green-600' : ''}`}
+      onPress={onPress}
+    >
+      <View className="flex-row items-center justify-between mb-3">
+        <View className="flex-row items-center gap-2 flex-1">
+          {flag ? <Text className="text-base">{flag}</Text> : null}
+          <Text className="text-white font-semibold text-base" numberOfLines={1}>
+            {nodeName}
+          </Text>
+        </View>
+        <StatusDot status={connected ? 'connected' : 'disconnected'} />
+      </View>
+
+      {isLoading ? (
+        <ActivityIndicator size="small" color="#666" />
+      ) : nodeStatus ? (
+        <>
+          <BarGauge label="CPU" value={nodeStatus.system.cpu.usage_percent} />
+          <BarGauge label="MEM" value={nodeStatus.system.memory.usage_percent} />
+          <Text className="text-gray-500 text-xs mt-2">
+            {t('mobile.containers_summary', {
+              running: String(nodeStatus.containers.running),
+              total: String(nodeStatus.containers.total),
+            })}
+          </Text>
+        </>
+      ) : null}
+    </Pressable>
+  );
+}
 
 function BarGauge({ label, value }: { label: string; value: number }) {
   const clamped = Math.min(100, Math.max(0, value));
@@ -37,77 +82,41 @@ function BarGauge({ label, value }: { label: string; value: number }) {
   );
 }
 
-function LocalNodeCard() {
-  const { t } = useTranslation();
-  const activeNode = useNodeStore((s) => s.activeNode);
-  const { data: status, isLoading } = useStatus();
-
-  if (!activeNode) return null;
-
-  const flag = status?.node.country ? countryFlag(status.node.country) : '';
-  const nodeName = status?.node.name ?? activeNode.name;
-
-  return (
-    <Pressable
-      testID="local-node-card"
-      className="bg-gray-900 rounded-xl p-4 active:opacity-70"
-      onPress={() => router.push('/nodes/local')}
-    >
-      <View className="flex-row items-center justify-between mb-3">
-        <View className="flex-row items-center gap-2 flex-1">
-          {flag ? <Text className="text-base">{flag}</Text> : null}
-          <Text className="text-white font-semibold text-base" numberOfLines={1}>
-            {nodeName}
-          </Text>
-        </View>
-        <StatusDot status={status ? 'connected' : 'disconnected'} />
-      </View>
-
-      {isLoading ? (
-        <ActivityIndicator size="small" color="#666" />
-      ) : status ? (
-        <>
-          <BarGauge label="CPU" value={status.system.cpu.usage_percent} />
-          <BarGauge label="MEM" value={status.system.memory.usage_percent} />
-          <Text className="text-gray-500 text-xs mt-2">
-            {t('mobile.containers_summary', { running: String(status.containers.running), total: String(status.containers.total) })}
-          </Text>
-        </>
-      ) : null}
-    </Pressable>
-  );
-}
-
 export default function NodesScreen() {
   const { t } = useTranslation();
-  const { data: remoteNodes, isLoading, refetch } = useNodes();
+  const { top } = useSafeAreaInsets();
+  const nodes = useNodeStore((s) => s.nodes);
+  const setActiveNode = useNodeStore((s) => s.setActiveNode);
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
+    // SSE handles real-time updates; pull-to-refresh is just a visual affordance
+    setTimeout(() => setRefreshing(false), 500);
+  }, []);
 
-  const renderRemoteNode = useCallback(
-    ({ item }: { item: RemoteNode }) => (
+  const renderNode = useCallback(
+    ({ item }: { item: { id: string } }) => (
       <View className="mb-3">
         <NodeCard
-          node={item}
-          onPress={() => router.push(`/nodes/${item.id}`)}
+          nodeId={item.id}
+          onPress={() => {
+            setActiveNode(item.id);
+            router.push(`/nodes/${item.id}`);
+          }}
         />
       </View>
     ),
-    [],
+    [setActiveNode],
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-black">
+    <View className="flex-1 bg-black">
       <FlatList
         className="flex-1 px-4"
-        data={remoteNodes ?? []}
+        data={nodes}
         keyExtractor={(item) => item.id}
-        renderItem={renderRemoteNode}
+        renderItem={renderNode}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -116,47 +125,25 @@ export default function NodesScreen() {
           />
         }
         ListHeaderComponent={
-          <>
-            {/* Header */}
-            <View className="flex-row items-center justify-between mt-4 mb-6">
-              <Text className="text-2xl font-bold text-white">{t('nav.nodes')}</Text>
-              <Pressable
-                testID="btn-add-node"
-                className="bg-primary rounded-lg px-4 py-2"
-                onPress={() => router.push('/nodes/add')}
-              >
-                <Text className="text-black font-semibold">{t('node.add')}</Text>
-              </Pressable>
-            </View>
-
-            {/* Local Node */}
-            <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-              {t('mobile.local_node')}
-            </Text>
-            <View className="mb-6">
-              <LocalNodeCard />
-            </View>
-
-            {/* Remote Nodes Header */}
-            <Text testID="remote-nodes" className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-              {t('mobile.remote_nodes')}
-            </Text>
-
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#666" className="my-8" />
-            ) : !remoteNodes?.length ? (
-              <EmptyState
-                icon="globe-outline"
-                title={t('mobile.no_remote_nodes')}
-                subtitle={t('mobile.no_remote_nodes_desc')}
-                actionLabel={t('node.add')}
-                onAction={() => router.push('/nodes/add')}
-              />
-            ) : null}
-          </>
+          <View className="flex-row items-center justify-between mt-4 mb-6">
+            <Text className="text-2xl font-bold text-white">{t('nav.nodes')}</Text>
+            <Pressable
+              testID="btn-add-node"
+              className="bg-primary rounded-lg px-4 py-2"
+              onPress={() => router.push('/nodes/add')}
+            >
+              <Text className="text-black font-semibold">{t('node.add')}</Text>
+            </Pressable>
+          </View>
         }
-        contentContainerStyle={{ paddingBottom: 32 }}
+        ListEmptyComponent={
+          <View className="items-center mt-12">
+            <Ionicons name="server-outline" size={48} color="#444" />
+            <Text className="text-gray-500 mt-3">{t('mobile.no_remote_nodes')}</Text>
+          </View>
+        }
+        contentContainerStyle={{ paddingTop: top, paddingBottom: 32 }}
       />
-    </SafeAreaView>
+    </View>
   );
 }

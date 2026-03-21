@@ -11,12 +11,13 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusDot } from '@/components/StatusDot';
 import { getNodeApi } from '@/lib/api';
+import { qk } from '@/lib/query-keys';
 import { useNodeStore } from '@/stores/node-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { usePreferencesStore } from '@/stores/preferences-store';
@@ -134,6 +135,7 @@ function NodeNameModal({
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
+  const { top } = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -151,35 +153,40 @@ export default function SettingsScreen() {
     changelog?: string;
   } | null>(null);
 
+  const nodeId = activeNodeId ?? '';
+
   // Queries
   const settingsQuery = useQuery({
-    queryKey: ['settings'],
-    queryFn: () => getNodeApi().getSettings(),
+    queryKey: qk.settings(nodeId),
+    queryFn: () => getNodeApi(nodeId).getSettings(),
+    enabled: !!nodeId,
   });
 
   const sslQuery = useQuery({
-    queryKey: ['ssl'],
-    queryFn: () => getNodeApi().getSSLStatus(),
+    queryKey: qk.ssl(nodeId),
+    queryFn: () => getNodeApi(nodeId).getSSLStatus(),
+    enabled: !!nodeId,
   });
 
   const versionQuery = useQuery({
-    queryKey: ['version'],
-    queryFn: () => getNodeApi().getVersion(),
+    queryKey: qk.version(nodeId),
+    queryFn: () => getNodeApi(nodeId).getVersion(),
+    enabled: !!nodeId,
   });
 
   // Mutations
   const updateSettingsMut = useMutation({
-    mutationFn: (data: { node_name?: string }) => getNodeApi().updateSettings(data),
+    mutationFn: (data: { node_name?: string }) => getNodeApi(nodeId).updateSettings(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
-      queryClient.invalidateQueries({ queryKey: ['status'] });
+      queryClient.invalidateQueries({ queryKey: qk.settings(nodeId) });
+      queryClient.invalidateQueries({ queryKey: qk.status(nodeId) });
     },
   });
 
   const renewSSLMut = useMutation({
-    mutationFn: () => getNodeApi().renewSSL(),
+    mutationFn: () => getNodeApi(nodeId).renewSSL(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ssl'] });
+      queryClient.invalidateQueries({ queryKey: qk.ssl(nodeId) });
       Alert.alert(t('settings.ssl_renew'), t('settings.ssl_renew_success'));
     },
     onError: (err: Error) => {
@@ -188,7 +195,7 @@ export default function SettingsScreen() {
   });
 
   const checkUpdateMut = useMutation({
-    mutationFn: () => getNodeApi().checkUpdate({ force: true }),
+    mutationFn: () => getNodeApi(nodeId).checkUpdate({ force: true }),
     onSuccess: (data) => {
       setUpdateResult(data);
       if (!data.available) {
@@ -201,7 +208,7 @@ export default function SettingsScreen() {
   });
 
   const performUpdateMut = useMutation({
-    mutationFn: (version: string) => getNodeApi().performUpdate(version),
+    mutationFn: (version: string) => getNodeApi(nodeId).performUpdate(version),
     onSuccess: () => {
       Alert.alert(t('settings.install_update'), t('settings.update_started'));
     },
@@ -311,8 +318,8 @@ export default function SettingsScreen() {
       : undefined;
 
   return (
-    <SafeAreaView className="flex-1 bg-black">
-      <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 48 }}>
+    <View className="flex-1 bg-black">
+      <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingTop: top, paddingBottom: 48 }}>
         <Text className="text-2xl font-bold text-white mt-4 mb-6">{t('settings.title')}</Text>
 
         {/* General */}
@@ -461,6 +468,6 @@ export default function SettingsScreen() {
           onCancel={() => setNameModalVisible(false)}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }

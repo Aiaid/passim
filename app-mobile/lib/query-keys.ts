@@ -1,0 +1,15 @@
+export const qk = {
+  status: (nodeId: string) => ['status', nodeId] as const,
+  apps: (nodeId: string) => ['apps', nodeId] as const,
+  app: (nodeId: string, appId: string) => ['apps', nodeId, appId] as const,
+  appClientConfig: (nodeId: string, appId: string) => ['apps', nodeId, appId, 'client-config'] as const,
+  containers: (nodeId: string) => ['containers', nodeId] as const,
+  containerLogs: (nodeId: string, cid: string) => ['containers', nodeId, cid, 'logs'] as const,
+  templates: (nodeId: string) => ['templates', nodeId] as const,
+  template: (nodeId: string, name: string) => ['templates', nodeId, name] as const,
+  settings: (nodeId: string) => ['settings', nodeId] as const,
+  ssl: (nodeId: string) => ['ssl', nodeId] as const,
+  version: (nodeId: string) => ['version', nodeId] as const,
+  passkeys: (nodeId: string) => ['passkeys', nodeId] as const,
+  metrics: (nodeId: string) => ['metrics', nodeId] as const,
+};

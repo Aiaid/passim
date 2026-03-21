@@ -19,6 +19,7 @@ import {
   useStopContainer,
   useRestartContainer,
 } from '@/hooks/use-containers';
+import { useNodeStore } from '@/stores/node-store';
 import { StatusDot } from '@/components/StatusDot';
 import { localized } from '@/lib/utils';
 import { useTranslation } from '@/lib/i18n';
@@ -111,12 +112,13 @@ function CopyableField({ label, value }: { label: string; value: string }) {
 export default function AppDetailScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: app, isLoading: appLoading } = useApp(id);
-  const { data: clientConfig } = useAppClientConfig(id);
-  const deleteApp = useDeleteApp();
-  const startContainer = useStartContainer();
-  const stopContainer = useStopContainer();
-  const restartContainer = useRestartContainer();
+  const nodeId = useNodeStore((s) => s.activeNodeId) ?? '';
+  const { data: app, isLoading: appLoading } = useApp(nodeId, id);
+  const { data: clientConfig } = useAppClientConfig(nodeId, id);
+  const deleteApp = useDeleteApp(nodeId);
+  const startContainer = useStartContainer(nodeId);
+  const stopContainer = useStopContainer(nodeId);
+  const restartContainer = useRestartContainer(nodeId);
 
   const isRunning = app?.status === 'running';
   const containerId = app?.container_id;

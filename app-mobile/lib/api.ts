@@ -3,13 +3,11 @@ import { createApi, ApiError } from '@passim/shared/api';
 
 export { ApiError };
 
-export function getNodeApi(nodeId?: string) {
+export function getNodeApi(nodeId: string) {
   const store = useNodeStore.getState();
-  const node = nodeId
-    ? store.nodes.find((n) => n.id === nodeId)
-    : store.activeNode;
+  const node = store.nodes.find((n) => n.id === nodeId);
 
-  if (!node) throw new Error('No active node');
+  if (!node) throw new Error(`Node ${nodeId} not found`);
 
   return createApi(async <T>(path: string, options?: RequestInit): Promise<T> => {
     const res = await fetch(`https://${node.host}/api${path}`, {

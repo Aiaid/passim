@@ -12,6 +12,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { usePasskeys, useDeletePasskey } from '@/hooks/use-passkeys';
+import { useNodeStore } from '@/stores/node-store';
 import { useTranslation } from '@/lib/i18n';
 
 interface Passkey {
@@ -72,8 +73,9 @@ function PasskeyCard({
 
 export default function PasskeysScreen() {
   const { t } = useTranslation();
-  const { data: passkeys, isLoading } = usePasskeys();
-  const deleteMutation = useDeletePasskey();
+  const nodeId = useNodeStore((s) => s.activeNodeId) ?? '';
+  const { data: passkeys, isLoading } = usePasskeys(nodeId);
+  const deleteMutation = useDeletePasskey(nodeId);
 
   const handleDelete = useCallback(
     (passkey: Passkey) => {

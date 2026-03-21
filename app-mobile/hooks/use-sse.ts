@@ -1,131 +1,191 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { AppState } from 'react-native';
 import EventSource from 'react-native-sse';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNodeStore } from '@/stores/node-store';
+import { qk } from '@/lib/query-keys';
 import type {
   MetricsData,
   StatusResponse,
   Container,
   AppResponse,
-  RemoteNode,
 } from '@passim/shared/types';
 
 const MAX_HISTORY = 60;
 const RECONNECT_DELAY = 3000;
+const MAX_CONCURRENT_SSE = 5;
 
-interface SSEState {
+export interface SSENodeState {
   metrics: MetricsData | null;
   metricsHistory: MetricsData[];
   status: StatusResponse | null;
   containers: Container[] | null;
   apps: AppResponse[] | null;
-  nodes: RemoteNode[] | null;
   isConnected: boolean;
 }
 
-export function useSSE(): SSEState {
-  const activeNode = useNodeStore((s) => s.activeNode);
+const EMPTY_STATE: SSENodeState = {
+  metrics: null,
+  metricsHistory: [],
+  status: null,
+  containers: null,
+  apps: null,
+  isConnected: false,
+};
+
+interface Connection {
+  es: EventSource;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
+}
+
+export function useMultiNodeSSE() {
+  const nodes = useNodeStore((s) => s.nodes);
+  const activeNodeId = useNodeStore((s) => s.activeNodeId);
   const queryClient = useQueryClient();
 
-  const [metrics, setMetrics] = useState<MetricsData | null>(null);
-  const [metricsHistory, setMetricsHistory] = useState<MetricsData[]>([]);
-  const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [containers, setContainers] = useState<Container[] | null>(null);
-  const [apps, setApps] = useState<AppResponse[] | null>(null);
-  const [nodes, setNodes] = useState<RemoteNode[] | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const connectionsRef = useRef<Map<string, Connection>>(new Map());
+  const statesRef = useRef<Map<string, SSENodeState>>(new Map());
+  const [, forceUpdate] = useState(0);
+  const tick = useCallback(() => forceUpdate((n) => n + 1), []);
 
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const esRef = useRef<EventSource | null>(null);
+  // Determine which nodes should have SSE connections
+  const connectedNodeIds = useMemo(() => {
+    const ids = nodes.slice(0, MAX_CONCURRENT_SSE).map((n) => n.id);
+    // Always include active node even if beyond the limit
+    if (activeNodeId && !ids.includes(activeNodeId)) {
+      ids.push(activeNodeId);
+    }
+    return ids;
+  }, [nodes, activeNodeId]);
 
-  const pushMetrics = useCallback((data: MetricsData) => {
-    setMetrics(data);
-    setMetricsHistory((prev) => {
-      const next = [...prev, data];
-      return next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next;
-    });
-    queryClient.setQueryData(['metrics'], data);
-  }, [queryClient]);
-
-  const handleStatus = useCallback((data: StatusResponse) => {
-    setStatus(data);
-    queryClient.setQueryData(['status'], data);
-  }, [queryClient]);
-
-  const handleContainers = useCallback((data: Container[]) => {
-    setContainers(data);
-    queryClient.setQueryData(['containers'], data);
-  }, [queryClient]);
-
-  const handleApps = useCallback((data: AppResponse[]) => {
-    setApps(data);
-    queryClient.setQueryData(['apps'], data);
-  }, [queryClient]);
-
-  const handleNodes = useCallback((data: RemoteNode[]) => {
-    setNodes(data);
-    queryClient.setQueryData(['nodes'], data);
-  }, [queryClient]);
+  const updateNodeState = useCallback(
+    (nodeId: string, updater: (prev: SSENodeState) => SSENodeState) => {
+      const prev = statesRef.current.get(nodeId) ?? { ...EMPTY_STATE };
+      statesRef.current.set(nodeId, updater(prev));
+      tick();
+    },
+    [tick],
+  );
 
   useEffect(() => {
-    if (!activeNode) return;
+    const conns = connectionsRef.current;
 
-    const connect = () => {
-      const url = `https://${activeNode.host}/api/stream?token=${activeNode.token}`;
-      const es = new EventSource(url);
-      esRef.current = es;
+    // Close connections for nodes no longer in the list
+    for (const [id, conn] of conns) {
+      if (!connectedNodeIds.includes(id)) {
+        if (conn.reconnectTimer) clearTimeout(conn.reconnectTimer);
+        conn.es.close();
+        conns.delete(id);
+        statesRef.current.delete(id);
+      }
+    }
 
-      es.addEventListener('open', () => {
-        setIsConnected(true);
-      });
+    // Open connections for new nodes
+    for (const nodeId of connectedNodeIds) {
+      if (conns.has(nodeId)) continue;
 
-      // @ts-expect-error react-native-sse custom event types
-      es.addEventListener('metrics', (e: { data?: string }) => {
-        if (e.data) try { pushMetrics(JSON.parse(e.data)); } catch { /* ignore */ }
-      });
+      const node = nodes.find((n) => n.id === nodeId);
+      if (!node) continue;
 
-      // @ts-expect-error react-native-sse custom event types
-      es.addEventListener('status', (e: { data?: string }) => {
-        if (e.data) try { handleStatus(JSON.parse(e.data)); } catch { /* ignore */ }
-      });
+      const connect = () => {
+        const url = `https://${node.host}/api/stream?token=${node.token}`;
+        const es = new EventSource(url);
+        const entry: Connection = { es, reconnectTimer: null };
+        conns.set(nodeId, entry);
 
-      // @ts-expect-error react-native-sse custom event types
-      es.addEventListener('containers', (e: { data?: string }) => {
-        if (e.data) try { handleContainers(JSON.parse(e.data)); } catch { /* ignore */ }
-      });
+        es.addEventListener('open', () => {
+          updateNodeState(nodeId, (s) => ({ ...s, isConnected: true }));
+        });
 
-      // @ts-expect-error react-native-sse custom event types
-      es.addEventListener('apps', (e: { data?: string }) => {
-        if (e.data) try { handleApps(JSON.parse(e.data)); } catch { /* ignore */ }
-      });
+        // @ts-expect-error react-native-sse custom event types
+        es.addEventListener('metrics', (e: { data?: string }) => {
+          if (!e.data) return;
+          try {
+            const data: MetricsData = JSON.parse(e.data);
+            queryClient.setQueryData(qk.metrics(nodeId), data);
+            updateNodeState(nodeId, (s) => {
+              const history = [...s.metricsHistory, data];
+              return {
+                ...s,
+                metrics: data,
+                metricsHistory: history.length > MAX_HISTORY ? history.slice(-MAX_HISTORY) : history,
+              };
+            });
+          } catch { /* ignore */ }
+        });
 
-      // @ts-expect-error react-native-sse custom event types
-      es.addEventListener('nodes', (e: { data?: string }) => {
-        if (e.data) try { handleNodes(JSON.parse(e.data)); } catch { /* ignore */ }
-      });
+        // @ts-expect-error react-native-sse custom event types
+        es.addEventListener('status', (e: { data?: string }) => {
+          if (!e.data) return;
+          try {
+            const data: StatusResponse = JSON.parse(e.data);
+            queryClient.setQueryData(qk.status(nodeId), data);
+            updateNodeState(nodeId, (s) => ({ ...s, status: data }));
+          } catch { /* ignore */ }
+        });
 
-      es.addEventListener('error', () => {
-        setIsConnected(false);
-        es.close();
-        esRef.current = null;
-        reconnectTimerRef.current = setTimeout(connect, RECONNECT_DELAY);
-      });
-    };
+        // @ts-expect-error react-native-sse custom event types
+        es.addEventListener('containers', (e: { data?: string }) => {
+          if (!e.data) return;
+          try {
+            const data: Container[] = JSON.parse(e.data);
+            queryClient.setQueryData(qk.containers(nodeId), data);
+            updateNodeState(nodeId, (s) => ({ ...s, containers: data }));
+          } catch { /* ignore */ }
+        });
 
-    connect();
+        // @ts-expect-error react-native-sse custom event types
+        es.addEventListener('apps', (e: { data?: string }) => {
+          if (!e.data) return;
+          try {
+            const data: AppResponse[] = JSON.parse(e.data);
+            queryClient.setQueryData(qk.apps(nodeId), data);
+            updateNodeState(nodeId, (s) => ({ ...s, apps: data }));
+          } catch { /* ignore */ }
+        });
+
+        es.addEventListener('error', () => {
+          updateNodeState(nodeId, (s) => ({ ...s, isConnected: false }));
+          es.close();
+          conns.delete(nodeId);
+          entry.reconnectTimer = setTimeout(connect, RECONNECT_DELAY);
+        });
+      };
+
+      connect();
+    }
 
     return () => {
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
+      for (const [, conn] of conns) {
+        if (conn.reconnectTimer) clearTimeout(conn.reconnectTimer);
+        conn.es.close();
       }
-      if (esRef.current) {
-        esRef.current.close();
-        esRef.current = null;
-      }
-      setIsConnected(false);
+      conns.clear();
+      statesRef.current.clear();
     };
-  }, [activeNode, pushMetrics, handleStatus, handleContainers, handleApps, handleNodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectedNodeIds.join(',')]);
 
-  return { metrics, metricsHistory, status, containers, apps, nodes, isConnected };
+  // Pause/resume on app state changes
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      const conns = connectionsRef.current;
+      if (state === 'background') {
+        for (const [, conn] of conns) {
+          if (conn.reconnectTimer) clearTimeout(conn.reconnectTimer);
+          conn.es.close();
+        }
+        conns.clear();
+      }
+      // Reconnect handled by the main effect re-running when app returns
+    });
+    return () => sub.remove();
+  }, []);
+
+  const getNodeSSE = useCallback(
+    (nodeId: string): SSENodeState => statesRef.current.get(nodeId) ?? EMPTY_STATE,
+    [],
+  );
+
+  return { getNodeSSE };
 }
