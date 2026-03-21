@@ -115,8 +115,9 @@ function PairingQRDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
   }, [open, generate]);
 
   // Countdown timer
+  const isActive = expiresIn > 0;
   useEffect(() => {
-    if (!open || expiresIn <= 0) return;
+    if (!open || !isActive) return;
     const timer = setInterval(() => {
       setExpiresIn((prev) => {
         if (prev <= 1) {
@@ -127,7 +128,7 @@ function PairingQRDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [open, expiresIn > 0]);
+  }, [open, isActive]);
 
   const minutes = Math.floor(expiresIn / 60);
   const seconds = expiresIn % 60;
