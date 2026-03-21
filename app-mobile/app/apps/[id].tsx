@@ -21,6 +21,7 @@ import {
 } from '@/hooks/use-containers';
 import { StatusDot } from '@/components/StatusDot';
 import { localized } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n';
 
 function mapStatus(status: string): 'running' | 'stopped' | 'deploying' | 'error' {
   switch (status) {
@@ -108,6 +109,7 @@ function CopyableField({ label, value }: { label: string; value: string }) {
 }
 
 export default function AppDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: app, isLoading: appLoading } = useApp(id);
   const { data: clientConfig } = useAppClientConfig(id);
@@ -123,12 +125,12 @@ export default function AppDetailScreen() {
     if (!app) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert(
-      'Delete App',
-      `Are you sure you want to delete "${app.template}"? All data will be lost.`,
+      t('mobile.delete_app_title'),
+      t('mobile.delete_app_desc', { name: app.template }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             deleteApp.mutate(app.id, {
@@ -159,7 +161,7 @@ export default function AppDetailScreen() {
           <Ionicons name="chevron-back" size={20} color="#fff" />
         </Pressable>
         <Text className="text-white text-lg font-semibold flex-1" numberOfLines={1}>
-          {app ? app.template.charAt(0).toUpperCase() + app.template.slice(1) : 'App'}
+          {app ? app.template.charAt(0).toUpperCase() + app.template.slice(1) : t('nav.apps')}
         </Text>
       </View>
 
@@ -177,16 +179,16 @@ export default function AppDetailScreen() {
                 {app.status}
               </Text>
             </View>
-            <InfoRow label="Template" value={app.template} />
-            <InfoRow label="Deployed" value={deployedDate} />
-            <InfoRow label="Container" value={containerId?.slice(0, 12)} />
+            <InfoRow label={t('app.overview')} value={app.template} />
+            <InfoRow label={t('app.deployed_at')} value={deployedDate} />
+            <InfoRow label={t('app.container')} value={containerId?.slice(0, 12)} />
           </View>
 
           {/* Settings */}
           {Object.keys(app.settings).length > 0 ? (
             <>
               <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                Settings
+                {t('app.settings')}
               </Text>
               <View className="bg-gray-900 rounded-xl p-4 mb-4">
                 {Object.entries(app.settings).map(([key, value]) => (
@@ -200,7 +202,7 @@ export default function AppDetailScreen() {
           {clientConfig ? (
             <>
               <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                Client Config
+                {t('app.configs')}
               </Text>
               <View testID="client-config" className="bg-gray-900 rounded-xl p-4 mb-4">
                 {/* Files */}
@@ -235,13 +237,13 @@ export default function AppDetailScreen() {
 
           {/* Actions */}
           <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-            Actions
+            {t('common.actions')}
           </Text>
           <View className="flex-row gap-3 mb-4">
             <ActionButton
               testID="btn-app-restart"
               icon="refresh"
-              label="Restart"
+              label={t('app.restart')}
               color="#ffd60a"
               loading={restartContainer.isPending}
               onPress={() => {
@@ -252,7 +254,7 @@ export default function AppDetailScreen() {
               <ActionButton
                 testID="btn-app-stop"
                 icon="stop"
-                label="Stop"
+                label={t('app.stop')}
                 color="#ff453a"
                 loading={stopContainer.isPending}
                 onPress={() => {
@@ -263,7 +265,7 @@ export default function AppDetailScreen() {
               <ActionButton
                 testID="btn-app-start"
                 icon="play"
-                label="Start"
+                label={t('app.start')}
                 color="#30d158"
                 loading={startContainer.isPending}
                 onPress={() => {
@@ -283,13 +285,13 @@ export default function AppDetailScreen() {
             {deleteApp.isPending ? (
               <ActivityIndicator size="small" color="#ff453a" />
             ) : (
-              <Text className="text-red-500 font-semibold">Delete App</Text>
+              <Text className="text-red-500 font-semibold">{t('mobile.delete_app')}</Text>
             )}
           </Pressable>
         </ScrollView>
       ) : (
         <View className="flex-1 items-center justify-center">
-          <Text className="text-gray-500">App not found</Text>
+          <Text className="text-gray-500">{t('common.no_data')}</Text>
         </View>
       )}
     </SafeAreaView>

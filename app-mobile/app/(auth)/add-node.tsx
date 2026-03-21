@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useNodeStore } from '@/stores/node-store';
+import { useTranslation } from '@/lib/i18n';
 
 export default function AddNodeScreen() {
+  const { t } = useTranslation();
   const [host, setHost] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [error, setError] = useState('');
@@ -36,9 +38,9 @@ export default function AddNodeScreen() {
 
   return (
     <View className="flex-1 bg-black px-8 pt-20">
-      <Text className="text-3xl font-bold text-white mb-8">Add Server</Text>
+      <Text className="text-3xl font-bold text-white mb-8">{t('mobile.add_server')}</Text>
 
-      <Text className="text-gray-400 mb-2">Server Address</Text>
+      <Text className="text-gray-400 mb-2">{t('mobile.host_address')}</Text>
       <TextInput
         testID="input-host"
         className="bg-gray-900 text-white rounded-xl px-4 py-3 mb-4 text-base"
@@ -50,7 +52,7 @@ export default function AddNodeScreen() {
         autoCorrect={false}
       />
 
-      <Text className="text-gray-400 mb-2">API Key</Text>
+      <Text className="text-gray-400 mb-2">{t('settings.api_key')}</Text>
       <TextInput
         testID="input-api-key"
         className="bg-gray-900 text-white rounded-xl px-4 py-3 mb-6 text-base"
@@ -77,7 +79,7 @@ export default function AddNodeScreen() {
           <ActivityIndicator color="black" />
         ) : (
           <Text className="text-black text-center text-lg font-semibold">
-            Connect
+            {t('mobile.connect')}
           </Text>
         )}
       </Pressable>

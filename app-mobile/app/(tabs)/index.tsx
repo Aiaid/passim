@@ -9,13 +9,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSSE } from '@/hooks/use-sse';
-import { useStatus } from '@/hooks/use-node';
+import { useStatus, useNodes } from '@/hooks/use-node';
 import { useApps } from '@/hooks/use-apps';
 import { useNodeStore } from '@/stores/node-store';
 import { MetricRing } from '@/components/MetricRing';
 import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
 import { StatusDot } from '@/components/StatusDot';
+import { GlobeView } from '@/components/globe/GlobeView';
 import { formatBytes, formatUptime, formatNetworkRate, countryFlag } from '@/lib/utils';
 import { useTranslation } from '@/lib/i18n';
 import { router } from 'expo-router';
@@ -27,6 +28,7 @@ export default function DashboardScreen() {
   const { metrics, isConnected } = useSSE();
   const statusQuery = useStatus();
   const appsQuery = useApps();
+  const nodesQuery = useNodes();
 
   const status = statusQuery.data;
   const apps = appsQuery.data;
@@ -80,7 +82,7 @@ export default function DashboardScreen() {
       >
         {/* Header */}
         <View className="flex-row items-center justify-between mt-4 mb-4">
-          <Text testID="dashboard-title" className="text-2xl font-bold text-white">Dashboard</Text>
+          <Text testID="dashboard-title" className="text-2xl font-bold text-white">{t('dashboard.title')}</Text>
           <StatusDot status={isConnected ? 'connected' : 'disconnected'} size={10} />
         </View>
 
@@ -117,37 +119,22 @@ export default function DashboardScreen() {
           </ScrollView>
         )}
 
-        {/* Globe placeholder / Node info card */}
-        <View testID="node-info-card" className="h-48 bg-gray-900 rounded-2xl p-5 justify-between mb-6">
-          <View className="flex-row items-center justify-between">
+        {/* 3D Globe */}
+        <View testID="node-info-card" className="mb-6">
+          <GlobeView
+            localStatus={status}
+            remoteNodes={nodesQuery.data ?? undefined}
+          />
+          {/* Node info overlay */}
+          <View className="flex-row items-center justify-between mt-2 px-1">
             <View className="flex-row items-center gap-2">
               {nodeInfo.flag ? (
-                <Text className="text-2xl">{nodeInfo.flag}</Text>
+                <Text className="text-lg">{nodeInfo.flag}</Text>
               ) : null}
-              <Text className="text-xl font-bold text-white">
-                {nodeInfo.name}
-              </Text>
+              <Text className="text-white font-semibold">{nodeInfo.name}</Text>
+              <Text className="text-gray-500 text-xs">v{nodeInfo.version}</Text>
             </View>
-            <StatusDot status={isConnected ? 'connected' : 'disconnected'} />
-          </View>
-
-          <View>
-            <View className="flex-row items-center gap-2 mb-1">
-              <Ionicons name="globe-outline" size={14} color="#9ca3af" />
-              <Text className="text-gray-400 text-sm">{nodeInfo.ip}</Text>
-            </View>
-            <View className="flex-row items-center gap-2 mb-1">
-              <Ionicons name="time-outline" size={14} color="#9ca3af" />
-              <Text className="text-gray-400 text-sm">
-                Uptime: {nodeInfo.uptime}
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-2">
-              <Ionicons name="code-slash-outline" size={14} color="#9ca3af" />
-              <Text className="text-gray-400 text-sm">
-                v{nodeInfo.version}
-              </Text>
-            </View>
+            <Text className="text-gray-400 text-xs">{nodeInfo.ip} · {nodeInfo.uptime}</Text>
           </View>
         </View>
 
@@ -155,21 +142,21 @@ export default function DashboardScreen() {
         <View className="flex-row justify-between mb-6">
           <View testID="metric-cpu">
             <MetricRing
-              label="CPU"
+              label={t('dashboard.cpu')}
               value={Math.round(cpuPercent)}
               color="#30d158"
             />
           </View>
           <View testID="metric-memory">
             <MetricRing
-              label="Memory"
+              label={t('dashboard.memory')}
               value={memPercent}
               color="#5e5ce6"
             />
           </View>
           <View testID="metric-disk">
             <MetricRing
-              label="Disk"
+              label={t('dashboard.disk')}
               value={diskPercent}
               color="#ff9f0a"
             />
@@ -181,7 +168,7 @@ export default function DashboardScreen() {
           <View className="flex-1 bg-gray-900 rounded-xl p-4">
             <View className="flex-row items-center gap-2 mb-2">
               <Ionicons name="arrow-up-outline" size={16} color="#30d158" />
-              <Text className="text-gray-400 text-sm">Upload</Text>
+              <Text className="text-gray-400 text-sm">{t('speedtest.upload')}</Text>
             </View>
             <Text testID="net-upload" className="text-white text-lg font-bold">
               {formatNetworkRate(netSent)}
@@ -190,7 +177,7 @@ export default function DashboardScreen() {
           <View className="flex-1 bg-gray-900 rounded-xl p-4">
             <View className="flex-row items-center gap-2 mb-2">
               <Ionicons name="arrow-down-outline" size={16} color="#5e5ce6" />
-              <Text className="text-gray-400 text-sm">Download</Text>
+              <Text className="text-gray-400 text-sm">{t('speedtest.download')}</Text>
             </View>
             <Text testID="net-download" className="text-white text-lg font-bold">
               {formatNetworkRate(netRecv)}
@@ -203,19 +190,16 @@ export default function DashboardScreen() {
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-2">
               <Ionicons name="cube-outline" size={20} color="#9ca3af" />
-              <Text className="text-white font-semibold">Containers</Text>
+              <Text className="text-white font-semibold">{t('dashboard.containers')}</Text>
             </View>
             <Text className="text-gray-400">
-              <Text className="text-green-500 font-bold">
-                {containersRunning}
-              </Text>
-              {' '}running / {containersTotal} total
+              {t('mobile.containers_summary', { running: String(containersRunning), total: String(containersTotal) })}
             </Text>
           </View>
         </View>
 
         {/* Apps section */}
-        <Text testID="apps-section" className="text-lg font-semibold text-white mb-3">Apps</Text>
+        <Text testID="apps-section" className="text-lg font-semibold text-white mb-3">{t('nav.apps')}</Text>
         {apps && apps.length > 0 ? (
           <View className="gap-3 mb-8">
             {apps.map((app) => (
@@ -230,9 +214,9 @@ export default function DashboardScreen() {
           <View className="mb-8">
             <EmptyState
               icon="apps-outline"
-              title="No apps deployed"
-              subtitle="Deploy your first app from the Apps tab"
-              actionLabel="Browse Apps"
+              title={t('app.no_apps')}
+              subtitle={t('app.no_apps_desc')}
+              actionLabel={t('nav.apps')}
               onAction={() => router.push('/(tabs)/apps')}
             />
           </View>

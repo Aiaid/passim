@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from '@/lib/i18n';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -22,6 +23,7 @@ function TabIcon({ focused, color, size, activeIcon, inactiveIcon }: TabIconProp
 }
 
 export default function TabLayout() {
+  const { t } = useTranslation();
   return (
     <Tabs
       screenOptions={{
@@ -37,8 +39,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
-          tabBarLabel: 'Home',
+          title: t('dashboard.title'),
+          tabBarLabel: t('mobile.home'),
           tabBarIcon: ({ focused, color, size }) => (
             <TabIcon
               focused={focused}
@@ -53,7 +55,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="apps"
         options={{
-          title: 'Apps',
+          title: t('nav.apps'),
           tabBarIcon: ({ focused, color, size }) => (
             <TabIcon
               focused={focused}
@@ -68,7 +70,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="nodes"
         options={{
-          title: 'Nodes',
+          title: t('nav.nodes'),
           tabBarIcon: ({ focused, color, size }) => (
             <TabIcon
               focused={focused}
@@ -83,7 +85,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: t('nav.settings'),
           tabBarIcon: ({ focused, color, size }) => (
             <TabIcon
               focused={focused}

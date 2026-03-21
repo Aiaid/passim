@@ -21,6 +21,7 @@ import { StatusDot } from '@/components/StatusDot';
 import { MetricRing } from '@/components/MetricRing';
 import { ContainerCard } from '@/components/ContainerCard';
 import { AppCard } from '@/components/AppCard';
+import { useTranslation } from '@/lib/i18n';
 
 function InfoRow({ label, value }: { label: string; value?: string }) {
   if (!value) return null;
@@ -35,6 +36,7 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
 }
 
 export default function NodeDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const isLocal = id === 'local';
 
@@ -48,18 +50,18 @@ export default function NodeDetailScreen() {
   const status = isLocal ? localStatus : remoteStatus;
   const isLoading = isLocal ? localLoading : remoteLoading;
 
-  const nodeName = status?.node.name ?? (isLocal ? activeNode?.name : id) ?? 'Node';
+  const nodeName = status?.node.name ?? (isLocal ? activeNode?.name : id) ?? t('nav.nodes');
   const flag = status?.node.country ? countryFlag(status.node.country) : '';
 
   const handleRemove = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert(
-      'Remove Node',
-      `Are you sure you want to remove "${nodeName}"? This cannot be undone.`,
+      t('mobile.remove_node_title'),
+      t('mobile.remove_node_confirm', { name: nodeName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             removeMutation.mutate(id, {
@@ -97,21 +99,21 @@ export default function NodeDetailScreen() {
           <View className="bg-gray-900 rounded-xl p-4 mb-4">
             {status ? (
               <>
-                <InfoRow label="Version" value={status.node.version} />
-                {!isLocal && <InfoRow label="Address" value={activeNode?.host} />}
-                <InfoRow label="Uptime" value={formatUptime(status.node.uptime)} />
-                <InfoRow label="Public IP" value={status.node.public_ip} />
-                <InfoRow label="OS" value={status.system.os} />
-                <InfoRow label="Kernel" value={status.system.kernel} />
-                <InfoRow label="CPU Cores" value={String(status.system.cpu.cores)} />
+                <InfoRow label={t('dashboard.version')} value={status.node.version} />
+                {!isLocal && <InfoRow label={t('node.address')} value={activeNode?.host} />}
+                <InfoRow label={t('dashboard.uptime')} value={formatUptime(status.node.uptime)} />
+                <InfoRow label="IP" value={status.node.public_ip} />
+                <InfoRow label={t('dashboard.os')} value={status.system.os} />
+                <InfoRow label={t('dashboard.kernel')} value={status.system.kernel} />
+                <InfoRow label={t('dashboard.cores')} value={String(status.system.cpu.cores)} />
                 <InfoRow
-                  label="Memory"
+                  label={t('dashboard.memory')}
                   value={`${formatBytes(status.system.memory.used_bytes)} / ${formatBytes(status.system.memory.total_bytes)}`}
                 />
               </>
             ) : (
               <Text className="text-gray-500 text-sm text-center py-4">
-                Unable to fetch node status
+                {t('mobile.unable_fetch_status')}
               </Text>
             )}
           </View>
@@ -141,7 +143,7 @@ export default function NodeDetailScreen() {
           {containers && containers.length > 0 ? (
             <>
               <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                Containers
+                {t('dashboard.containers')}
               </Text>
               <View className="gap-3 mb-6">
                 {containers.map((container: Container) => (
@@ -155,7 +157,7 @@ export default function NodeDetailScreen() {
           {apps && apps.length > 0 ? (
             <>
               <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                Apps
+                {t('nav.apps')}
               </Text>
               <View className="gap-3 mb-6">
                 {apps.map((app: AppResponse) => (
@@ -180,7 +182,7 @@ export default function NodeDetailScreen() {
               {removeMutation.isPending ? (
                 <ActivityIndicator size="small" color="#ff453a" />
               ) : (
-                <Text className="text-red-500 font-semibold">Remove Node</Text>
+                <Text className="text-red-500 font-semibold">{t('node.remove')}</Text>
               )}
             </Pressable>
           ) : null}

@@ -20,6 +20,7 @@ import { getNodeApi } from '@/lib/api';
 import { useNodeStore } from '@/stores/node-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { usePreferencesStore } from '@/stores/preferences-store';
+import { useTranslation } from '@/lib/i18n';
 import type { Theme, Language } from '@passim/shared/types';
 
 // ---------------------------------------------------------------------------
@@ -97,12 +98,13 @@ function NodeNameModal({
   onCancel: () => void;
 }) {
   const [text, setText] = useState(initialValue);
+  const { t } = useTranslation();
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable className="flex-1 bg-black/60 items-center justify-center" onPress={onCancel}>
         <Pressable className="bg-gray-900 rounded-2xl w-72 p-5" onPress={() => {}}>
-          <Text className="text-white text-lg font-semibold mb-3">Node Name</Text>
+          <Text className="text-white text-lg font-semibold mb-3">{t('mobile.node_name_title')}</Text>
           <TextInput
             className="bg-gray-800 text-white rounded-lg px-3 py-2.5 text-base mb-4"
             value={text}
@@ -110,14 +112,14 @@ function NodeNameModal({
             autoFocus
             selectTextOnFocus
             placeholderTextColor="#666"
-            placeholder="Enter node name"
+            placeholder={t('mobile.node_name_prompt')}
           />
           <View className="flex-row justify-end gap-3">
             <Pressable onPress={onCancel}>
-              <Text className="text-gray-400 text-base py-1 px-2">Cancel</Text>
+              <Text className="text-gray-400 text-base py-1 px-2">{t('common.cancel')}</Text>
             </Pressable>
             <Pressable onPress={() => onSave(text.trim())}>
-              <Text className="text-[#30d158] text-base font-semibold py-1 px-2">Save</Text>
+              <Text className="text-[#30d158] text-base font-semibold py-1 px-2">{t('common.save')}</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -131,6 +133,7 @@ function NodeNameModal({
 // ---------------------------------------------------------------------------
 
 export default function SettingsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -177,10 +180,10 @@ export default function SettingsScreen() {
     mutationFn: () => getNodeApi().renewSSL(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ssl'] });
-      Alert.alert('SSL Renewed', 'Certificate has been renewed successfully.');
+      Alert.alert(t('settings.ssl_renew'), t('settings.ssl_renew_success'));
     },
     onError: (err: Error) => {
-      Alert.alert('Renew Failed', err.message);
+      Alert.alert(t('common.error'), err.message);
     },
   });
 
@@ -189,21 +192,21 @@ export default function SettingsScreen() {
     onSuccess: (data) => {
       setUpdateResult(data);
       if (!data.available) {
-        Alert.alert('Up to Date', `You are running the latest version (${data.latest}).`);
+        Alert.alert(t('settings.up_to_date'), `${data.latest}`);
       }
     },
     onError: (err: Error) => {
-      Alert.alert('Check Failed', err.message);
+      Alert.alert(t('common.error'), err.message);
     },
   });
 
   const performUpdateMut = useMutation({
     mutationFn: (version: string) => getNodeApi().performUpdate(version),
     onSuccess: () => {
-      Alert.alert('Update Started', 'The node is updating. It will restart shortly.');
+      Alert.alert(t('settings.install_update'), t('settings.update_started'));
     },
     onError: (err: Error) => {
-      Alert.alert('Update Failed', err.message);
+      Alert.alert(t('common.error'), err.message);
     },
   });
 
@@ -211,11 +214,11 @@ export default function SettingsScreen() {
   const handleEditNodeName = () => {
     const currentName = settingsQuery.data?.node_name ?? '';
     if (Platform.OS === 'ios') {
-      Alert.prompt('Node Name', 'Enter a name for this node.', [
-        { text: 'Cancel', style: 'cancel' },
+      Alert.prompt(t('mobile.node_name_title'), t('mobile.node_name_prompt'), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Save',
-          onPress: (value) => {
+          text: t('common.save'),
+          onPress: (value: string | undefined) => {
             const trimmed = (value ?? '').trim();
             if (trimmed && trimmed !== currentName) {
               updateSettingsMut.mutate({ node_name: trimmed });
@@ -253,31 +256,31 @@ export default function SettingsScreen() {
   };
 
   const handlePerformUpdate = (version: string) => {
-    Alert.alert('Install Update', `Update to ${version}?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('settings.install_update'), `${version}`, [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Update',
+        text: t('settings.install_update'),
         onPress: () => performUpdateMut.mutate(version),
       },
     ]);
   };
 
   const handleRenewSSL = () => {
-    Alert.alert('Renew Certificate', 'This will request a new SSL certificate. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Renew', onPress: () => renewSSLMut.mutate() },
+    Alert.alert(t('settings.ssl_renew'), t('settings.ssl_renew_success'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('settings.ssl_renew'), onPress: () => renewSSLMut.mutate() },
     ]);
   };
 
   const handleRemoveNode = () => {
     if (!activeNode) return;
     Alert.alert(
-      'Remove Node',
-      `Remove "${activeNode.name}" from this device? You can add it back later.`,
+      t('mobile.remove_node_title'),
+      t('mobile.remove_node_desc', { name: activeNode.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             const id = activeNode.id;
@@ -302,35 +305,35 @@ export default function SettingsScreen() {
   const version = versionQuery.data;
 
   const updateValue = checkUpdateMut.isPending
-    ? 'Checking...'
+    ? t('settings.check_update') + '...'
     : updateResult?.available
-      ? `v${updateResult.latest} available`
+      ? `v${updateResult.latest} ${t('settings.update_available')}`
       : undefined;
 
   return (
     <SafeAreaView className="flex-1 bg-black">
       <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 48 }}>
-        <Text className="text-2xl font-bold text-white mt-4 mb-6">Settings</Text>
+        <Text className="text-2xl font-bold text-white mt-4 mb-6">{t('settings.title')}</Text>
 
         {/* General */}
-        <SettingsSection title="General">
-          <SettingsRow testID="setting-node-name" label="Node Name" value={nodeName} onPress={handleEditNodeName} chevron />
+        <SettingsSection title={t('settings.general')}>
+          <SettingsRow testID="setting-node-name" label={t('settings.node_name')} value={nodeName} onPress={handleEditNodeName} chevron />
           <SettingsRow
             testID="setting-language"
-            label="Language"
+            label={t('settings.language')}
             value={LANGUAGE_LABELS[language]}
             onPress={cycleLanguage}
           />
-          <SettingsRow testID="setting-theme" label="Theme" value={THEME_LABELS[theme]} onPress={cycleTheme} />
+          <SettingsRow testID="setting-theme" label={t('settings.theme')} value={THEME_LABELS[theme]} onPress={cycleTheme} />
         </SettingsSection>
 
         {/* Security */}
-        <SettingsSection title="Security">
-          <SettingsRow label="Passkeys" onPress={() => {}} chevron />
-          <SettingsRow label="API Key" value={maskedToken} />
+        <SettingsSection title={t('settings.security')}>
+          <SettingsRow label={t('settings.passkeys')} onPress={() => router.push('/settings/passkeys')} chevron />
+          <SettingsRow label={t('settings.api_key')} value={maskedToken} />
           <SettingsRow
             testID="switch-app-lock"
-            label="App Lock"
+            label={t('mobile.app_lock')}
             right={
               <Switch
                 value={biometricEnabled}
@@ -343,38 +346,38 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         {/* SSL */}
-        <SettingsSection title="SSL">
+        <SettingsSection title={t('settings.ssl')}>
           <SettingsRow
             testID="setting-ssl"
-            label="Certificate"
+            label={t('settings.ssl')}
             right={
               <View className="flex-row items-center gap-2">
                 <StatusDot status={ssl?.valid ? 'running' : 'error'} size={8} />
                 <Text className="text-gray-400 text-base">
-                  {ssl?.valid ? 'Valid' : 'Invalid'}
+                  {ssl?.valid ? t('settings.ssl_valid') : t('settings.ssl_invalid')}
                 </Text>
               </View>
             }
           />
-          <SettingsRow label="Domain" value={ssl?.domain ?? '--'} />
+          <SettingsRow label={t('settings.ssl_domain')} value={ssl?.domain ?? '--'} />
           <SettingsRow
-            label="Expires"
+            label={t('settings.ssl_expires')}
             value={ssl?.expires_at ? new Date(ssl.expires_at).toLocaleDateString() : '--'}
           />
           <SettingsRow
-            label="Renew"
+            label={t('settings.ssl_renew')}
             onPress={handleRenewSSL}
-            value={renewSSLMut.isPending ? 'Renewing...' : undefined}
+            value={renewSSLMut.isPending ? t('settings.updating') : undefined}
             chevron
           />
         </SettingsSection>
 
         {/* System */}
-        <SettingsSection title="System">
-          <SettingsRow testID="setting-version" label="Version" value={version?.version ?? '--'} />
+        <SettingsSection title={t('settings.system')}>
+          <SettingsRow testID="setting-version" label={t('settings.current_version')} value={version?.version ?? '--'} />
           <SettingsRow
             testID="btn-check-updates"
-            label="Check Updates"
+            label={t('settings.check_update')}
             value={updateValue}
             onPress={
               updateResult?.available
@@ -385,7 +388,7 @@ export default function SettingsScreen() {
           />
           <SettingsRow
             testID="switch-push"
-            label="Push Notifications"
+            label={t('mobile.push_notifications')}
             right={
               <Switch
                 value={pushEnabled}
@@ -398,12 +401,12 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         {/* Nodes */}
-        <SettingsSection title="Nodes">
+        <SettingsSection title={t('mobile.nodes')}>
           {nodes.map((node) => (
             <SettingsRow
               key={node.id}
               label={node.name}
-              value={node.id === activeNodeId ? 'Active' : undefined}
+              value={node.id === activeNodeId ? t('mobile.active') : undefined}
               onPress={() => setActiveNode(node.id)}
               right={
                 node.id === activeNodeId ? (
@@ -413,18 +416,18 @@ export default function SettingsScreen() {
             />
           ))}
           <SettingsRow
-            label="Add Node"
+            label={t('mobile.add_node_btn')}
             onPress={() => router.push('/nodes/add')}
             chevron
           />
         </SettingsSection>
 
         {/* About */}
-        <SettingsSection title="About">
-          <SettingsRow label="Version" value={version?.version ?? '--'} />
-          <SettingsRow label="Commit" value={version?.commit ?? '--'} />
+        <SettingsSection title={t('mobile.about')}>
+          <SettingsRow label={t('settings.current_version')} value={version?.version ?? '--'} />
+          <SettingsRow label={t('settings.commit')} value={version?.commit ?? '--'} />
           <SettingsRow
-            label="Build Time"
+            label={t('settings.build_time')}
             value={
               version?.build_time
                 ? new Date(version.build_time).toLocaleDateString()
@@ -439,10 +442,10 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         {/* Danger Zone */}
-        <SettingsSection title="Danger Zone">
+        <SettingsSection title={t('mobile.danger_zone')}>
           <SettingsRow
             testID="btn-remove-node"
-            label="Remove Current Node"
+            label={t('mobile.remove_current_node')}
             onPress={handleRemoveNode}
             danger
           />

@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import type { TemplateSummary, SettingInfo } from '@passim/shared/types';
 import { useTemplates, useTemplate, useDeployApp } from '@/hooks/use-apps';
 import { localized } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n';
 
 const CATEGORY_COLORS: Record<string, string> = {
   vpn: '#30d158',
@@ -165,6 +166,7 @@ function SettingField({
 }
 
 export default function DeployScreen() {
+  const { t } = useTranslation();
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [settings, setSettings] = useState<Record<string, unknown>>({});
@@ -234,7 +236,7 @@ export default function DeployScreen() {
         },
         onError: (error: Error) => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert('Deploy Failed', error.message || 'Could not deploy the app.');
+          Alert.alert(t('marketplace.deploy_failed'), error.message || t('mobile.deploy_failed_msg'));
         },
       },
     );
@@ -264,7 +266,7 @@ export default function DeployScreen() {
           <Ionicons name="chevron-back" size={20} color="#fff" />
         </Pressable>
         <Text className="text-white text-lg font-semibold flex-1">
-          {step === 1 ? 'Choose Template' : 'Configure'}
+          {step === 1 ? t('mobile.choose_template') : t('mobile.configure')}
         </Text>
         {/* Step indicator */}
         <View className="flex-row gap-1.5">
@@ -291,7 +293,7 @@ export default function DeployScreen() {
               </View>
             ) : (
               <View className="items-center mt-12">
-                <Text className="text-gray-500">No templates available</Text>
+                <Text className="text-gray-500">{t('mobile.no_templates')}</Text>
               </View>
             )}
           </ScrollView>
@@ -303,7 +305,7 @@ export default function DeployScreen() {
                 className="bg-primary rounded-xl py-4 items-center active:opacity-70"
                 onPress={handleNext}
               >
-                <Text className="text-black font-semibold text-base">Next</Text>
+                <Text className="text-black font-semibold text-base">{t('mobile.next')}</Text>
               </Pressable>
             </View>
           ) : null}
@@ -330,7 +332,7 @@ export default function DeployScreen() {
                 ) : (
                   <View className="bg-gray-900 rounded-xl p-6 mt-2 items-center">
                     <Text className="text-gray-400 text-sm">
-                      No configuration needed. Deploy with defaults.
+                      {t('mobile.no_config_needed')}
                     </Text>
                   </View>
                 )}
@@ -348,7 +350,7 @@ export default function DeployScreen() {
                         color="#666"
                       />
                       <Text className="text-gray-400 text-sm">
-                        {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
+                        {showAdvanced ? t('mobile.hide_advanced') : t('mobile.show_advanced')}
                       </Text>
                     </Pressable>
 
@@ -371,7 +373,7 @@ export default function DeployScreen() {
                 {deployApp.isError ? (
                   <View className="bg-red-500/10 rounded-xl px-4 py-3 mt-4">
                     <Text className="text-red-400 text-sm">
-                      {deployApp.error?.message || 'Deploy failed. Please try again.'}
+                      {deployApp.error?.message || t('marketplace.deploy_failed')}
                     </Text>
                   </View>
                 ) : null}
@@ -390,10 +392,10 @@ export default function DeployScreen() {
               {deployApp.isPending ? (
                 <View className="flex-row items-center gap-2">
                   <ActivityIndicator size="small" color="#30d158" />
-                  <Text className="text-gray-300 font-semibold text-base">Deploying...</Text>
+                  <Text className="text-gray-300 font-semibold text-base">{t('mobile.deploying')}</Text>
                 </View>
               ) : (
-                <Text className="text-black font-semibold text-base">Deploy</Text>
+                <Text className="text-black font-semibold text-base">{t('mobile.deploy')}</Text>
               )}
             </Pressable>
           </View>

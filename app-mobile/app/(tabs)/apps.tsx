@@ -13,8 +13,10 @@ import type { AppResponse } from '@passim/shared/types';
 import { useApps } from '@/hooks/use-apps';
 import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
+import { useTranslation } from '@/lib/i18n';
 
 export default function AppsScreen() {
+  const { t } = useTranslation();
   const { data: apps, isLoading, refetch } = useApps();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -52,13 +54,13 @@ export default function AppsScreen() {
           <>
             {/* Header */}
             <View className="flex-row items-center justify-between mt-4 mb-6">
-              <Text className="text-2xl font-bold text-white">Apps</Text>
+              <Text className="text-2xl font-bold text-white">{t('nav.apps')}</Text>
               <Pressable
                 testID="btn-deploy"
                 className="bg-primary rounded-lg px-4 py-2"
                 onPress={() => router.push('/apps/deploy')}
               >
-                <Text className="text-black font-semibold">Deploy</Text>
+                <Text className="text-black font-semibold">{t('marketplace.deploy')}</Text>
               </Pressable>
             </View>
 
@@ -68,9 +70,9 @@ export default function AppsScreen() {
               <EmptyState
                 testID="apps-empty"
                 icon="rocket-outline"
-                title="No apps deployed"
-                subtitle="Deploy your first app from the marketplace"
-                actionLabel="Deploy App"
+                title={t('app.no_apps')}
+                subtitle={t('app.no_apps_desc')}
+                actionLabel={t('marketplace.deploy')}
                 onAction={() => router.push('/apps/deploy')}
               />
             ) : null}

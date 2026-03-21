@@ -17,6 +17,7 @@ import { countryFlag } from '@/lib/utils';
 import { StatusDot } from '@/components/StatusDot';
 import { NodeCard } from '@/components/NodeCard';
 import { EmptyState } from '@/components/EmptyState';
+import { useTranslation } from '@/lib/i18n';
 
 function BarGauge({ label, value }: { label: string; value: number }) {
   const clamped = Math.min(100, Math.max(0, value));
@@ -37,6 +38,7 @@ function BarGauge({ label, value }: { label: string; value: number }) {
 }
 
 function LocalNodeCard() {
+  const { t } = useTranslation();
   const activeNode = useNodeStore((s) => s.activeNode);
   const { data: status, isLoading } = useStatus();
 
@@ -68,7 +70,7 @@ function LocalNodeCard() {
           <BarGauge label="CPU" value={status.system.cpu.usage_percent} />
           <BarGauge label="MEM" value={status.system.memory.usage_percent} />
           <Text className="text-gray-500 text-xs mt-2">
-            {status.containers.running}/{status.containers.total} containers
+            {t('mobile.containers_summary', { running: String(status.containers.running), total: String(status.containers.total) })}
           </Text>
         </>
       ) : null}
@@ -77,6 +79,7 @@ function LocalNodeCard() {
 }
 
 export default function NodesScreen() {
+  const { t } = useTranslation();
   const { data: remoteNodes, isLoading, refetch } = useNodes();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -116,19 +119,19 @@ export default function NodesScreen() {
           <>
             {/* Header */}
             <View className="flex-row items-center justify-between mt-4 mb-6">
-              <Text className="text-2xl font-bold text-white">Nodes</Text>
+              <Text className="text-2xl font-bold text-white">{t('nav.nodes')}</Text>
               <Pressable
                 testID="btn-add-node"
                 className="bg-primary rounded-lg px-4 py-2"
                 onPress={() => router.push('/nodes/add')}
               >
-                <Text className="text-black font-semibold">Add</Text>
+                <Text className="text-black font-semibold">{t('node.add')}</Text>
               </Pressable>
             </View>
 
             {/* Local Node */}
             <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-              Local Node
+              {t('mobile.local_node')}
             </Text>
             <View className="mb-6">
               <LocalNodeCard />
@@ -136,7 +139,7 @@ export default function NodesScreen() {
 
             {/* Remote Nodes Header */}
             <Text testID="remote-nodes" className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-              Remote Nodes
+              {t('mobile.remote_nodes')}
             </Text>
 
             {isLoading ? (
@@ -144,9 +147,9 @@ export default function NodesScreen() {
             ) : !remoteNodes?.length ? (
               <EmptyState
                 icon="globe-outline"
-                title="No remote nodes"
-                subtitle="Add a remote node to manage multiple servers"
-                actionLabel="Add Node"
+                title={t('mobile.no_remote_nodes')}
+                subtitle={t('mobile.no_remote_nodes_desc')}
+                actionLabel={t('node.add')}
                 onAction={() => router.push('/nodes/add')}
               />
             ) : null}

@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useNodeStore } from '@/stores/node-store';
+import { useTranslation } from '@/lib/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SCAN_SIZE = SCREEN_WIDTH * 0.65;
@@ -52,6 +53,7 @@ async function loginToNode(host: string, key: string): Promise<{ token: string; 
 }
 
 export default function ScanScreen() {
+  const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -68,7 +70,7 @@ export default function ScanScreen() {
 
       const payload = parseQRData(data);
       if (!payload) {
-        setError('Invalid QR code. Please scan a Passim server QR code.');
+        setError(t('mobile.scan_invalid'));
         setIsProcessing(false);
         // Allow re-scan after a short delay
         setTimeout(() => {
@@ -127,11 +129,10 @@ export default function ScanScreen() {
           <View className="bg-gray-900 rounded-2xl p-8 items-center w-full">
             <Ionicons name="camera-outline" size={64} color="#666" />
             <Text className="text-white text-xl font-bold mt-4 mb-2 text-center">
-              Camera Access Required
+              {t('mobile.camera_required')}
             </Text>
             <Text className="text-gray-400 text-center mb-6 leading-5">
-              Passim needs camera access to scan the QR code displayed on your
-              server&apos;s web interface.
+              {t('mobile.camera_required_desc')}
             </Text>
             <TouchableOpacity
               testID="btn-allow-camera"
@@ -139,11 +140,11 @@ export default function ScanScreen() {
               className="bg-green-600 rounded-xl px-8 py-3 w-full items-center"
             >
               <Text className="text-white font-semibold text-base">
-                Allow Camera Access
+                {t('mobile.allow_camera')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleGoBack} className="mt-4 py-2">
-              <Text className="text-gray-400 text-base">Go Back</Text>
+              <Text className="text-gray-400 text-base">{t('mobile.go_back')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -184,10 +185,10 @@ export default function ScanScreen() {
         {/* Bottom overlay */}
         <View style={styles.overlayBottom}>
           <Text className="text-white text-base text-center mt-8 font-medium">
-            Scan your server QR code
+            {t('mobile.scan_title')}
           </Text>
           <Text className="text-gray-400 text-sm text-center mt-2">
-            Find it in your Passim web dashboard
+            {t('mobile.scan_desc')}
           </Text>
 
           {/* Error message */}
@@ -196,7 +197,7 @@ export default function ScanScreen() {
               <Text className="text-red-300 text-center text-sm">{error}</Text>
               <TouchableOpacity onPress={handleRetry} className="mt-2">
                 <Text className="text-white text-center text-sm font-medium">
-                  Tap to retry
+                  {t('mobile.scan_retry')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -206,7 +207,7 @@ export default function ScanScreen() {
           {isProcessing && (
             <View className="items-center mt-4">
               <ActivityIndicator color="#30d158" size="small" />
-              <Text className="text-gray-400 text-sm mt-2">Connecting...</Text>
+              <Text className="text-gray-400 text-sm mt-2">{t('mobile.scan_connecting')}</Text>
             </View>
           )}
         </View>

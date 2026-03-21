@@ -14,10 +14,12 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAddRemoteNode } from '@/hooks/use-node';
+import { useTranslation } from '@/lib/i18n';
 
 type Mode = 'choose' | 'manual';
 
 export default function AddNodeScreen() {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>('choose');
   const [host, setHost] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -37,7 +39,7 @@ export default function AddNodeScreen() {
         },
         onError: (error: Error) => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert('Connection Failed', error.message || 'Could not connect to the node.');
+          Alert.alert(t('mobile.connection_failed'), error.message || t('mobile.connection_failed'));
         },
       },
     );
@@ -59,7 +61,7 @@ export default function AddNodeScreen() {
         >
           <Ionicons name="chevron-back" size={20} color="#fff" />
         </Pressable>
-        <Text className="text-white text-lg font-semibold flex-1">Add Node</Text>
+        <Text className="text-white text-lg font-semibold flex-1">{t('mobile.add_node')}</Text>
       </View>
 
       {mode === 'choose' ? (
@@ -74,9 +76,9 @@ export default function AddNodeScreen() {
               <Ionicons name="qr-code" size={24} color="#30d158" />
             </View>
             <View className="flex-1">
-              <Text className="text-white font-semibold text-base">Scan QR Code</Text>
+              <Text className="text-white font-semibold text-base">{t('mobile.scan_qr')}</Text>
               <Text className="text-gray-400 text-sm mt-0.5">
-                Scan the QR code shown on your node
+                {t('mobile.scan_qr_desc')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#666" />
@@ -92,9 +94,9 @@ export default function AddNodeScreen() {
               <Ionicons name="create-outline" size={24} color="#5e5ce6" />
             </View>
             <View className="flex-1">
-              <Text className="text-white font-semibold text-base">Enter Manually</Text>
+              <Text className="text-white font-semibold text-base">{t('mobile.enter_manually')}</Text>
               <Text className="text-gray-400 text-sm mt-0.5">
-                Type in the host address and API key
+                {t('mobile.enter_manually_desc')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#666" />
@@ -107,7 +109,7 @@ export default function AddNodeScreen() {
         >
           {/* Host Input */}
           <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-            Host Address
+            {t('mobile.host_address')}
           </Text>
           <TextInput
             testID="input-remote-host"
@@ -124,7 +126,7 @@ export default function AddNodeScreen() {
 
           {/* API Key Input */}
           <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-            API Key
+            {t('settings.api_key')}
           </Text>
           <TextInput
             testID="input-remote-key"
@@ -144,7 +146,7 @@ export default function AddNodeScreen() {
           {addNode.isError ? (
             <View className="bg-red-500/10 rounded-xl px-4 py-3 mb-4">
               <Text className="text-red-400 text-sm">
-                {addNode.error?.message || 'Connection failed. Check the address and API key.'}
+                {addNode.error?.message || t('mobile.connection_failed')}
               </Text>
             </View>
           ) : null}
@@ -160,7 +162,7 @@ export default function AddNodeScreen() {
               <ActivityIndicator size="small" color="#000" />
             ) : (
               <Text className={`font-semibold text-base ${canSubmit ? 'text-black' : 'text-gray-500'}`}>
-                Connect
+                {t('mobile.connect')}
               </Text>
             )}
           </Pressable>
