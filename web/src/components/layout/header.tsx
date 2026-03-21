@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Moon, Sun, Languages, Server, Clock, Shield, Globe, Container } from 'lucide-react';
+import { useState } from 'react';
+import { Moon, Sun, Languages, Smartphone, Server, Clock, Shield, Globe, Container } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
@@ -19,6 +20,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { usePreferencesStore } from '@/stores/preferences-store';
 import { api } from '@/lib/api-client';
+import { PairingQRDialog } from '@/components/shared/pairing-qr-dialog';
 
 function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);
@@ -40,6 +42,7 @@ export function Header() {
   const { theme, setTheme } = useTheme();
   const { setLanguage } = usePreferencesStore();
   const { t, i18n } = useTranslation();
+  const [qrOpen, setQrOpen] = useState(false);
 
   const { data: status } = useQuery({
     queryKey: ['status'],
@@ -129,6 +132,17 @@ export function Header() {
       )}
 
       <div className="flex-1" />
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" onClick={() => setQrOpen(true)}>
+              <Smartphone className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('settings.mobile_qr')}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PairingQRDialog open={qrOpen} onOpenChange={setQrOpen} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon">
