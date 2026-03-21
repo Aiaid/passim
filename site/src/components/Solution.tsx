@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl'
 export function Solution() {
   const t = useTranslations('Solution')
   const [copied, setCopied] = useState(false)
-  const cmd = 'curl -fsSL https://get.passim.io | sudo bash'
+  const cmd = 'curl -fsSL https://raw.githubusercontent.com/aiaid/passim/main/install.sh | sudo bash'
 
   const handleCopy = () => {
     navigator.clipboard.writeText(cmd)

@@ -44,7 +44,7 @@ function CodeBlock({
 export function QuickStart() {
   const t = useTranslations('QuickStart')
 
-  const installerCmd = 'curl -fsSL https://get.passim.io | sudo bash'
+  const installerCmd = 'curl -fsSL https://raw.githubusercontent.com/aiaid/passim/main/install.sh | sudo bash'
   const dockerCmd = `docker run -d \\
   --name passim \\
   --restart always \\
