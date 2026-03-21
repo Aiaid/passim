@@ -1,0 +1,124 @@
+{
+  "Navbar": {
+    "features": "特性",
+    "apps": "应用",
+    "compare": "对比",
+    "start": "开始使用"
+  },
+  "Hero": {
+    "title1": "你的服务器",
+    "title2": "你做主",
+    "subtitle": "无需终端，一键部署 VPN、存储、远程桌面。像用手机 App 一样管理你的云服务器。",
+    "cta": "立即开始",
+    "cta2": "了解更多"
+  },
+  "PainPoints": {
+    "title": "管理服务器，",
+    "titleHighlight": "不该这么难",
+    "item1Title": "终端命令太复杂",
+    "item1Desc": "安装一个 VPN 需要十几步命令行操作，一个字母打错就要从头来。",
+    "item2Title": "安全配置太麻烦",
+    "item2Desc": "SSL 证书、防火墙规则、认证系统全都要自己折腾。",
+    "item3Title": "维护更新太费劲",
+    "item3Desc": "每次更新都怕把服务搞崩，回滚更是噩梦。"
+  },
+  "Solution": {
+    "label": "解决方案",
+    "title": "认识 Passim",
+    "subtitle": "你的私人云管家",
+    "desc": "一个容器，零依赖，自动 SSL。从安装到使用，只需要一行命令。",
+    "copy": "复制",
+    "copied": "已复制!",
+    "tag1": "30 秒安装",
+    "tag2": "自动 HTTPS",
+    "tag3": "开箱即用"
+  },
+  "Features": {
+    "title": "核心特性",
+    "f1Title": "一键部署应用",
+    "f1Desc": "WireGuard VPN、WebDAV 存储、远程桌面，在应用市场点一下就好。",
+    "f2Title": "自动 SSL 证书",
+    "f2Desc": "无需购买域名，通过 DNS 反射自动获取 Let's Encrypt 证书。",
+    "f3Title": "多节点管理",
+    "f3Desc": "一个面板管理所有服务器，去中心化架构，无需中央服务器。",
+    "f4Title": "生物识别登录",
+    "f4Desc": "支持 Passkey 指纹和面容识别，安全又便捷。",
+    "f5Title": "实时监控",
+    "f5Desc": "CPU、内存、网络、磁盘用量一目了然，内置网络测速。",
+    "f6Title": "自动更新回滚",
+    "f6Desc": "一键更新到最新版本，失败自动回滚，数据永不丢失。"
+  },
+  "Marketplace": {
+    "title": "内置应用市场",
+    "subtitle": "7 款精选应用，覆盖最常用场景",
+    "wireguard": "高性能点对点 VPN",
+    "l2tp": "兼容所有设备的经典 VPN",
+    "hysteria": "基于 UDP 的高速代理",
+    "v2ray": "多协议代理平台",
+    "webdav": "通过浏览器管理文件",
+    "samba": "Windows 兼容的文件共享",
+    "rdesktop": "浏览器内远程桌面",
+    "vpn": "VPN",
+    "proxy": "代理",
+    "storage": "存储",
+    "remote": "远程"
+  },
+  "HowItWorks": {
+    "title": "三步开始使用",
+    "step1Title": "安装",
+    "step1Desc": "复制安装脚本，粘贴到服务器终端，30 秒完成安装。",
+    "step2Title": "打开",
+    "step2Desc": "在浏览器输入服务器地址，自动获取 SSL 证书，打开即用。",
+    "step3Title": "部署",
+    "step3Desc": "在应用市场选择想要的服务，填写配置，一键部署。"
+  },
+  "Comparison": {
+    "title": "为什么选择 Passim",
+    "manual": "手动配置",
+    "portainer": "Portainer",
+    "passim": "Passim",
+    "difficulty": "安装难度",
+    "presetApps": "预置应用",
+    "autoSSL": "自动 SSL",
+    "biometric": "生物识别",
+    "autoUpdate": "自动更新回滚",
+    "multiNode": "多节点",
+    "audience": "面向人群",
+    "none": "无",
+    "limited": "有限",
+    "yes": "支持",
+    "no": "不支持",
+    "7apps": "7 个开箱即用",
+    "noDomain": "无需域名",
+    "passkey": "Passkey",
+    "centralized": "中心化",
+    "decentralized": "去中心化",
+    "expert": "专家",
+    "developer": "开发者",
+    "everyone": "所有人",
+    "hard": "困难",
+    "medium": "中等",
+    "easy": "简单"
+  },
+  "TechStack": {
+    "title": "开源 · 现代 · 可靠",
+    "desc": "基于现代技术栈构建，单一 Go 二进制文件，零外部依赖。",
+    "github": "在 GitHub 上查看",
+    "multiArch": "多架构"
+  },
+  "QuickStart": {
+    "title": "快速开始",
+    "method1": "一键安装脚本",
+    "method2": "Docker 运行",
+    "copy": "复制",
+    "copied": "已复制!",
+    "note": "支持自签名证书、Let's Encrypt、自定义域名三种 SSL 模式。"
+  },
+  "Footer": {
+    "tagline": "让每个人都能轻松管理自己的云",
+    "docs": "文档",
+    "github": "GitHub",
+    "license": "开源协议",
+    "copyright": "Passim 项目"
+  }
+}

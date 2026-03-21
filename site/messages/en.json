@@ -1,0 +1,124 @@
+{
+  "Navbar": {
+    "features": "Features",
+    "apps": "Apps",
+    "compare": "Compare",
+    "start": "Get Started"
+  },
+  "Hero": {
+    "title1": "Your Server",
+    "title2": "Your Rules",
+    "subtitle": "Deploy VPN, storage, and remote desktop with one click. Manage your cloud server like a mobile app — no terminal required.",
+    "cta": "Get Started",
+    "cta2": "Learn More"
+  },
+  "PainPoints": {
+    "title": "Managing servers ",
+    "titleHighlight": "shouldn't be this hard",
+    "item1Title": "Terminal commands are complex",
+    "item1Desc": "Setting up a VPN takes dozens of command-line steps. One typo and you start over.",
+    "item2Title": "Security config is painful",
+    "item2Desc": "SSL certificates, firewall rules, authentication systems — all on your own.",
+    "item3Title": "Maintenance is a headache",
+    "item3Desc": "Every update risks breaking your services. Rolling back is a nightmare."
+  },
+  "Solution": {
+    "label": "The Solution",
+    "title": "Meet Passim",
+    "subtitle": "Your Personal Cloud Butler",
+    "desc": "One container, zero dependencies, automatic SSL. From install to usage — just one command.",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "tag1": "30s install",
+    "tag2": "Auto HTTPS",
+    "tag3": "Ready to go"
+  },
+  "Features": {
+    "title": "Core Features",
+    "f1Title": "One-Click Deploy",
+    "f1Desc": "WireGuard VPN, WebDAV storage, remote desktop — just pick and click in the marketplace.",
+    "f2Title": "Auto SSL Certificates",
+    "f2Desc": "No domain needed. Get Let's Encrypt certificates automatically via DNS reflection.",
+    "f3Title": "Multi-Node Management",
+    "f3Desc": "Manage all your servers from one panel. Decentralized — no central server required.",
+    "f4Title": "Biometric Login",
+    "f4Desc": "Support for Passkey fingerprint and face recognition. Secure and convenient.",
+    "f5Title": "Real-Time Monitoring",
+    "f5Desc": "CPU, memory, network, disk at a glance. Built-in network speed test.",
+    "f6Title": "Auto Update & Rollback",
+    "f6Desc": "One-click updates. Automatic rollback on failure. Your data is always safe."
+  },
+  "Marketplace": {
+    "title": "Built-in App Marketplace",
+    "subtitle": "7 curated apps covering the most common use cases",
+    "wireguard": "High-performance peer-to-peer VPN",
+    "l2tp": "Classic VPN compatible with all devices",
+    "hysteria": "High-speed UDP-based proxy",
+    "v2ray": "Multi-protocol proxy platform",
+    "webdav": "Manage files via browser",
+    "samba": "Windows-compatible file sharing",
+    "rdesktop": "Remote desktop in the browser",
+    "vpn": "VPN",
+    "proxy": "Proxy",
+    "storage": "Storage",
+    "remote": "Remote"
+  },
+  "HowItWorks": {
+    "title": "Get Started in 3 Steps",
+    "step1Title": "Install",
+    "step1Desc": "Copy the install script, paste it in your server terminal. Done in 30 seconds.",
+    "step2Title": "Open",
+    "step2Desc": "Enter your server address in a browser. SSL certificate is obtained automatically.",
+    "step3Title": "Deploy",
+    "step3Desc": "Pick a service from the marketplace, configure it, and deploy with one click."
+  },
+  "Comparison": {
+    "title": "Why Choose Passim",
+    "manual": "Manual Setup",
+    "portainer": "Portainer",
+    "passim": "Passim",
+    "difficulty": "Install Difficulty",
+    "presetApps": "Preset Apps",
+    "autoSSL": "Auto SSL",
+    "biometric": "Biometric Auth",
+    "autoUpdate": "Auto Update & Rollback",
+    "multiNode": "Multi-Node",
+    "audience": "Target Audience",
+    "none": "None",
+    "limited": "Limited",
+    "yes": "Yes",
+    "no": "No",
+    "7apps": "7 out-of-the-box",
+    "noDomain": "No domain needed",
+    "passkey": "Passkey",
+    "centralized": "Centralized",
+    "decentralized": "Decentralized",
+    "expert": "Experts",
+    "developer": "Developers",
+    "everyone": "Everyone",
+    "hard": "Hard",
+    "medium": "Medium",
+    "easy": "Easy"
+  },
+  "TechStack": {
+    "title": "Open Source · Modern · Reliable",
+    "desc": "Built on a modern tech stack. Single Go binary, zero external dependencies.",
+    "github": "View on GitHub",
+    "multiArch": "Multi-arch"
+  },
+  "QuickStart": {
+    "title": "Quick Start",
+    "method1": "One-Line Installer",
+    "method2": "Docker Run",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "note": "Supports self-signed certificates, Let's Encrypt, and custom domain SSL modes."
+  },
+  "Footer": {
+    "tagline": "Making cloud management simple for everyone",
+    "docs": "Docs",
+    "github": "GitHub",
+    "license": "License",
+    "copyright": "Passim Project"
+  }
+}
