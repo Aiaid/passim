@@ -96,9 +96,15 @@ func ExecSwitch(ctx context.Context, dockerClient docker.DockerClient, targetID,
 		return rollback(ctx, dockerClient, targetID, oldName, name, err)
 	}
 
-	// Success — remove old container
+	// Success — remove old container.
+	// Use a fresh context because the parent context may be close to its timeout
+	// after the health check.
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cleanupCancel()
 	log.Printf("update-exec: update successful, removing old container %s", oldName)
-	dockerClient.RemoveContainer(ctx, targetID)
+	if err := dockerClient.RemoveContainer(cleanupCtx, targetID); err != nil {
+		log.Printf("update-exec: WARNING: failed to remove old container %s: %v", oldName, err)
+	}
 
 	return nil
 }
@@ -144,7 +150,7 @@ func waitForHealthy(ctx context.Context, host string, timeout time.Duration) err
 		default:
 		}
 
-		var lastErr string
+		var errors []string
 		for _, url := range urls {
 			resp, err := client.Get(url)
 			if err == nil {
@@ -152,12 +158,12 @@ func waitForHealthy(ctx context.Context, host string, timeout time.Duration) err
 				if resp.StatusCode == http.StatusOK {
 					return nil
 				}
-				lastErr = fmt.Sprintf("%s returned %d", url, resp.StatusCode)
+				errors = append(errors, fmt.Sprintf("%s returned %d", url, resp.StatusCode))
 			} else {
-				lastErr = fmt.Sprintf("%s: %v", url, err)
+				errors = append(errors, fmt.Sprintf("%s: %v", url, err))
 			}
 		}
-		log.Printf("update-exec: health check attempt: %s", lastErr)
+		log.Printf("update-exec: health check attempt: %s", strings.Join(errors, " | "))
 
 		time.Sleep(2 * time.Second)
 	}

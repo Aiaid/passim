@@ -52,6 +52,7 @@ type ContainerConfig struct {
 	Sysctls       map[string]string
 	Cmd           []string
 	RestartPolicy string
+	AutoRemove    bool
 	// DataDir is the data directory path inside the Passim container (e.g. "/data").
 	// Used to identify which volume specs should be converted to named volume mounts.
 	DataDir string
@@ -146,6 +147,9 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, cfg *ContainerConf
 
 	if cfg.RestartPolicy != "" {
 		hostCfg.RestartPolicy = container.RestartPolicy{Name: container.RestartPolicyMode(cfg.RestartPolicy)}
+	}
+	if cfg.AutoRemove {
+		hostCfg.AutoRemove = true
 	}
 
 	resp, err := c.cli.ContainerCreate(ctx, containerCfg, hostCfg, nil, nil, cfg.Name)

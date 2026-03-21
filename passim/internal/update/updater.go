@@ -94,7 +94,8 @@ func (u *Updater) Execute(ctx context.Context, targetVersion string) error {
 			"--name=" + containerName,
 			"--config=" + configPayload,
 		},
-		Volumes: []string{"/var/run/docker.sock:/var/run/docker.sock"},
+		Volumes:    []string{"/var/run/docker.sock:/var/run/docker.sock"},
+		AutoRemove: true,
 	}
 
 	log.Printf("update: launching helper container for switch to %s", targetVersion)

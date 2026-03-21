@@ -39,6 +39,8 @@ export function UpdateSettings() {
     onMutate: () => setUpdating(true),
     onSuccess: () => {
       toast.success(t('settings.update_started'));
+      // Signal SSE reconnect handler to reload the page when the new container is ready
+      sessionStorage.setItem('passim-update-pending', String(Date.now()));
     },
     onError: (err) => {
       setUpdating(false);

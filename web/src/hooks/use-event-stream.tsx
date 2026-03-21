@@ -57,7 +57,25 @@ export function EventStreamProvider({ children }: { children: React.ReactNode })
       const source = new EventSource(url);
       sourceRef.current = source;
 
-      source.onopen = () => setIsConnected(true);
+      source.onopen = () => {
+        setIsConnected(true);
+
+        // After an update, the new container serves new frontend assets.
+        // Reload the page so the browser picks up the new JS/CSS bundle.
+        const pendingTs = sessionStorage.getItem('passim-update-pending');
+        if (pendingTs) {
+          const elapsed = Date.now() - Number(pendingTs);
+          if (elapsed > 5_000 && elapsed < 10 * 60_000) {
+            sessionStorage.removeItem('passim-update-pending');
+            window.location.reload();
+            return;
+          }
+          // Stale flag (> 10 min), clean up
+          if (elapsed >= 10 * 60_000) {
+            sessionStorage.removeItem('passim-update-pending');
+          }
+        }
+      };
 
       source.addEventListener('metrics', ((e: MessageEvent) => {
         try {

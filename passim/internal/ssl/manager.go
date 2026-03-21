@@ -158,6 +158,23 @@ func (m *SSLManager) GetTLSConfig() (*tls.Config, error) {
 			}
 		}
 		tlsCfg.NextProtos = filtered
+
+		// Wrap GetCertificate with a fallback for non-matching SNI.
+		// Health checks (and other internal callers) connect via container IP,
+		// whose SNI doesn't match the HostPolicy whitelist, causing TLS
+		// handshake failure. Fall back to serving the domain cert so these
+		// connections can complete.
+		origGetCert := tlsCfg.GetCertificate
+		domain := m.domain
+		mgr := m.autocertMgr
+		tlsCfg.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			cert, err := origGetCert(hello)
+			if err != nil && domain != "" {
+				return mgr.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+			}
+			return cert, err
+		}
+
 		return tlsCfg, nil
 	default:
 		if m.certPath == "" || m.keyPath == "" {
