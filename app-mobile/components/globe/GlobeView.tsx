@@ -4,6 +4,7 @@ import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
 import { Renderer, loadTextureAsync } from 'expo-three';
 import { Asset } from 'expo-asset';
 import * as THREE from 'three';
+import { earthVert, earthFrag, atmosVert, atmosFrag } from '@passim/shared/globe/shaders';
 import { EARTH_RADIUS, COUNTRY_COORDS } from '@passim/shared/globe/constants';
 import { resolveNodeCoords } from '@passim/shared/globe/clustering';
 import { useGlobeGesture } from './use-globe-gesture';
@@ -46,39 +47,81 @@ export function GlobeView({ localStatus, remoteNodes }: GlobeViewProps) {
     const globe = new THREE.Group();
     scene.add(globe);
 
-    // Earth
+    const sunDir = getSunDirection();
+
+    // Earth — fallback color, then upgrade to shared day/night shader
     const earthMesh = new THREE.Mesh(
       new THREE.SphereGeometry(EARTH_RADIUS, 48, 48),
       new THREE.MeshBasicMaterial({ color: 0x1a3a5c }),
     );
     globe.add(earthMesh);
 
-    // Load earth texture via expo-asset + expo-three
-    Asset.fromURI('https://unpkg.com/three-globe@2.41.2/example/img/earth-blue-marble.jpg')
-      .downloadAsync()
-      .then((asset) => loadTextureAsync({ asset }))
-      .then((tex: THREE.Texture) => {
-        earthMesh.material.dispose();
-        earthMesh.material = new THREE.MeshBasicMaterial({ map: tex });
-      })
-      .catch(() => { /* keep fallback color */ });
+    // Load 3 textures → shared earth shader (day/night + specular)
+    Promise.all(
+      [
+        'https://unpkg.com/three-globe@2.41.2/example/img/earth-blue-marble.jpg',
+        'https://unpkg.com/three-globe@2.41.2/example/img/earth-night.jpg',
+        'https://unpkg.com/three-globe@2.41.2/example/img/earth-water.png',
+      ].map((url) =>
+        Asset.fromURI(url).downloadAsync().then((a) => loadTextureAsync({ asset: a })),
+      ),
+    ).then(([dayTex, nightTex, specTex]) => {
+      earthMesh.material.dispose();
+      earthMesh.material = new THREE.ShaderMaterial({
+        vertexShader: earthVert,
+        fragmentShader: earthFrag,
+        uniforms: {
+          uDayMap: { value: dayTex },
+          uNightMap: { value: nightTex },
+          uSpecMap: { value: specTex },
+          uSunDir: { value: sunDir },
+          uMinBrightness: { value: 0.03 },
+        },
+      });
+    }).catch(() => {});
 
-    // Atmosphere
+    // Clouds
+    const cloudMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(EARTH_RADIUS * 1.01, 48, 48),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    );
+    globe.add(cloudMesh);
+    Asset.fromURI('https://raw.githubusercontent.com/turban/webgl-earth/master/images/fair_clouds_4k.png')
+      .downloadAsync()
+      .then((a) => loadTextureAsync({ asset: a }))
+      .then((tex: THREE.Texture) => {
+        cloudMesh.material.dispose();
+        cloudMesh.material = new THREE.MeshBasicMaterial({
+          map: tex, transparent: true, opacity: 0.35, depthWrite: false,
+        });
+      })
+      .catch(() => {});
+
+    // Atmosphere — shared atmos shader
     globe.add(new THREE.Mesh(
-      new THREE.SphereGeometry(EARTH_RADIUS * 1.08, 48, 48),
-      new THREE.MeshBasicMaterial({
-        color: 0x4488ff, transparent: true, opacity: 0.08,
-        side: THREE.BackSide, depthWrite: false,
+      new THREE.SphereGeometry(EARTH_RADIUS * 1.04, 48, 48),
+      new THREE.ShaderMaterial({
+        vertexShader: atmosVert,
+        fragmentShader: atmosFrag,
+        uniforms: {
+          uSunDir: { value: sunDir },
+          uGlowStrength: { value: 0.5 },
+          uRimPower: { value: 5.0 },
+          uAtmosDark: { value: new THREE.Color(0.1, 0.15, 0.4) },
+          uAtmosLight: { value: new THREE.Color(0.3, 0.6, 1.0) },
+        },
+        transparent: true,
+        side: THREE.BackSide,
+        depthWrite: false,
       }),
     ));
 
     // Stars (InstancedMesh — expo-gl doesn't support GL_POINTS)
     const starGeo = new THREE.SphereGeometry(0.015, 4, 4);
     const starMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const starCount = 200;
-    const stars = new THREE.InstancedMesh(starGeo, starMat, starCount);
+    const stars = new THREE.InstancedMesh(starGeo, starMat, 200);
     const dummy = new THREE.Object3D();
-    for (let i = 0; i < starCount; i++) {
+    for (let i = 0; i < 200; i++) {
       const r = 6 + Math.random() * 4;
       const th = Math.random() * Math.PI * 2;
       const ph = Math.acos(2 * Math.random() - 1);
@@ -132,6 +175,9 @@ export function GlobeView({ localStatus, remoteNodes }: GlobeViewProps) {
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.15));
 
+    // Camera orbits around the globe (like web version)
+    const camRadius = 4.2;
+
     const animate = () => {
       requestAnimationFrame(animate);
 
@@ -142,8 +188,11 @@ export function GlobeView({ localStatus, remoteNodes }: GlobeViewProps) {
       rot.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, rot.x));
       vel.x *= 0.95;
       vel.y *= 0.95;
-      globe.rotation.x = rot.x;
-      globe.rotation.y = rot.y;
+
+      camera.position.x = camRadius * Math.sin(rot.y) * Math.cos(rot.x);
+      camera.position.y = camRadius * Math.sin(rot.x);
+      camera.position.z = camRadius * Math.cos(rot.y) * Math.cos(rot.x);
+      camera.lookAt(0, 0, 0);
 
       // Pulse markers
       const t = Date.now() * 0.003;

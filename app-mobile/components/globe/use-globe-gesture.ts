@@ -24,13 +24,13 @@ export function useGlobeGesture() {
         rotation.current = {
           x: Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5,
             savedRotation.current.x + gs.dy * sensitivity)),
-          y: savedRotation.current.y + gs.dx * sensitivity,
+          y: savedRotation.current.y - gs.dx * sensitivity,
         };
       },
       onPanResponderRelease: (_e: GestureResponderEvent, gs: PanResponderGestureState) => {
         velocity.current = {
           x: gs.vy * 0.003,
-          y: gs.vx * 0.003,
+          y: -gs.vx * 0.003,
         };
       },
     }),

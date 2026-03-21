@@ -1,10 +1,9 @@
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   View,
   Text,
-  ScrollView,
-  RefreshControl,
   TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,27 +12,23 @@ import { useStatus, useNodes } from '@/hooks/use-node';
 import { useApps } from '@/hooks/use-apps';
 import { useNodeStore } from '@/stores/node-store';
 import { MetricRing } from '@/components/MetricRing';
-import { AppCard } from '@/components/AppCard';
-import { EmptyState } from '@/components/EmptyState';
 import { StatusDot } from '@/components/StatusDot';
 import { GlobeView } from '@/components/globe/GlobeView';
-import { formatBytes, formatUptime, formatNetworkRate, countryFlag } from '@/lib/utils';
+import { formatUptime, formatNetworkRate, countryFlag } from '@/lib/utils';
 import { useTranslation } from '@/lib/i18n';
-import { router } from 'expo-router';
-import type { AppResponse } from '@passim/shared/types';
 
 export default function DashboardScreen() {
   const { t } = useTranslation();
   const { nodes, activeNodeId, setActiveNode, activeNode } = useNodeStore();
   const { metrics, isConnected } = useSSE();
   const statusQuery = useStatus();
-  const appsQuery = useApps();
   const nodesQuery = useNodes();
+  const appsQuery = useApps();
 
   const status = statusQuery.data;
-  const apps = appsQuery.data;
+  const appsCount = appsQuery.data?.length ?? 0;
+  const appsRunning = appsQuery.data?.filter((a) => a.status === 'running').length ?? 0;
 
-  // Compute metric values from SSE (primary) or status query (fallback)
   const cpuPercent = metrics?.cpu_percent ?? status?.system?.cpu?.usage_percent ?? 0;
   const memUsed = metrics?.mem_used ?? 0;
   const memTotal = metrics?.mem_total ?? 0;
@@ -47,17 +42,6 @@ export default function DashboardScreen() {
   const containersRunning = status?.containers?.running ?? 0;
   const containersTotal = status?.containers?.total ?? 0;
 
-  const isRefreshing = statusQuery.isRefetching || appsQuery.isRefetching;
-
-  const onRefresh = useCallback(() => {
-    statusQuery.refetch();
-    appsQuery.refetch();
-  }, [statusQuery, appsQuery]);
-
-  const handleAppPress = useCallback((app: AppResponse) => {
-    router.push(`/(tabs)/apps?appId=${app.id}`);
-  }, []);
-
   const hasMultipleNodes = nodes.length > 1;
 
   const nodeInfo = useMemo(() => ({
@@ -70,57 +54,50 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-black">
-      <ScrollView
-        className="flex-1 px-4"
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
-            tintColor="#30d158"
-          />
-        }
-      >
-        {/* Header */}
-        <View className="flex-row items-center justify-between mt-4 mb-4">
-          <Text testID="dashboard-title" className="text-2xl font-bold text-white">{t('dashboard.title')}</Text>
-          <StatusDot status={isConnected ? 'connected' : 'disconnected'} size={10} />
-        </View>
+      <View className="flex-1 px-4 justify-between">
+        {/* Top: Header + Node picker */}
+        <View>
+          <View className="flex-row items-center justify-between mt-4 mb-2">
+            <Text testID="dashboard-title" className="text-2xl font-bold text-white">{t('dashboard.title')}</Text>
+            <StatusDot status={isConnected ? 'connected' : 'disconnected'} size={10} />
+          </View>
 
-        {/* Node picker pills */}
-        {hasMultipleNodes && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            className="mb-4"
-          >
-            <View className="flex-row gap-2">
-              {nodes.map((node) => (
-                <TouchableOpacity
-                  key={node.id}
-                  onPress={() => setActiveNode(node.id)}
-                  className={`px-4 py-2 rounded-full ${
-                    node.id === activeNodeId
-                      ? 'bg-green-600'
-                      : 'bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-sm font-medium ${
+          {/* Node picker pills */}
+          {hasMultipleNodes && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mb-2"
+            >
+              <View className="flex-row gap-2">
+                {nodes.map((node) => (
+                  <TouchableOpacity
+                    key={node.id}
+                    onPress={() => setActiveNode(node.id)}
+                    className={`px-4 py-2 rounded-full ${
                       node.id === activeNodeId
-                        ? 'text-white'
-                        : 'text-gray-400'
+                        ? 'bg-green-600'
+                        : 'bg-gray-800'
                     }`}
                   >
-                    {node.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        )}
+                    <Text
+                      className={`text-sm font-medium ${
+                        node.id === activeNodeId
+                          ? 'text-white'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {node.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          )}
+        </View>
 
-        {/* 3D Globe */}
-        <View testID="node-info-card" className="mb-6">
+        {/* Center: 3D Globe */}
+        <View testID="node-info-card">
           <GlobeView
             localStatus={status}
             remoteNodes={nodesQuery.data ?? undefined}
@@ -138,8 +115,10 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        {/* Bottom: Stats */}
+        <View>
         {/* Metric Rings */}
-        <View className="flex-row justify-between mb-6">
+        <View className="flex-row justify-between mb-3">
           <View testID="metric-cpu">
             <MetricRing
               label={t('dashboard.cpu')}
@@ -163,65 +142,53 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Network section */}
-        <View className="flex-row gap-3 mb-6">
-          <View className="flex-1 bg-gray-900 rounded-xl p-4">
-            <View className="flex-row items-center gap-2 mb-2">
-              <Ionicons name="arrow-up-outline" size={16} color="#30d158" />
-              <Text className="text-gray-400 text-sm">{t('speedtest.upload')}</Text>
+        {/* Network row */}
+        <View className="flex-row gap-3 mb-3">
+          <View className="flex-1 bg-gray-900 rounded-xl p-3">
+            <View className="flex-row items-center gap-1.5 mb-1">
+              <Ionicons name="arrow-up-outline" size={14} color="#30d158" />
+              <Text className="text-gray-400 text-xs">{t('speedtest.upload')}</Text>
             </View>
-            <Text testID="net-upload" className="text-white text-lg font-bold">
+            <Text testID="net-upload" className="text-white text-base font-bold">
               {formatNetworkRate(netSent)}
             </Text>
           </View>
-          <View className="flex-1 bg-gray-900 rounded-xl p-4">
-            <View className="flex-row items-center gap-2 mb-2">
-              <Ionicons name="arrow-down-outline" size={16} color="#5e5ce6" />
-              <Text className="text-gray-400 text-sm">{t('speedtest.download')}</Text>
+          <View className="flex-1 bg-gray-900 rounded-xl p-3">
+            <View className="flex-row items-center gap-1.5 mb-1">
+              <Ionicons name="arrow-down-outline" size={14} color="#5e5ce6" />
+              <Text className="text-gray-400 text-xs">{t('speedtest.download')}</Text>
             </View>
-            <Text testID="net-download" className="text-white text-lg font-bold">
+            <Text testID="net-download" className="text-white text-base font-bold">
               {formatNetworkRate(netRecv)}
             </Text>
           </View>
         </View>
 
-        {/* Container summary */}
-        <View testID="container-summary" className="bg-gray-900 rounded-xl p-4 mb-6">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2">
-              <Ionicons name="cube-outline" size={20} color="#9ca3af" />
-              <Text className="text-white font-semibold">{t('dashboard.containers')}</Text>
+        {/* Apps + Containers row */}
+        <View className="flex-row gap-3">
+          <View testID="container-summary" className="flex-1 bg-gray-900 rounded-xl p-3">
+            <View className="flex-row items-center gap-1.5 mb-1">
+              <Ionicons name="cube-outline" size={14} color="#ff9f0a" />
+              <Text className="text-gray-400 text-xs">{t('dashboard.containers')}</Text>
             </View>
-            <Text className="text-gray-400">
-              {t('mobile.containers_summary', { running: String(containersRunning), total: String(containersTotal) })}
+            <Text className="text-white text-base font-bold">
+              <Text className="text-green-500">{containersRunning}</Text>
+              <Text className="text-gray-500"> / {containersTotal}</Text>
+            </Text>
+          </View>
+          <View className="flex-1 bg-gray-900 rounded-xl p-3">
+            <View className="flex-row items-center gap-1.5 mb-1">
+              <Ionicons name="grid-outline" size={14} color="#bf5af2" />
+              <Text className="text-gray-400 text-xs">{t('nav.apps')}</Text>
+            </View>
+            <Text className="text-white text-base font-bold">
+              <Text className="text-green-500">{appsRunning}</Text>
+              <Text className="text-gray-500"> / {appsCount}</Text>
             </Text>
           </View>
         </View>
-
-        {/* Apps section */}
-        <Text testID="apps-section" className="text-lg font-semibold text-white mb-3">{t('nav.apps')}</Text>
-        {apps && apps.length > 0 ? (
-          <View className="gap-3 mb-8">
-            {apps.map((app) => (
-              <AppCard
-                key={app.id}
-                app={app}
-                onPress={() => handleAppPress(app)}
-              />
-            ))}
-          </View>
-        ) : (
-          <View className="mb-8">
-            <EmptyState
-              icon="apps-outline"
-              title={t('app.no_apps')}
-              subtitle={t('app.no_apps_desc')}
-              actionLabel={t('nav.apps')}
-              onAction={() => router.push('/(tabs)/apps')}
-            />
-          </View>
-        )}
-      </ScrollView>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
