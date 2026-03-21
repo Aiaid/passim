@@ -3,113 +3,6 @@
 import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
 
-function DashboardMockup() {
-  const metrics = [
-    { label: 'CPU', value: '72%', color: 'text-cyan' },
-    { label: 'MEM', value: '45%', color: 'text-purple' },
-    { label: 'DISK', value: '28%', color: 'text-amber' },
-    { label: 'NET', value: '1.2G', color: 'text-emerald' },
-  ]
-
-  return (
-    <div className="glass rounded-2xl overflow-hidden w-full max-w-[520px] border border-white/10 shadow-[0_20px_60px_oklch(0_0_0/0.5)]">
-      {/* Title bar */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/5 bg-white/[0.02]">
-        <div className="flex gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
-          <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
-          <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
-        </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-white.svg" alt="Passim" className="h-3 ml-2 opacity-50" />
-      </div>
-
-      <div className="flex min-h-[220px]">
-        {/* Sidebar */}
-        <div className="w-11 border-r border-white/5 py-3 flex flex-col items-center gap-3 bg-white/[0.01]">
-          {[true, false, false, false].map((active, i) => (
-            <div
-              key={i}
-              className={`w-6 h-6 rounded-md ${
-                active
-                  ? 'bg-cyan/20 border border-cyan/30'
-                  : 'bg-white/5'
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* Main */}
-        <div className="flex-1 p-4 space-y-3">
-          {/* Metrics */}
-          <div className="grid grid-cols-4 gap-2">
-            {metrics.map((m) => (
-              <div
-                key={m.label}
-                className="rounded-lg bg-white/[0.03] border border-white/5 p-2 text-center"
-              >
-                <div className="text-[9px] text-space-500 uppercase tracking-wider">
-                  {m.label}
-                </div>
-                <div className={`text-sm font-bold font-mono mt-0.5 ${m.color}`}>
-                  {m.value}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Chart */}
-          <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3 h-[68px]">
-            <svg
-              viewBox="0 0 200 32"
-              className="w-full h-full"
-              preserveAspectRatio="none"
-            >
-              <defs>
-                <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="0%"
-                    stopColor="oklch(0.78 0.15 195)"
-                    stopOpacity="0.3"
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor="oklch(0.78 0.15 195)"
-                    stopOpacity="0"
-                  />
-                </linearGradient>
-              </defs>
-              <path
-                d="M0,26 C15,22 25,20 40,16 S60,10 80,14 S100,6 120,12 S140,8 160,10 S180,4 200,8 V32 H0 Z"
-                fill="url(#cg)"
-              />
-              <path
-                d="M0,26 C15,22 25,20 40,16 S60,10 80,14 S100,6 120,12 S140,8 160,10 S180,4 200,8"
-                fill="none"
-                stroke="oklch(0.78 0.15 195)"
-                strokeWidth="1.5"
-              />
-            </svg>
-          </div>
-
-          {/* Running apps */}
-          <div className="flex gap-2">
-            {['WireGuard', 'WebDAV'].map((name) => (
-              <div
-                key={name}
-                className="flex items-center gap-1.5 rounded-md bg-white/[0.03] border border-white/5 px-2.5 py-1.5"
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse" />
-                <span className="text-[11px] text-space-300">{name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export function Hero() {
   const t = useTranslations('Hero')
 
@@ -177,7 +70,7 @@ export function Hero() {
           </motion.div>
         </div>
 
-        {/* Dashboard mockup */}
+        {/* Dashboard screenshot */}
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
@@ -187,8 +80,16 @@ export function Hero() {
           <motion.div
             animate={{ y: [0, -8, 0] }}
             transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+            className="w-full max-w-[600px]"
           >
-            <DashboardMockup />
+            <div className="rounded-2xl overflow-hidden border border-white/10 shadow-[0_20px_60px_oklch(0_0_0/0.5)] glow-cyan">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/screenshots/dashboard.png"
+                alt="Passim Dashboard"
+                className="w-full h-auto"
+              />
+            </div>
           </motion.div>
         </motion.div>
       </div>
