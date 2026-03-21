@@ -61,17 +61,21 @@ export function UpdateSettings() {
     // queryKey changes will trigger refetch automatically
   }
 
-  // Show toast after page reload following a successful update
+  // Show success toast after page reload following a successful update
   useEffect(() => {
     const result = sessionStorage.getItem('passim-update-result');
-    if (result) {
+    if (result === 'success') {
       sessionStorage.removeItem('passim-update-result');
-      if (result === 'success') {
-        toast.success(t('settings.update_success'));
-      }
-      setUpdating(false);
+      toast.success(t('settings.update_success'));
     }
   }, [t]);
+
+  // Reset updating state when a rollback is detected (from EventStreamProvider)
+  useEffect(() => {
+    const handler = () => setUpdating(false);
+    window.addEventListener('passim-update-rollback', handler);
+    return () => window.removeEventListener('passim-update-rollback', handler);
+  }, []);
 
   const isDev = !versionInfo?.version
     || versionInfo.version === 'dev'

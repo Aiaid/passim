@@ -95,6 +95,7 @@ export function EventStreamProvider({ children }: { children: React.ReactNode })
               } else {
                 // Version unchanged — rollback happened
                 toast.error(i18next.t('settings.update_rollback'));
+                window.dispatchEvent(new Event('passim-update-rollback'));
               }
             })
             .catch(() => {
