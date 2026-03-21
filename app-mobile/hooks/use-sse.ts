@@ -41,6 +41,7 @@ interface Connection {
 export function useMultiNodeSSE() {
   const nodes = useNodeStore((s) => s.nodes);
   const activeNodeId = useNodeStore((s) => s.activeNodeId);
+  const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const queryClient = useQueryClient();
 
   const connectionsRef = useRef<Map<string, Connection>>(new Map());
@@ -121,6 +122,12 @@ export function useMultiNodeSSE() {
             const data: StatusResponse = JSON.parse(e.data);
             queryClient.setQueryData(qk.status(nodeId), data);
             updateNodeState(nodeId, (s) => ({ ...s, status: data }));
+            // Sync node name from server if it differs from stored name
+            const serverName = data.node?.name;
+            if (serverName) {
+              const stored = nodes.find((n) => n.id === nodeId);
+              if (stored && stored.name !== serverName) updateNodeName(nodeId, serverName);
+            }
           } catch { /* ignore */ }
         });
 

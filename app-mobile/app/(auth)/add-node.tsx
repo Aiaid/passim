@@ -27,7 +27,18 @@ export default function AddNodeScreen() {
         return;
       }
       const { token } = await res.json();
-      await addNode({ host, token, name: host.split(':')[0] });
+      // Fetch node name from status API
+      let name = host.split(':')[0];
+      try {
+        const statusRes = await fetch(`https://${host}/api/status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (statusRes.ok) {
+          const status = await statusRes.json();
+          if (status?.node?.name) name = status.node.name;
+        }
+      } catch { /* use host as fallback */ }
+      await addNode({ host, token, name });
       router.replace('/(tabs)');
     } catch {
       setError('Could not connect. Check the address.');

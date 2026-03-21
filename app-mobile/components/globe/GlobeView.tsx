@@ -1,15 +1,14 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { useRef, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
 import { Renderer, loadTextureAsync } from 'expo-three';
 import { Asset } from 'expo-asset';
 import * as THREE from 'three';
 import { earthVert, earthFrag, atmosVert, atmosFrag } from '@passim/shared/globe/shaders';
 import { EARTH_RADIUS, COUNTRY_COORDS } from '@passim/shared/globe/constants';
-import { resolveNodeCoords } from '@passim/shared/globe/clustering';
 import { useGlobeGesture } from './use-globe-gesture';
 import { getSunDirection } from './helpers';
-import type { RemoteNode, StatusResponse } from '@passim/shared/types';
+import type { StatusResponse } from '@passim/shared/types';
 
 type Vec3Tuple = [number, number, number];
 
@@ -35,32 +34,31 @@ interface BillboardData {
   ip: string;
   uptime: string;
   version: string;
-  type: 'local' | 'remote';
+  isActive: boolean;
+  nodeId: string;
+}
+
+export interface GlobeNodeStatus {
+  nodeId: string;
+  status: StatusResponse;
+  isConnected: boolean;
 }
 
 interface GlobeViewProps {
-  localStatus?: StatusResponse | null;
-  remoteNodes?: RemoteNode[];
+  nodeStatuses: GlobeNodeStatus[];
+  activeNodeId?: string | null;
   fullscreen?: boolean;
+  onNodeSelect?: (nodeId: string) => void;
 }
 
-export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewProps) {
+export function GlobeView({ nodeStatuses, activeNodeId, fullscreen, onNodeSelect }: GlobeViewProps) {
   const { panResponder, getRotation, getVelocity } = useGlobeGesture();
-  const propsRef = useRef({ localStatus, remoteNodes });
-  propsRef.current = { localStatus, remoteNodes };
+  const propsRef = useRef({ nodeStatuses, activeNodeId });
+  propsRef.current = { nodeStatuses, activeNodeId };
 
   const [billboards, setBillboards] = useState<BillboardData[]>([]);
-  const billboardRef = useRef<BillboardData[]>([]);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const sizeRef = useRef({ w: 0, h: 0 });
-
-  // Periodically sync projected billboard positions to React state
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setBillboards([...billboardRef.current]);
-    }, 50); // 20fps for overlay updates
-    return () => clearInterval(interval);
-  }, []);
 
   const onContextCreate = useCallback((gl: ExpoWebGLRenderingContext) => {
     const renderer = new Renderer({ gl });
@@ -175,7 +173,8 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
     interface MarkerEntry {
       pos: Vec3Tuple;
       color: number;
-      type: 'local' | 'remote';
+      isActive: boolean;
+      nodeId: string;
       name: string;
       flag: string;
       cpu: string;
@@ -189,59 +188,38 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
     let lastMarkersKey = '';
     let markerEntries: MarkerEntry[] = [];
 
+    function toFlag(country: string): string {
+      return [...country.toUpperCase()]
+        .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+        .join('');
+    }
+
     function syncMarkers() {
-      const { localStatus: ls, remoteNodes: rn } = propsRef.current;
+      const { nodeStatuses: ns, activeNodeId: activeId } = propsRef.current;
       const entries: MarkerEntry[] = [];
 
-      if (ls?.node?.country) {
-        const cc = COUNTRY_COORDS[ls.node.country.toUpperCase()];
-        if (cc) {
-          const flag = [...ls.node.country.toUpperCase()]
-            .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
-            .join('');
-          entries.push({
-            pos: latLonToPos(cc[0], cc[1], EARTH_RADIUS * 1.01),
-            color: 0x30d158,
-            type: 'local',
-            name: ls.node.name ?? 'Local',
-            flag,
-            cpu: `${ls.system.cpu.usage_percent.toFixed(0)}%`,
-            mem: `${ls.system.memory.usage_percent.toFixed(0)}%`,
-            containers: ls.containers.running,
-            ip: ls.node.public_ip ?? '--',
-            uptime: formatUptime(ls.node.uptime),
-            version: ls.node.version ?? '',
-          });
-        }
+      for (const { nodeId, status: s, isConnected } of ns) {
+        if (!s?.node?.country) continue;
+        const cc = COUNTRY_COORDS[s.node.country.toUpperCase()];
+        if (!cc) continue;
+
+        entries.push({
+          pos: latLonToPos(cc[0], cc[1], EARTH_RADIUS * 1.01),
+          color: isConnected ? 0x30d158 : 0x666666,
+          isActive: nodeId === activeId,
+          nodeId,
+          name: s.node.name ?? nodeId,
+          flag: toFlag(s.node.country),
+          cpu: `${s.system.cpu.usage_percent.toFixed(0)}%`,
+          mem: `${s.system.memory.usage_percent.toFixed(0)}%`,
+          containers: s.containers.running,
+          ip: s.node.public_ip ?? '--',
+          uptime: formatUptime(s.node.uptime),
+          version: s.node.version ?? '',
+        });
       }
 
-      if (rn) {
-        for (const node of rn) {
-          const coords = resolveNodeCoords(node);
-          if (coords) {
-            const flag = node.country
-              ? [...node.country.toUpperCase()]
-                  .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
-                  .join('')
-              : '';
-            entries.push({
-              pos: latLonToPos(coords[0], coords[1], EARTH_RADIUS * 1.01),
-              color: 0xbf5af2,
-              type: 'remote',
-              name: node.name ?? node.id,
-              flag,
-              cpu: node.metrics ? `${node.metrics.cpu_percent.toFixed(0)}%` : '--',
-              mem: node.metrics ? `${node.metrics.memory_percent.toFixed(0)}%` : '--',
-              containers: node.metrics?.containers?.running ?? 0,
-              ip: node.address ?? '--',
-              uptime: '--',
-              version: node.version ?? '',
-            });
-          }
-        }
-      }
-
-      const key = entries.map(e => e.pos.join(',')).join(';');
+      const key = entries.map(e => `${e.pos.join(',')}_${e.isActive}`).join(';');
       if (key === lastMarkersKey) return;
       lastMarkersKey = key;
       markerEntries = entries;
@@ -254,7 +232,7 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
       }
       for (const e of entries) {
         const m = new THREE.Mesh(
-          new THREE.SphereGeometry(0.03, 8, 8),
+          new THREE.SphereGeometry(e.isActive ? 0.04 : 0.03, 8, 8),
           new THREE.MeshBasicMaterial({ color: e.color }),
         );
         m.position.set(...e.pos);
@@ -266,7 +244,11 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
     scene.add(new THREE.AmbientLight(0xffffff, 0.15));
 
     const camRadius = 9.0;
+    // Pre-allocate reusable vectors — avoid GC pressure in hot loop
     const projVec = new THREE.Vector3();
+    const dirVec = new THREE.Vector3();
+    const R2 = EARTH_RADIUS * EARTH_RADIUS;
+    let frameCount = 0;
 
     const animate = () => {
       requestAnimationFrame(animate);
@@ -289,48 +271,46 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
 
       syncMarkers();
 
-      // Project marker positions to screen coordinates for billboards
-      const viewW = sizeRef.current.w;
-      const viewH = sizeRef.current.h;
-      // GLView pixel ratio: screen coords = projected * cssSize
-      // We need CSS size, not drawingBuffer size
-      const dpr = viewW > 0 ? viewW / (styles.canvas.flex * 1) : 1; // approximate
+      // Sync billboard positions every 3rd frame (~20fps at 60fps) — avoids excessive setState
+      if (++frameCount % 3 === 0) {
+        camera.updateMatrixWorld();
+        const newBillboards: BillboardData[] = [];
+        const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
 
-      camera.updateMatrixWorld();
-      const newBillboards: BillboardData[] = [];
-      for (const entry of markerEntries) {
-        projVec.set(...entry.pos);
-        projVec.project(camera);
+        for (const entry of markerEntries) {
+          projVec.set(...entry.pos);
+          projVec.project(camera);
 
-        // Check if behind camera
-        const isBehind = projVec.z > 1;
-        // Check if occluded by earth (dot product between camera→marker and camera→origin)
-        const markerVec = new THREE.Vector3(...entry.pos).sub(camera.position);
-        const originVec = new THREE.Vector3(0, 0, 0).sub(camera.position);
-        const markerDist = markerVec.length();
-        const originDist = originVec.length();
-        markerVec.normalize();
-        originVec.normalize();
-        const behindEarth = markerDist > originDist && markerVec.dot(originVec) > 0.85;
+          const isBehind = projVec.z > 1;
 
-        newBillboards.push({
-          // Map from NDC [-1,1] to container pixels [0, containerSize]
-          // Container is 260px tall, width is full screen
-          x: (projVec.x * 0.5 + 0.5) * 100, // percentage
-          y: (-projVec.y * 0.5 + 0.5) * 100,
-          visible: !isBehind && !behindEarth,
-          name: entry.name,
-          flag: entry.flag,
-          cpu: entry.cpu,
-          mem: entry.mem,
-          containers: entry.containers,
-          ip: entry.ip,
-          uptime: entry.uptime,
-          version: entry.version,
-          type: entry.type,
-        });
+          // Ray-sphere occlusion: cast ray from camera toward marker, test intersection with earth sphere
+          dirVec.set(entry.pos[0] - cx, entry.pos[1] - cy, entry.pos[2] - cz);
+          const tMarker = dirVec.length();
+          dirVec.multiplyScalar(1 / tMarker); // normalize without creating new vec
+          // Solve |camera + t*dir|² = R² → t²(dir·dir) + 2t(cam·dir) + (cam·cam - R²) = 0
+          const b = cx * dirVec.x + cy * dirVec.y + cz * dirVec.z;
+          const c = cx * cx + cy * cy + cz * cz - R2;
+          const disc = b * b - c;
+          const behindEarth = disc > 0 && (-b - Math.sqrt(disc)) < tMarker * 0.98;
+
+          newBillboards.push({
+            x: (projVec.x * 0.5 + 0.5) * 100,
+            y: (-projVec.y * 0.5 + 0.5) * 100,
+            visible: !isBehind && !behindEarth,
+            name: entry.name,
+            flag: entry.flag,
+            cpu: entry.cpu,
+            mem: entry.mem,
+            containers: entry.containers,
+            ip: entry.ip,
+            uptime: entry.uptime,
+            version: entry.version,
+            isActive: entry.isActive,
+            nodeId: entry.nodeId,
+          });
+        }
+        setBillboards(newBillboards);
       }
-      billboardRef.current = newBillboards;
 
       renderer.render(scene, camera);
       gl.endFrameEXP();
@@ -344,9 +324,10 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
       <GLView style={styles.canvas} onContextCreate={onContextCreate} />
       {/* Billboard overlays */}
       {billboards.map((b, i) => (
-        <View
+        <TouchableOpacity
           key={i}
-          pointerEvents="none"
+          activeOpacity={0.7}
+          onPress={() => onNodeSelect?.(b.nodeId)}
           style={[
             styles.billboard,
             {
@@ -356,10 +337,10 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
             },
           ]}
         >
-          <View style={styles.billboardCard}>
+          <View style={[styles.billboardCard, b.isActive && styles.billboardCardActive]}>
             {/* Header */}
             <View style={styles.billboardHeader}>
-              <View style={[styles.pingDot, { backgroundColor: b.type === 'local' ? '#30d158' : '#bf5af2' }]} />
+              <View style={[styles.pingDot, { backgroundColor: b.isActive ? '#30d158' : '#888' }]} />
               <Text style={styles.billboardName} numberOfLines={1}>{b.name}</Text>
               {b.flag ? <Text style={styles.billboardFlag}>{b.flag}</Text> : null}
             </View>
@@ -380,10 +361,17 @@ export function GlobeView({ localStatus, remoteNodes, fullscreen }: GlobeViewPro
                 <Text style={styles.billboardLabel}>CTR</Text>
               </View>
             </View>
+            {/* Footer: version + DNS address */}
+            {(b.version || b.ip !== '--') ? (
+              <View style={styles.billboardFooter}>
+                {b.version ? <Text style={styles.billboardMeta}>{b.version}</Text> : null}
+                {b.ip !== '--' ? <Text style={styles.billboardMeta} numberOfLines={1}>{b.ip}</Text> : null}
+              </View>
+            ) : null}
             {/* Arrow */}
             <View style={styles.billboardArrow} />
           </View>
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
   );
@@ -422,6 +410,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
     width: 120,
     alignItems: 'center',
+  },
+  billboardCardActive: {
+    borderColor: 'rgba(48, 209, 88, 0.5)',
   },
   billboardHeader: {
     flexDirection: 'row',
@@ -465,6 +456,17 @@ const styles = StyleSheet.create({
     width: 1,
     height: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  billboardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  billboardMeta: {
+    color: '#666',
+    fontSize: 8,
+    fontFamily: 'monospace',
   },
   billboardArrow: {
     width: 0,

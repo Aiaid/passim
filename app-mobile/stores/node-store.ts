@@ -24,6 +24,7 @@ interface NodeState {
   addNode: (node: Omit<NodeInfo, 'id'>) => Promise<void>;
   removeNode: (id: string) => Promise<void>;
   setActiveNode: (id: string) => void;
+  updateNodeName: (id: string, name: string) => Promise<void>;
   loadNodes: () => Promise<void>;
 }
 
@@ -62,6 +63,15 @@ export const useNodeStore = create<NodeState>((set, get) => ({
   setActiveNode: (id) => {
     const node = get().nodes.find((n) => n.id === id);
     if (node) set({ activeNodeId: id, activeNode: node });
+  },
+
+  updateNodeName: async (id, name) => {
+    const nodes = get().nodes.map((n) => n.id === id ? { ...n, name } : n);
+    await SecureStore.setItemAsync('passim-nodes', JSON.stringify(nodes));
+    const activeNode = get().activeNodeId === id
+      ? nodes.find((n) => n.id === id) ?? get().activeNode
+      : get().activeNode;
+    set({ nodes, activeNode });
   },
 
   loadNodes: async () => {

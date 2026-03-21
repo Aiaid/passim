@@ -27,6 +27,20 @@ export default function DashboardScreen() {
   const appsQuery = useApps(nodeId);
 
   const status = sse.status ?? statusQuery.data;
+
+  // Collect all node statuses for the globe
+  const globeNodeStatuses = useMemo(() =>
+    nodes.map((n) => {
+      const nodeSSE = getNodeSSE(n.id);
+      return {
+        nodeId: n.id,
+        status: nodeSSE.status!,
+        isConnected: nodeSSE.isConnected,
+      };
+    }).filter((n) => n.status != null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [nodes, status], // re-derive when any SSE status updates
+  );
   const metrics = sse.metrics;
   const isConnected = sse.isConnected;
   const appsCount = appsQuery.data?.length ?? 0;
@@ -57,7 +71,9 @@ export default function DashboardScreen() {
     <View className="flex-1 bg-black">
       {/* Full-screen 3D globe background */}
       <GlobeView
-        localStatus={status}
+        nodeStatuses={globeNodeStatuses}
+        activeNodeId={activeNodeId}
+        onNodeSelect={setActiveNode}
         fullscreen
       />
 
