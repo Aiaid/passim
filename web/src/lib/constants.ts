@@ -1,5 +1,7 @@
 import { Shield, HardDrive, Globe, Monitor, Gauge, Lock, Zap, FolderOpen, type LucideIcon } from 'lucide-react';
 
+export const APP_VERSION = '0.5.4';
+
 export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   vpn: Shield,
   storage: HardDrive,
