@@ -1,0 +1,83 @@
+import { useState } from 'react';
+import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { router } from 'expo-router';
+import { useNodeStore } from '@/stores/node-store';
+
+export default function AddNodeScreen() {
+  const [host, setHost] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const addNode = useNodeStore((s) => s.addNode);
+
+  const handleConnect = async () => {
+    if (!host || !apiKey) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`https://${host}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey }),
+      });
+      if (!res.ok) {
+        setError(res.status === 401 ? 'Invalid API Key' : 'Connection failed');
+        return;
+      }
+      const { token } = await res.json();
+      await addNode({ host, token, name: host.split(':')[0] });
+      router.replace('/(tabs)');
+    } catch {
+      setError('Could not connect. Check the address.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View className="flex-1 bg-black px-8 pt-20">
+      <Text className="text-3xl font-bold text-white mb-8">Add Server</Text>
+
+      <Text className="text-gray-400 mb-2">Server Address</Text>
+      <TextInput
+        className="bg-gray-900 text-white rounded-xl px-4 py-3 mb-4 text-base"
+        placeholder="host:8443"
+        placeholderTextColor="#666"
+        value={host}
+        onChangeText={setHost}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+
+      <Text className="text-gray-400 mb-2">API Key</Text>
+      <TextInput
+        className="bg-gray-900 text-white rounded-xl px-4 py-3 mb-6 text-base"
+        placeholder="ak_..."
+        placeholderTextColor="#666"
+        value={apiKey}
+        onChangeText={setApiKey}
+        autoCapitalize="none"
+        autoCorrect={false}
+        secureTextEntry
+      />
+
+      {error ? (
+        <Text className="text-red-400 mb-4 text-center">{error}</Text>
+      ) : null}
+
+      <Pressable
+        className="bg-primary rounded-2xl py-4"
+        onPress={handleConnect}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="black" />
+        ) : (
+          <Text className="text-black text-center text-lg font-semibold">
+            Connect
+          </Text>
+        )}
+      </Pressable>
+    </View>
+  );
+}

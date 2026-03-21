@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Passim",
+    "slug": "passim",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "passim",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.passim.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan QR code to connect to your Passim server"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#000000"
+      },
+      "package": "io.passim.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Passim to use the camera for QR code scanning"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#30d158"
+        }
+      ]
+    ]
+  }
+}
