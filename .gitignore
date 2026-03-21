@@ -10,12 +10,13 @@ passim/e2eserver
 # Claude Code
 .claude/
 
+# Dependencies
+node_modules/
+
 # Web (Phase 2)
-web/node_modules/
 web/dist/
 
 # App (Phase 5)
-app/node_modules/
 app/.expo/
 
 # Legacy (archived)
