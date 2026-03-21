@@ -155,6 +155,19 @@ func NewRouter(deps Deps) http.Handler {
 			protected.GET("/nodes/:id/apps/:appId/configs", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") + "/configs" }))
 			protected.GET("/nodes/:id/apps/:appId/client-config", nodeProxyHandler(deps, "GET", func(c *gin.Context) string { return "/api/apps/" + c.Param("appId") + "/client-config" }))
 
+			// Node container action proxy routes
+			protected.POST("/nodes/:id/containers/:cid/start", nodeProxyHandler(deps, "POST", func(c *gin.Context) string { return "/api/containers/" + c.Param("cid") + "/start" }))
+			protected.POST("/nodes/:id/containers/:cid/stop", nodeProxyHandler(deps, "POST", func(c *gin.Context) string { return "/api/containers/" + c.Param("cid") + "/stop" }))
+			protected.POST("/nodes/:id/containers/:cid/restart", nodeProxyHandler(deps, "POST", func(c *gin.Context) string { return "/api/containers/" + c.Param("cid") + "/restart" }))
+			protected.DELETE("/nodes/:id/containers/:cid", nodeProxyHandler(deps, "DELETE", func(c *gin.Context) string { return "/api/containers/" + c.Param("cid") }))
+			protected.GET("/nodes/:id/containers/:cid/logs", nodeProxyHandler(deps, "GET", func(c *gin.Context) string {
+				path := "/api/containers/" + c.Param("cid") + "/logs"
+				if qs := c.Request.URL.RawQuery; qs != "" {
+					return path + "?" + qs
+				}
+				return path
+			}))
+
 			// Node update proxy routes
 			protected.GET("/nodes/:id/version/check", nodeProxyHandler(deps, "GET", func(c *gin.Context) string {
 				qs := c.Request.URL.RawQuery

@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, Trash2, Cpu, HardDrive, MemoryStick, Server, AppWindow, AlertCircle, X, Container as ContainerIcon, RefreshCw, Download } from 'lucide-react';
+import { ArrowLeft, Trash2, Cpu, HardDrive, MemoryStick, Server, AppWindow, AlertCircle, ExternalLink, RefreshCw, Download } from 'lucide-react';
 import { PageSkeleton } from '@/components/shared/loading-skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { ContainerDetailPanel } from '@/features/containers/container-detail-panel';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { useEventStream } from '@/hooks/use-event-stream';
 import { api } from '@/lib/api-client';
@@ -226,7 +226,7 @@ function OverviewTab({ node, statusData }: { node: RemoteNode; statusData?: impo
   );
 }
 
-function ContainersTab({ containers, isLoading }: { containers?: Container[]; isLoading: boolean }) {
+function ContainersTab({ nodeId, containers, isLoading }: { nodeId: string; containers?: Container[]; isLoading: boolean }) {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<Container | null>(null);
 
@@ -267,52 +267,12 @@ function ContainersTab({ containers, isLoading }: { containers?: Container[]; is
         })}
       </div>
 
-      {/* Container detail side panel */}
-      <Sheet open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
-        <SheetContent showCloseButton={false} className="sm:max-w-md w-full flex flex-col p-0 gap-0">
-          {selected && (() => {
-            const name = selected.Names[0]?.replace(/^\//, '') ?? selected.Id.slice(0, 12);
-            const state = selected.State === 'exited' ? 'stopped' : selected.State;
-            return (
-              <>
-                <SheetHeader className="px-5 py-4 border-b space-y-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <ContainerIcon className="size-5 text-muted-foreground shrink-0" />
-                      <div className="min-w-0">
-                        <SheetTitle className="text-base truncate">{name}</SheetTitle>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          <StatusBadge status={state} />
-                        </p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon" className="size-8 shrink-0" onClick={() => setSelected(null)}>
-                      <X className="size-3.5" />
-                    </Button>
-                  </div>
-                </SheetHeader>
-                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-                  {[
-                    { label: t('container.name'), value: name },
-                    { label: t('container.id'), value: selected.Id.slice(0, 12), mono: true },
-                    { label: t('container.image'), value: selected.Image, mono: true },
-                    { label: t('container.state'), value: selected.State },
-                    { label: t('container.status'), value: selected.Status },
-                    { label: t('container.created_at'), value: new Date(selected.Created * 1000).toLocaleString() },
-                  ].map(f => (
-                    <div key={f.label} className="flex items-start justify-between gap-4">
-                      <span className="text-sm text-muted-foreground shrink-0">{f.label}</span>
-                      <span className={cn('text-sm text-right truncate max-w-[65%]', f.mono && 'font-mono text-xs')}>
-                        {f.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            );
-          })()}
-        </SheetContent>
-      </Sheet>
+      <ContainerDetailPanel
+        nodeId={nodeId}
+        container={selected}
+        open={!!selected}
+        onOpenChange={(open) => { if (!open) setSelected(null); }}
+      />
     </>
   );
 }
@@ -433,6 +393,14 @@ export function NodeDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(node.address, '_blank', 'noopener,noreferrer')}
+            >
+              <ExternalLink className="mr-1 size-4" />
+              {t('node.open_ui')}
+            </Button>
             <Button variant="destructive" size="sm" onClick={() => setShowRemove(true)}>
               <Trash2 className="mr-1 size-4" />
               {t('node.remove')}
@@ -454,7 +422,7 @@ export function NodeDetailPage() {
         </TabsContent>
 
         <TabsContent value="containers" className="mt-6">
-          <ContainersTab containers={containers} isLoading={containersLoading} />
+          <ContainersTab nodeId={id!} containers={containers} isLoading={containersLoading} />
         </TabsContent>
 
         <TabsContent value="apps" className="mt-6">

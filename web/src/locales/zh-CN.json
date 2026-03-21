@@ -292,6 +292,7 @@
     "disconnected": "未连接",
     "connecting": "连接中",
     "remove": "移除节点",
+    "open_ui": "打开管理界面",
     "remove_confirm": "确定移除此节点？之后可以重新添加。",
     "no_nodes": "没有远程节点",
     "no_nodes_desc": "添加远程 Passim 实例，在这里统一管理",

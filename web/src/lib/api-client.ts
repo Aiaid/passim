@@ -92,6 +92,18 @@ export const api = {
   removeContainer: (id: string) => request<void>(`/containers/${id}`, { method: 'DELETE' }),
   getContainerLogs: (id: string) => request<{ logs: string }>(`/containers/${id}/logs`),
 
+  // Remote node container operations
+  nodeStartContainer: (nodeId: string, cid: string) =>
+    request<void>(`/nodes/${nodeId}/containers/${cid}/start`, { method: 'POST' }),
+  nodeStopContainer: (nodeId: string, cid: string) =>
+    request<void>(`/nodes/${nodeId}/containers/${cid}/stop`, { method: 'POST' }),
+  nodeRestartContainer: (nodeId: string, cid: string) =>
+    request<void>(`/nodes/${nodeId}/containers/${cid}/restart`, { method: 'POST' }),
+  nodeRemoveContainer: (nodeId: string, cid: string) =>
+    request<void>(`/nodes/${nodeId}/containers/${cid}`, { method: 'DELETE' }),
+  getNodeContainerLogs: (nodeId: string, cid: string) =>
+    request<{ logs: string }>(`/nodes/${nodeId}/containers/${cid}/logs`),
+
   // Templates
   getTemplates: () => request<TemplateSummary[]>('/templates'),
   getTemplate: (name: string) => request<TemplateDetail>(`/templates/${name}`),

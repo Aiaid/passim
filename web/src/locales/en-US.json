@@ -292,6 +292,7 @@
     "disconnected": "Disconnected",
     "connecting": "Connecting",
     "remove": "Remove Node",
+    "open_ui": "Open UI",
     "remove_confirm": "Are you sure you want to remove this node? You can re-add it later.",
     "no_nodes": "No remote nodes",
     "no_nodes_desc": "Add remote Passim instances to manage them from here",

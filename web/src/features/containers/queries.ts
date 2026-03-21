@@ -46,3 +46,39 @@ export function useContainerLogs(id: string | null) {
     enabled: !!id,
   });
 }
+
+// Remote node container hooks
+
+export function useNodeContainerAction(nodeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string; action: 'start' | 'stop' | 'restart' }) => {
+      switch (action) {
+        case 'start':   return api.nodeStartContainer(nodeId, id);
+        case 'stop':    return api.nodeStopContainer(nodeId, id);
+        case 'restart': return api.nodeRestartContainer(nodeId, id);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nodes', nodeId, 'containers'] });
+    },
+  });
+}
+
+export function useNodeRemoveContainer(nodeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.nodeRemoveContainer(nodeId, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nodes', nodeId, 'containers'] });
+    },
+  });
+}
+
+export function useNodeContainerLogs(nodeId: string, id: string | null) {
+  return useQuery({
+    queryKey: ['node-container-logs', nodeId, id],
+    queryFn: () => api.getNodeContainerLogs(nodeId, id!),
+    enabled: !!nodeId && !!id,
+  });
+}

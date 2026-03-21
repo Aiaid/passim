@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { Container } from '@/lib/api-client';
-import { useContainerAction, useRemoveContainer, useContainerLogs } from './queries';
+import { useContainerAction, useRemoveContainer, useContainerLogs, useNodeContainerAction, useNodeRemoveContainer, useNodeContainerLogs } from './queries';
 import { mapState } from './utils';
 import { TerminalTab } from './terminal-tab';
 
@@ -21,6 +21,7 @@ interface ContainerDetailPanelProps {
   container: Container | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  nodeId?: string;
 }
 
 function displayName(container: Container): string {
@@ -31,11 +32,16 @@ export function ContainerDetailPanel({
   container,
   open,
   onOpenChange,
+  nodeId,
 }: ContainerDetailPanelProps) {
   const { t } = useTranslation();
   const [removeOpen, setRemoveOpen] = useState(false);
-  const containerAction = useContainerAction();
-  const removeContainer = useRemoveContainer();
+  const localContainerAction = useContainerAction();
+  const nodeContainerAction = useNodeContainerAction(nodeId ?? '');
+  const localRemoveContainer = useRemoveContainer();
+  const nodeRemoveContainer = useNodeRemoveContainer(nodeId ?? '');
+  const containerAction = nodeId ? nodeContainerAction : localContainerAction;
+  const removeContainer = nodeId ? nodeRemoveContainer : localRemoveContainer;
 
   if (!container) return null;
 
@@ -159,7 +165,7 @@ export function ContainerDetailPanel({
                 <TabsTrigger value="logs" className="flex-1">
                   {t('container.logs')}
                 </TabsTrigger>
-                <TabsTrigger value="terminal" className="flex-1" disabled={!isRunning}>
+                <TabsTrigger value="terminal" className="flex-1" disabled={!isRunning || !!nodeId}>
                   {t('container.terminal')}
                 </TabsTrigger>
               </TabsList>
@@ -170,7 +176,7 @@ export function ContainerDetailPanel({
             </TabsContent>
 
             <TabsContent value="logs" className="flex-1 overflow-hidden mt-0">
-              <LogsTab containerId={container.Id} containerName={name} />
+              <LogsTab containerId={container.Id} containerName={name} nodeId={nodeId} />
             </TabsContent>
 
             <TabsContent value="terminal" className="flex-1 overflow-hidden mt-0">
@@ -232,12 +238,16 @@ function InfoTab({ container, state }: { container: Container; state: string }) 
 function LogsTab({
   containerId,
   containerName,
+  nodeId,
 }: {
   containerId: string;
   containerName: string;
+  nodeId?: string;
 }) {
   const { t } = useTranslation();
-  const { data, isLoading, refetch } = useContainerLogs(containerId);
+  const localLogs = useContainerLogs(nodeId ? null : containerId);
+  const nodeLogs = useNodeContainerLogs(nodeId ?? '', nodeId ? containerId : null);
+  const { data, isLoading, refetch } = nodeId ? nodeLogs : localLogs;
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
