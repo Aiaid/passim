@@ -648,9 +648,10 @@ GET    /api/apps/:id/events         # SSE 部署进度
 ### 公开分享端点 (无需认证)
 
 ```
-GET    /api/s/:token                # 分享配置数据
+GET    /api/s/:token                # 分享配置数据 (含远程节点聚合)
 GET    /api/s/:token/subscribe      # 分享订阅 YAML
-GET    /api/s/:token/file/:n        # 分享文件下载
+GET    /api/s/:token/file/:n        # 分享文件下载 (?node=&app= 支持远程节点代理)
+GET    /api/s/:token/zip            # 分享 ZIP 下载 (跨节点聚合)
 ```
 
 ### 远程节点管理

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -112,15 +113,14 @@ func shareConfigHandler(deps Deps) gin.HandlerFunc {
 		appCtx, nodeCtx := buildContexts(deps, app, t)
 		appCtx.SubscribeURL = computeShareSubscribeURL(c, token)
 
+		resolved, err := clientcfg.Resolve(clientsDef, appCtx, nodeCtx)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "resolve: " + err.Error()})
+			return
+		}
+
 		// If per-user share, filter to specific user index
 		if st.UserIndex > 0 && clientsDef.Type == "file_per_user" {
-			// Resolve only the specific peer
-			resolved, err := clientcfg.Resolve(clientsDef, appCtx, nodeCtx)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "resolve: " + err.Error()})
-				return
-			}
-			// Filter to the requested index
 			var filtered []clientcfg.ResolvedFile
 			for _, f := range resolved.Files {
 				if f.Index == st.UserIndex {
@@ -128,22 +128,15 @@ func shareConfigHandler(deps Deps) gin.HandlerFunc {
 				}
 			}
 			resolved.Files = filtered
-			resp := buildShareResponse(resolved, t)
-			c.JSON(http.StatusOK, resp)
-			return
-		}
-
-		resolved, err := clientcfg.Resolve(clientsDef, appCtx, nodeCtx)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "resolve: " + err.Error()})
-			return
 		}
 
 		resp := buildShareResponse(resolved, t)
 
-		// For url-type configs, include aggregated remote node URLs
-		if clientsDef.Type == "url" {
-			for _, rc := range fetchRemoteConfigs(c.Request.Context(), deps, app.Template) {
+		// Aggregate remote node configs
+		ctx := c.Request.Context()
+		switch clientsDef.Type {
+		case "url":
+			for _, rc := range fetchRemoteConfigs(ctx, deps, app.Template) {
 				if rc.Type != "url" || len(rc.URLs) == 0 {
 					continue
 				}
@@ -159,6 +152,36 @@ func shareConfigHandler(deps Deps) gin.HandlerFunc {
 					})
 				}
 				resp.RemoteGroups = append(resp.RemoteGroups, g)
+			}
+		case "file_per_user":
+			for _, ra := range findRemoteApps(ctx, deps, app.Template) {
+				ccStatus, ccBody, pErr := deps.NodeHub.ProxyRequest(
+					ctx, ra.NodeID, "GET", "/api/apps/"+ra.AppID+"/client-config", nil,
+				)
+				if pErr != nil || ccStatus != http.StatusOK {
+					continue
+				}
+				var ccResp clientConfigResponse
+				if json.Unmarshal(ccBody, &ccResp) != nil || ccResp.Type != "file_per_user" || len(ccResp.Files) == 0 {
+					continue
+				}
+				var files []clientConfigFile
+				for _, f := range ccResp.Files {
+					if st.UserIndex > 0 && f.Index != st.UserIndex {
+						continue
+					}
+					files = append(files, f)
+				}
+				if len(files) > 0 {
+					resp.RemoteGroups = append(resp.RemoteGroups, shareRemoteGroup{
+						NodeName:    ra.NodeName,
+						NodeID:      ra.NodeID,
+						NodeCountry: ra.NodeCountry,
+						AppID:       ra.AppID,
+						Files:       files,
+						QR:          ccResp.QR,
+					})
+				}
 			}
 		}
 
@@ -207,7 +230,7 @@ func shareSubscribeHandler(deps Deps) gin.HandlerFunc {
 func shareFileHandler(deps Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
-		_, app, t, ok := loadShareContext(deps, c, token)
+		st, app, t, ok := loadShareContext(deps, c, token)
 		if !ok {
 			return
 		}
@@ -224,6 +247,28 @@ func shareFileHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
+		// Enforce user_index restriction
+		if st.UserIndex > 0 && index != st.UserIndex {
+			c.JSON(http.StatusForbidden, gin.H{"error": "access denied for this peer index"})
+			return
+		}
+
+		// Remote node file proxy
+		nodeID := c.Query("node")
+		remoteAppID := c.Query("app")
+		if nodeID != "" && remoteAppID != "" && deps.NodeHub != nil {
+			content, err := fetchRemoteFileContent(c.Request.Context(), deps, nodeID, remoteAppID, index)
+			if err != nil {
+				c.JSON(http.StatusBadGateway, gin.H{"error": "fetch remote file: " + err.Error()})
+				return
+			}
+			name := fmt.Sprintf("peer%d.conf", index)
+			c.Header("Content-Disposition", "attachment; filename=\""+name+"\"")
+			c.Data(http.StatusOK, "application/octet-stream", content)
+			return
+		}
+
+		// Local file
 		dataDir := deps.DataDir
 		if dataDir == "" {
 			dataDir = defaultDataDir
@@ -238,6 +283,61 @@ func shareFileHandler(deps Deps) gin.HandlerFunc {
 
 		c.Header("Content-Disposition", "attachment; filename=\""+name+"\"")
 		c.Data(http.StatusOK, "application/octet-stream", []byte(content))
+	}
+}
+
+func shareZIPHandler(deps Deps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.Param("token")
+		st, app, t, ok := loadShareContext(deps, c, token)
+		if !ok {
+			return
+		}
+
+		clientsDef := templateToClientsDef(t)
+		if clientsDef == nil || clientsDef.Type != "file_per_user" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "not a file_per_user template"})
+			return
+		}
+
+		appCtx, nodeCtx := buildContexts(deps, app, t)
+		resolved, err := clientcfg.Resolve(clientsDef, appCtx, nodeCtx)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "resolve: " + err.Error()})
+			return
+		}
+
+		userIndex := st.UserIndex
+		if userIndex > 0 {
+			var filtered []clientcfg.ResolvedFile
+			for _, f := range resolved.Files {
+				if f.Index == userIndex {
+					filtered = append(filtered, f)
+				}
+			}
+			resolved.Files = filtered
+		}
+
+		resolved.NodeName = localNodeName(deps)
+		resolved.NodeCountry = nodeCtx.Country
+		configs := []clientcfg.ResolvedConfig{*resolved}
+
+		// Fetch remote files
+		ctx := c.Request.Context()
+		for _, ra := range findRemoteApps(ctx, deps, app.Template) {
+			if rc := fetchRemoteFilePerUserConfig(ctx, deps, ra, userIndex); rc != nil {
+				configs = append(configs, *rc)
+			}
+		}
+
+		zipData, err := clientcfg.GenerateZIP(configs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "generate zip: " + err.Error()})
+			return
+		}
+
+		c.Header("Content-Disposition", "attachment; filename=\""+app.Template+"-configs.zip\"")
+		c.Data(http.StatusOK, "application/zip", zipData)
 	}
 }
 
@@ -274,9 +374,13 @@ func loadShareContext(deps Deps, c *gin.Context, token string) (*db.ShareToken, 
 }
 
 type shareRemoteGroup struct {
-	NodeName    string            `json:"node_name"`
-	NodeCountry string           `json:"node_country,omitempty"`
-	URLs        []clientConfigURL `json:"urls"`
+	NodeName    string             `json:"node_name"`
+	NodeID      string             `json:"node_id,omitempty"`
+	NodeCountry string             `json:"node_country,omitempty"`
+	AppID       string             `json:"app_id,omitempty"`
+	URLs        []clientConfigURL  `json:"urls,omitempty"`
+	Files       []clientConfigFile `json:"files,omitempty"`
+	QR          bool               `json:"qr,omitempty"`
 }
 
 type shareResponse struct {

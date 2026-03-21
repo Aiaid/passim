@@ -131,6 +131,9 @@ export const api = {
   // Public share (no auth)
   getShareConfig: (token: string) => request<ShareConfigResponse>(`/s/${token}`),
   getShareFileURL: (token: string, index: number) => `/api/s/${token}/file/${index}`,
+  getShareRemoteFileURL: (token: string, index: number, nodeId: string, appId: string) =>
+    `/api/s/${token}/file/${index}?node=${nodeId}&app=${appId}`,
+  getShareZIPURL: (token: string) => `/api/s/${token}/zip`,
 
   // Tasks
   getTasks: () => request<Task[]>('/tasks'),
@@ -307,7 +310,15 @@ export interface ShareConfigResponse {
   fields?: { key: string; label: Record<string, string>; value: string; secret?: boolean }[];
   urls?: { name: string; scheme: string; qr?: boolean }[];
   import_urls?: Record<string, string>;
-  remote_groups?: { node_name: string; node_country?: string; urls: { name: string; scheme: string; qr?: boolean }[] }[];
+  remote_groups?: {
+    node_name: string;
+    node_id?: string;
+    node_country?: string;
+    app_id?: string;
+    urls?: { name: string; scheme: string; qr?: boolean }[];
+    files?: { index: number; name: string }[];
+    qr?: boolean;
+  }[];
   guide?: TemplateGuide;
   limitations?: string[];
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -139,7 +140,34 @@ func appClientConfigZIPHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		zipData, err := clientcfg.GenerateZIP([]clientcfg.ResolvedConfig{*resolved})
+		// Optional user_index filter
+		userIndex := 0
+		if ui := c.Query("user_index"); ui != "" {
+			userIndex, _ = strconv.Atoi(ui)
+		}
+		if userIndex > 0 {
+			var filtered []clientcfg.ResolvedFile
+			for _, f := range resolved.Files {
+				if f.Index == userIndex {
+					filtered = append(filtered, f)
+				}
+			}
+			resolved.Files = filtered
+		}
+
+		resolved.NodeName = localNodeName(deps)
+		resolved.NodeCountry = nodeCtx.Country
+		configs := []clientcfg.ResolvedConfig{*resolved}
+
+		// Aggregate files from remote nodes
+		ctx := c.Request.Context()
+		for _, ra := range findRemoteApps(ctx, deps, app.Template) {
+			if rc := fetchRemoteFilePerUserConfig(ctx, deps, ra, userIndex); rc != nil {
+				configs = append(configs, *rc)
+			}
+		}
+
+		zipData, err := clientcfg.GenerateZIP(configs)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "generate zip: " + err.Error()})
 			return
@@ -382,15 +410,21 @@ func buildClientConfigResponse(resolved *clientcfg.ResolvedConfig, t *tmpl.Templ
 	return resp
 }
 
-// fetchRemoteConfigs queries all connected remote nodes for apps using the
-// same template and returns their resolved client configs. This enables the
-// subscription endpoint to aggregate proxy URIs from every node into a single
-// Clash YAML so users get all servers in one subscription.
-func fetchRemoteConfigs(ctx context.Context, deps Deps, templateName string) []clientcfg.ResolvedConfig {
+// --- Remote node helpers ---
+
+// remoteAppInfo identifies an app on a remote node.
+type remoteAppInfo struct {
+	NodeID      string
+	NodeName    string
+	NodeCountry string
+	AppID       string
+}
+
+// findRemoteApps returns remote apps matching a template name across all connected nodes.
+func findRemoteApps(ctx context.Context, deps Deps, templateName string) []remoteAppInfo {
 	if deps.NodeHub == nil {
 		return nil
 	}
-
 	nodes := deps.NodeHub.ListNodes()
 	if len(nodes) == 0 {
 		return nil
@@ -398,7 +432,7 @@ func fetchRemoteConfigs(ctx context.Context, deps Deps, templateName string) []c
 
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	var all []clientcfg.ResolvedConfig
+	var result []remoteAppInfo
 
 	for _, n := range nodes {
 		if n.Status != "connected" {
@@ -407,67 +441,147 @@ func fetchRemoteConfigs(ctx context.Context, deps Deps, templateName string) []c
 		wg.Add(1)
 		go func(nodeID, nodeName, nodeCountry string) {
 			defer wg.Done()
+			status, body, err := deps.NodeHub.ProxyRequest(ctx, nodeID, "GET", "/api/apps", nil)
+			if err != nil || status != http.StatusOK {
+				return
+			}
+			var apps []struct {
+				ID       string `json:"id"`
+				Template string `json:"template"`
+			}
+			if json.Unmarshal(body, &apps) != nil {
+				return
+			}
+			for _, app := range apps {
+				if app.Template == templateName {
+					mu.Lock()
+					result = append(result, remoteAppInfo{
+						NodeID: nodeID, NodeName: nodeName,
+						NodeCountry: nodeCountry, AppID: app.ID,
+					})
+					mu.Unlock()
+				}
+			}
+		}(n.ID, n.Name, n.Country)
+	}
+	wg.Wait()
+	return result
+}
 
-			cfgs := fetchNodeConfigs(ctx, deps, nodeID, nodeName, nodeCountry, templateName)
+// fetchRemoteFileContent downloads a single config file from a remote node.
+func fetchRemoteFileContent(ctx context.Context, deps Deps, nodeID, appID string, index int) ([]byte, error) {
+	path := fmt.Sprintf("/api/apps/%s/client-config/file/%d", appID, index)
+	status, body, err := deps.NodeHub.ProxyRequest(ctx, nodeID, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("remote returned status %d", status)
+	}
+	return body, nil
+}
+
+// fetchRemoteFilePerUserConfig fetches file_per_user config metadata and content
+// from a remote node. If userIndex > 0, only fetches that specific peer.
+func fetchRemoteFilePerUserConfig(ctx context.Context, deps Deps, ra remoteAppInfo, userIndex int) *clientcfg.ResolvedConfig {
+	status, body, err := deps.NodeHub.ProxyRequest(
+		ctx, ra.NodeID, "GET", "/api/apps/"+ra.AppID+"/client-config", nil,
+	)
+	if err != nil || status != http.StatusOK {
+		return nil
+	}
+
+	var ccResp clientConfigResponse
+	if json.Unmarshal(body, &ccResp) != nil {
+		return nil
+	}
+	if ccResp.Type != "file_per_user" || len(ccResp.Files) == 0 {
+		return nil
+	}
+
+	var files []clientcfg.ResolvedFile
+	for _, f := range ccResp.Files {
+		if userIndex > 0 && f.Index != userIndex {
+			continue
+		}
+		content, err := fetchRemoteFileContent(ctx, deps, ra.NodeID, ra.AppID, f.Index)
+		if err != nil {
+			log.Printf("[remote] failed to fetch file %d from node %s: %v", f.Index, ra.NodeID, err)
+			continue
+		}
+		files = append(files, clientcfg.ResolvedFile{
+			Index:   f.Index,
+			Name:    f.Name,
+			Content: string(content),
+		})
+	}
+
+	if len(files) == 0 {
+		return nil
+	}
+
+	return &clientcfg.ResolvedConfig{
+		Type:        "file_per_user",
+		Files:       files,
+		QR:          ccResp.QR,
+		NodeName:    ra.NodeName,
+		NodeCountry: ra.NodeCountry,
+	}
+}
+
+// fetchRemoteConfigs queries all connected remote nodes for apps using the
+// same template and returns their resolved client configs (url type only,
+// metadata without file content). Used by subscription endpoints.
+func fetchRemoteConfigs(ctx context.Context, deps Deps, templateName string) []clientcfg.ResolvedConfig {
+	remoteApps := findRemoteApps(ctx, deps, templateName)
+	if len(remoteApps) == 0 {
+		return nil
+	}
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	var all []clientcfg.ResolvedConfig
+
+	for _, ra := range remoteApps {
+		wg.Add(1)
+		go func(ra remoteAppInfo) {
+			defer wg.Done()
+
+			cfgs := fetchNodeAppConfigs(ctx, deps, ra)
 			if len(cfgs) > 0 {
 				mu.Lock()
 				all = append(all, cfgs...)
 				mu.Unlock()
 			}
-		}(n.ID, n.Name, n.Country)
+		}(ra)
 	}
 
 	wg.Wait()
 	return all
 }
 
-// fetchNodeConfigs fetches client configs for a specific template from a single
-// remote node. It first lists all apps on the node, filters by template name,
-// then retrieves the client config for each matching app.
-func fetchNodeConfigs(ctx context.Context, deps Deps, nodeID, nodeName, nodeCountry, templateName string) []clientcfg.ResolvedConfig {
-	// List apps on the remote node
-	status, body, err := deps.NodeHub.ProxyRequest(ctx, nodeID, "GET", "/api/apps", nil)
-	if err != nil || status != http.StatusOK {
-		log.Printf("[subscribe] failed to list apps on node %s: status=%d err=%v", nodeID, status, err)
+// fetchNodeAppConfigs fetches the client config for a single app on a remote node.
+func fetchNodeAppConfigs(ctx context.Context, deps Deps, ra remoteAppInfo) []clientcfg.ResolvedConfig {
+	ccStatus, ccBody, err := deps.NodeHub.ProxyRequest(
+		ctx, ra.NodeID, "GET", "/api/apps/"+ra.AppID+"/client-config", nil,
+	)
+	if err != nil || ccStatus != http.StatusOK {
+		log.Printf("[subscribe] failed to get client-config for app %s on node %s: status=%d err=%v",
+			ra.AppID, ra.NodeID, ccStatus, err)
 		return nil
 	}
 
-	var apps []struct {
-		ID       string `json:"id"`
-		Template string `json:"template"`
-	}
-	if err := json.Unmarshal(body, &apps); err != nil {
-		log.Printf("[subscribe] failed to parse apps from node %s: %v", nodeID, err)
+	var ccResp clientConfigResponse
+	if err := json.Unmarshal(ccBody, &ccResp); err != nil {
+		log.Printf("[subscribe] failed to parse client-config from node %s: %v", ra.NodeID, err)
 		return nil
 	}
 
-	var configs []clientcfg.ResolvedConfig
-	for _, app := range apps {
-		if app.Template != templateName {
-			continue
+	switch ccResp.Type {
+	case "url":
+		if len(ccResp.URLs) == 0 {
+			return nil
 		}
-
-		// Fetch client config for this app
-		ccStatus, ccBody, err := deps.NodeHub.ProxyRequest(
-			ctx, nodeID, "GET", "/api/apps/"+app.ID+"/client-config", nil,
-		)
-		if err != nil || ccStatus != http.StatusOK {
-			log.Printf("[subscribe] failed to get client-config for app %s on node %s: status=%d err=%v",
-				app.ID, nodeID, ccStatus, err)
-			continue
-		}
-
-		var ccResp clientConfigResponse
-		if err := json.Unmarshal(ccBody, &ccResp); err != nil {
-			log.Printf("[subscribe] failed to parse client-config from node %s: %v", nodeID, err)
-			continue
-		}
-
-		if ccResp.Type != "url" || len(ccResp.URLs) == 0 {
-			continue
-		}
-
-		// Convert to ResolvedConfig
 		var urls []clientcfg.ResolvedURL
 		for _, u := range ccResp.URLs {
 			urls = append(urls, clientcfg.ResolvedURL{
@@ -476,15 +590,32 @@ func fetchNodeConfigs(ctx context.Context, deps Deps, nodeID, nodeName, nodeCoun
 				QR:   u.QR,
 			})
 		}
-
-		configs = append(configs, clientcfg.ResolvedConfig{
+		return []clientcfg.ResolvedConfig{{
 			Type:        "url",
 			URLs:        urls,
 			ImportURLs:  ccResp.ImportURLs,
-			NodeName:    nodeName,
-			NodeCountry: nodeCountry,
-		})
+			NodeName:    ra.NodeName,
+			NodeCountry: ra.NodeCountry,
+		}}
+	case "file_per_user":
+		if len(ccResp.Files) == 0 {
+			return nil
+		}
+		var files []clientcfg.ResolvedFile
+		for _, f := range ccResp.Files {
+			files = append(files, clientcfg.ResolvedFile{
+				Index: f.Index,
+				Name:  f.Name,
+			})
+		}
+		return []clientcfg.ResolvedConfig{{
+			Type:        "file_per_user",
+			Files:       files,
+			QR:          ccResp.QR,
+			NodeName:    ra.NodeName,
+			NodeCountry: ra.NodeCountry,
+		}}
+	default:
+		return nil
 	}
-
-	return configs
 }

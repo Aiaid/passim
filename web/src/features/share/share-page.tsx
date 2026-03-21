@@ -138,19 +138,13 @@ function ShareFiles({ token, config }: { token: string; config: ShareConfigRespo
   const [qrIndex, setQrIndex] = useState<number | null>(null);
   const [qrContent, setQrContent] = useState<string | null>(null);
   const files = config.files ?? [];
+  const remoteFileGroups = (config.remote_groups ?? []).filter((g) => g.files && g.files.length > 0);
+  const hasMultipleNodes = remoteFileGroups.length > 0;
 
-  const handleDownload = (index: number, name: string) => {
-    const a = document.createElement('a');
-    a.href = api.getShareFileURL(token, index);
-    a.download = name;
-    a.click();
-  };
-
-  const handleQR = async (index: number) => {
+  const showQR = async (url: string, index: number) => {
     try {
-      const resp = await fetch(api.getShareFileURL(token, index));
-      const text = await resp.text();
-      setQrContent(text);
+      const resp = await fetch(url);
+      setQrContent(await resp.text());
       setQrIndex(index);
     } catch {
       // ignore
@@ -159,40 +153,106 @@ function ShareFiles({ token, config }: { token: string; config: ShareConfigRespo
 
   return (
     <>
-      <div className="share-card">
-        <div className="space-y-1">
-          {files.map((file) => (
-            <div key={file.index} className="share-file-row">
-              <div className="share-file-idx">{file.index}</div>
-              <span className="flex-1 text-sm font-medium font-mono truncate">{file.name}</span>
-              <div className="flex items-center gap-0.5">
-                <Button
-                  variant="ghost" size="icon" className="size-8"
-                  onClick={() => handleDownload(file.index, file.name)}
-                >
-                  <Download className="size-4" />
-                </Button>
-                {config.qr && (
-                  <Button
-                    variant="ghost" size="icon" className="size-8"
-                    onClick={() => handleQR(file.index)}
-                  >
-                    <QrCode className="size-4" />
-                  </Button>
-                )}
-              </div>
+      {/* Local node files */}
+      {files.length > 0 && (
+        <div className="share-card">
+          {hasMultipleNodes && (
+            <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-border/30">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Local</span>
             </div>
-          ))}
+          )}
+          <div className="space-y-1">
+            {files.map((file) => (
+              <FileRow
+                key={file.index}
+                file={file}
+                qr={config.qr}
+                onDownload={() => {
+                  const a = document.createElement('a');
+                  a.href = api.getShareFileURL(token, file.index);
+                  a.download = file.name;
+                  a.click();
+                }}
+                onQR={() => showQR(api.getShareFileURL(token, file.index), file.index)}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Remote node files */}
+      {remoteFileGroups.map((group) => (
+        <div key={group.node_name} className="share-card">
+          <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-border/30">
+            {group.node_country && <span className="text-xs">{countryFlag(group.node_country)}</span>}
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+              {group.node_name}
+            </span>
+          </div>
+          <div className="space-y-1">
+            {group.files!.map((file) => (
+              <FileRow
+                key={file.index}
+                file={file}
+                qr={group.qr}
+                onDownload={() => {
+                  const a = document.createElement('a');
+                  a.href = api.getShareRemoteFileURL(token, file.index, group.node_id!, group.app_id!);
+                  a.download = file.name;
+                  a.click();
+                }}
+                onQR={() => showQR(
+                  api.getShareRemoteFileURL(token, file.index, group.node_id!, group.app_id!),
+                  file.index,
+                )}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* Download All ZIP */}
+      {hasMultipleNodes && (
+        <Button
+          variant="outline" className="w-full gap-2"
+          onClick={() => { window.location.href = api.getShareZIPURL(token); }}
+        >
+          <Download className="size-4" />
+          Download All (ZIP)
+        </Button>
+      )}
 
       <QRSpotlight
         open={qrIndex !== null}
         onClose={() => { setQrIndex(null); setQrContent(null); }}
-        title={files.find((f) => f.index === qrIndex)?.name ?? 'QR Code'}
+        title={`peer${qrIndex}.conf`}
         value={qrContent}
       />
     </>
+  );
+}
+
+function FileRow({ file, qr, onDownload, onQR }: {
+  file: { index: number; name: string };
+  qr?: boolean;
+  onDownload: () => void;
+  onQR: () => void;
+}) {
+  return (
+    <div className="share-file-row">
+      <div className="share-file-idx">{file.index}</div>
+      <span className="flex-1 text-sm font-medium font-mono truncate">{file.name}</span>
+      <div className="flex items-center gap-0.5">
+        <Button variant="ghost" size="icon" className="size-8" onClick={onDownload}>
+          <Download className="size-4" />
+        </Button>
+        {qr && (
+          <Button variant="ghost" size="icon" className="size-8" onClick={onQR}>
+            <QrCode className="size-4" />
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -244,7 +304,7 @@ function ShareURLs({ token, config }: { token: string; config: ShareConfigRespon
                 {group.node_name}
               </span>
             </div>
-            {group.urls.map((url) => (
+            {group.urls?.map((url) => (
               <ShareURIEntry key={url.scheme} url={url} onQR={setQrURI} />
             ))}
           </div>

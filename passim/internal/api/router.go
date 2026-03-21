@@ -74,6 +74,7 @@ func NewRouter(deps Deps) http.Handler {
 			shareGroup.GET("/:token", shareConfigHandler(deps))
 			shareGroup.GET("/:token/subscribe", shareSubscribeHandler(deps))
 			shareGroup.GET("/:token/file/:index", shareFileHandler(deps))
+			shareGroup.GET("/:token/zip", shareZIPHandler(deps))
 		}
 
 		// Public speedtest routes (no auth)

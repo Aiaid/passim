@@ -422,6 +422,10 @@ data: {"status":"running"}
 
 打包所有配置文件为 ZIP 下载（仅 `file_per_user` 类型）。返回 `application/zip`。
 
+支持跨节点聚合: 自动从所有连接的远程节点获取同模板应用的配置文件，按节点分目录打包 (`🇯🇵tokyo/peer1.conf`, `🇸🇬singapore/peer1.conf`)。
+
+可选参数 `?user_index=N`: 仅包含指定 peer index 的配置文件（跨所有节点）。
+
 #### `GET /api/apps/:id/subscribe`
 
 生成 Clash/Stash 兼容的订阅 YAML（仅 `url` 类型）。自动聚合本地及所有已连接远程节点部署的同模板应用，节点名称作为代理名前缀（如 `tokyo-1`、`singapore-2`）。
@@ -473,6 +477,12 @@ proxy-groups:
 #### `GET /api/s/:token/file/:index` (公开，无需认证)
 
 下载分享的配置文件（仅 `file_per_user` 类型）。
+
+支持远程节点代理: `?node=NODE_ID&app=APP_ID` 参数可下载远程节点的配置文件。share token 的 `user_index` 限制同样适用于远程文件。
+
+#### `GET /api/s/:token/zip` (公开，无需认证)
+
+打包分享的配置文件为 ZIP（仅 `file_per_user` 类型）。自动聚合本地 + 所有远程节点的配置，按节点分目录。如果 share token 有 `user_index`，仅包含该 peer index。
 
 ### 节点代理 — 客户端配置
 
