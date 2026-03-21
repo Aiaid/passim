@@ -674,16 +674,42 @@ async function main() {
     { name: 'settings', path: '/settings', waitFor: 2000 },
   ]
 
-  for (const pg of pages) {
-    console.log(`Capturing ${pg.name}...`)
-    await page.goto(`${BASE}${pg.path}`, { waitUntil: 'load' })
-    // Extra wait for animations / rendering
-    await page.waitForTimeout(pg.waitFor)
-    await page.screenshot({
-      path: `${OUT_DIR}/${pg.name}.png`,
-      fullPage: false,
-    })
-    console.log(`  → saved ${pg.name}.png`)
+  const locales = [
+    { code: 'zh-CN', dir: 'zh' },
+    { code: 'en-US', dir: 'en' },
+  ]
+
+  for (const locale of locales) {
+    console.log(`\n── ${locale.dir.toUpperCase()} ──`)
+    const localeDir = `${OUT_DIR}/${locale.dir}`
+    mkdirSync(localeDir, { recursive: true })
+
+    // Switch language
+    await page.evaluate((lang) => {
+      localStorage.setItem(
+        'preferences-storage',
+        JSON.stringify({
+          state: {
+            theme: 'dark',
+            language: lang,
+            sidebarCollapsed: false,
+          },
+          version: 0,
+        }),
+      )
+      localStorage.setItem('language', lang)
+    }, locale.code)
+
+    for (const pg of pages) {
+      console.log(`Capturing ${pg.name}...`)
+      await page.goto(`${BASE}${pg.path}`, { waitUntil: 'load' })
+      await page.waitForTimeout(pg.waitFor)
+      await page.screenshot({
+        path: `${localeDir}/${pg.name}.png`,
+        fullPage: false,
+      })
+      console.log(`  → saved ${locale.dir}/${pg.name}.png`)
+    }
   }
 
   await browser.close()

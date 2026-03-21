@@ -1,10 +1,11 @@
 'use client'
 
 import { motion } from 'motion/react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 
 export function Hero() {
   const t = useTranslations('Hero')
+  const locale = useLocale()
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20 pb-16">
@@ -85,7 +86,7 @@ export function Hero() {
             <div className="rounded-2xl overflow-hidden border border-white/10 shadow-[0_20px_60px_oklch(0_0_0/0.5)] glow-cyan">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/screenshots/dashboard.png"
+                src={`/screenshots/${locale}/dashboard.png`}
                 alt="Passim Dashboard"
                 className="w-full h-auto"
               />
