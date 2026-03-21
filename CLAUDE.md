@@ -15,10 +15,15 @@ Full rewrite in progress: legacy multi-component architecture → single Go bina
 | `passim/` | Go backend (Gin + SQLite + Docker SDK) | Active — Phase 4 |
 | `web/` | Vite + React 19 + shadcn/ui embedded frontend | Active — Phase 4 |
 | `site/` | Next.js 15 + next-intl marketing landing page | Active |
+| `app-mobile/` | Expo 52 + React Native mobile app (primary UI) | Active — Phase 5 |
+| `packages/shared/` | Shared types, API client, i18n, globe scene | Active |
 | `.github/` | GitHub Actions CI/CD workflows | Active |
-| `app/` | Expo mobile app (iOS + Android) | Planned — Phase 5 |
 | `DNS/` | Python nserver DNS server (kept as-is) | Maintained |
 | `Doc/` | Design docs, specs, user stories | Active |
+
+### Workspace
+
+pnpm workspace monorepo. Root `pnpm-workspace.yaml` includes `web`, `site`, `app-mobile`, `packages/*`.
 
 ## Development Workflow
 
@@ -58,9 +63,10 @@ go test -tags=e2e ./...          # Run E2E tests
 Unit tests: Vitest + React Testing Library
 E2E tests: Playwright
 
-### Mobile App (`app/`) — Phase 5
+### Mobile App (`app-mobile/`) — Phase 5
 
 Unit tests: Jest + React Native Testing Library
+Run: `cd app-mobile && pnpm test`
 
 ## Common Commands
 
@@ -72,6 +78,15 @@ go build ./cmd/passim/           # Build binary
 go test ./...                    # All tests
 go test -cover ./...             # Coverage
 ./passim --version               # Show version info
+```
+
+### Mobile App (Expo)
+```bash
+cd app-mobile
+pnpm start                       # Expo dev server
+pnpm ios                         # Run on iOS simulator
+pnpm android                     # Run on Android emulator
+pnpm typecheck                   # TypeScript check
 ```
 
 ### DNS Server
