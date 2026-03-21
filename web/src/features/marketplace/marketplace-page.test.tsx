@@ -18,6 +18,17 @@ vi.mock('./queries', () => ({
   })),
 }));
 
+vi.mock('@/hooks/use-event-stream', () => ({
+  useEventStream: vi.fn(() => ({
+    metrics: null,
+    metricsHistory: [],
+    status: null,
+    containers: null,
+    apps: null,
+    isConnected: false,
+  })),
+}));
+
 vi.mock('./template-grid', () => ({
   TemplateGrid: ({ templates }: { templates: { name: string }[] }) => (
     <div data-testid="template-grid">
