@@ -12,4 +12,6 @@ export const qk = {
   version: (nodeId: string) => ['version', nodeId] as const,
   passkeys: (nodeId: string) => ['passkeys', nodeId] as const,
   metrics: (nodeId: string) => ['metrics', nodeId] as const,
+  hubNodes: (hubNodeId: string) => ['hub-nodes', hubNodeId] as const,
+  hubNodeApps: (hubNodeId: string, remoteNodeId: string) => ['hub-nodes', hubNodeId, remoteNodeId, 'apps'] as const,
 };

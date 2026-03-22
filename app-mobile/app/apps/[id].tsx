@@ -11,9 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import * as Clipboard from 'expo-clipboard';
-import type { ClientConfigResponse } from '@passim/shared/types';
-import { useApp, useAppClientConfig, useDeleteApp } from '@/hooks/use-apps';
+import { useApp, useDeleteApp } from '@/hooks/use-apps';
 import {
   useStartContainer,
   useStopContainer,
@@ -21,7 +19,7 @@ import {
 } from '@/hooks/use-containers';
 import { useNodeStore } from '@/stores/node-store';
 import { StatusDot } from '@/components/StatusDot';
-import { localized } from '@/lib/utils';
+import { ClientConfig } from '@/components/client-config';
 import { useTranslation } from '@/lib/i18n';
 
 function mapStatus(status: string): 'running' | 'stopped' | 'deploying' | 'error' {
@@ -85,36 +83,11 @@ function ActionButton({
   );
 }
 
-function CopyableField({ label, value }: { label: string; value: string }) {
-  const handleCopy = () => {
-    Clipboard.setString(value);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  };
-
-  return (
-    <View className="flex-row items-center justify-between py-2.5 border-b border-gray-800">
-      <View className="flex-1 mr-3">
-        <Text className="text-gray-400 text-xs">{label}</Text>
-        <Text className="text-white text-sm mt-0.5" numberOfLines={2}>
-          {value}
-        </Text>
-      </View>
-      <Pressable
-        onPress={handleCopy}
-        className="w-9 h-9 rounded-lg bg-gray-800 items-center justify-center active:opacity-70"
-      >
-        <Ionicons name="copy-outline" size={16} color="#999" />
-      </Pressable>
-    </View>
-  );
-}
-
 export default function AppDetailScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const nodeId = useNodeStore((s) => s.activeNodeId) ?? '';
   const { data: app, isLoading: appLoading } = useApp(nodeId, id);
-  const { data: clientConfig } = useAppClientConfig(nodeId, id);
   const deleteApp = useDeleteApp(nodeId);
   const startContainer = useStartContainer(nodeId);
   const stopContainer = useStopContainer(nodeId);
@@ -201,41 +174,9 @@ export default function AppDetailScreen() {
           ) : null}
 
           {/* Client Config */}
-          {clientConfig ? (
-            <>
-              <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                {t('app.configs')}
-              </Text>
-              <View testID="client-config" className="bg-gray-900 rounded-xl p-4 mb-4">
-                {/* Files */}
-                {clientConfig.files?.map((file: { index: number; name: string }) => (
-                  <CopyableField
-                    key={file.index}
-                    label={`File #${file.index + 1}`}
-                    value={file.name}
-                  />
-                ))}
-
-                {/* Fields */}
-                {clientConfig.fields?.map((field: { key: string; label: Record<string, string>; value: string }) => (
-                  <CopyableField
-                    key={field.key}
-                    label={localized(field.label, 'en-US')}
-                    value={field.value}
-                  />
-                ))}
-
-                {/* URLs */}
-                {clientConfig.urls?.map((url: { name: string; scheme: string }) => (
-                  <CopyableField
-                    key={url.name}
-                    label={url.name}
-                    value={`${url.scheme}://...`}
-                  />
-                ))}
-              </View>
-            </>
-          ) : null}
+          <View testID="client-config" className="mb-4">
+            <ClientConfig nodeId={nodeId} appId={id} templateName={app.template} />
+          </View>
 
           {/* Actions */}
           <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">

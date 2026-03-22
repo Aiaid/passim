@@ -62,3 +62,25 @@ export function useAppClientConfig(nodeId: string, id: string) {
     enabled: !!nodeId && !!id,
   });
 }
+
+export function useCreateShare(nodeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, userIndex }: { id: string; userIndex?: number }) =>
+      getNodeApi(nodeId).createShare(id, userIndex),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: qk.appClientConfig(nodeId, variables.id) });
+    },
+  });
+}
+
+export function useRevokeShare(nodeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, userIndex }: { id: string; userIndex?: number }) =>
+      getNodeApi(nodeId).revokeShare(id, userIndex),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: qk.appClientConfig(nodeId, variables.id) });
+    },
+  });
+}
