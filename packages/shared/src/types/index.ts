@@ -90,6 +90,7 @@ export interface ClientConfigResponse {
   import_urls?: Record<string, string>;
   share_supported: boolean;
   share_token?: string;
+  share_tokens?: Record<number, string>;
 }
 
 export interface ShareConfigResponse {

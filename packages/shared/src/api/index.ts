@@ -113,8 +113,11 @@ export function createApi(request: <T>(path: string, options?: RequestInit) => P
         method: 'POST',
         body: JSON.stringify({ user_index: userIndex ?? 0 }),
       }),
-    revokeShare: (id: string) =>
-      request<{ ok: boolean }>(`/apps/${id}/share`, { method: 'DELETE' }),
+    revokeShare: (id: string, userIndex?: number) =>
+      request<{ ok: boolean }>(
+        `/apps/${id}/share${userIndex != null ? `?user_index=${userIndex}` : ''}`,
+        { method: 'DELETE' },
+      ),
 
     // Public share (no auth)
     getShareConfig: (token: string) => request<ShareConfigResponse>(`/s/${token}`),
