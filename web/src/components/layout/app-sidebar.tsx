@@ -1,8 +1,9 @@
 import { useLocation, Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { LayoutDashboard, Container, AppWindow, Globe, Settings, LogOut, ArrowUpCircle } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useEventStream } from '@/hooks/use-event-stream';
 import { api } from '@/lib/api-client';
 import {
   Sidebar,
@@ -50,6 +51,23 @@ export function AppSidebar() {
   });
 
   const hasUpdate = updateInfo?.available ?? false;
+
+  // Remote node update checks
+  const { nodes: sseNodes } = useEventStream();
+  const connectedNodes = sseNodes?.filter((n) => n.status === 'connected') ?? [];
+
+  const nodeUpdateChecks = useQueries({
+    queries: connectedNodes.map((node) => ({
+      queryKey: ['nodes', node.id, 'update-check'],
+      queryFn: () => api.checkNodeUpdate(node.id),
+      staleTime: 10 * 60_000,
+      retry: false,
+    })),
+  });
+
+  const nodesWithUpdates = connectedNodes.filter(
+    (_, i) => nodeUpdateChecks[i]?.data?.available,
+  );
 
   return (
     <Sidebar>
@@ -104,6 +122,27 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
+          {/* Remote node update indicators */}
+          {nodesWithUpdates.map((node, i) => {
+            const info = nodeUpdateChecks[connectedNodes.indexOf(node)]?.data;
+            return (
+              <SidebarMenuItem key={node.id}>
+                <SidebarMenuButton
+                  asChild
+                  size="lg"
+                  className="text-base text-[oklch(0.65_0.2_250)] hover:text-[oklch(0.7_0.2_250)]"
+                >
+                  <Link to={`/nodes/${node.id}`}>
+                    <ArrowUpCircle className="size-5" />
+                    <span className="flex items-center gap-2 truncate">
+                      {node.name || node.address}
+                      <span className="text-xs font-mono opacity-70">{info?.latest}</span>
+                    </span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
           {bottomItems.map((item) => (
             <SidebarMenuItem key={item.key}>
               <SidebarMenuButton asChild isActive={location.pathname === item.path} size="lg" className="text-base">
