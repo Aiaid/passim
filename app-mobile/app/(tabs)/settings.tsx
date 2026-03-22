@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useMigrateNodesToHub } from '@/hooks/use-hub';
 import { StatusDot } from '@/components/StatusDot';
 import { getNodeApi } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
@@ -145,6 +146,9 @@ export default function SettingsScreen() {
   const { biometricEnabled, setBiometricEnabled } = useAuthStore();
   const { theme, language, pushEnabled, setTheme, setLanguage, setPushEnabled } =
     usePreferencesStore();
+
+  // Hub migration
+  const migrateToHub = useMigrateNodesToHub();
 
   // Local state
   const [nameModalVisible, setNameModalVisible] = useState(false);
@@ -368,7 +372,26 @@ export default function SettingsScreen() {
                 [
                   ...nodes.map((n) => ({
                     text: `${n.name}${n.id === hubNodeId ? ' ✓' : ''}`,
-                    onPress: () => setHubNode(n.id),
+                    onPress: async () => {
+                      await setHubNode(n.id);
+                      // Trigger migration: register local nodes + discover Hub nodes
+                      migrateToHub.mutate(undefined, {
+                        onSuccess: (r) => {
+                          const parts: string[] = [];
+                          if (r.synced) parts.push(`${r.synced} registered`);
+                          if (r.discovered) parts.push(`${r.discovered} discovered`);
+                          if (r.skipped) parts.push(`${r.skipped} already synced`);
+                          if (r.noKey) parts.push(`${r.noKey} need re-adding (no API key)`);
+                          if (r.failed) parts.push(`${r.failed} failed`);
+                          if (parts.length > 0) {
+                            Alert.alert('Hub Sync', parts.join(', '));
+                          }
+                        },
+                        onError: (err) => {
+                          Alert.alert('Hub Sync Failed', err instanceof Error ? err.message : 'Unknown error');
+                        },
+                      });
+                    },
                   })),
                   {
                     text: t('mobile.none') ?? 'None',

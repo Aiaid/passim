@@ -6,20 +6,29 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import type { ClientConfigResponse } from '@passim/shared/types';
 import { useNodeStore } from '@/stores/node-store';
+import { useHubRemoteConfigs, type RemoteFileGroup } from '@/hooks/use-hub';
 import { QRFullScreen } from './QRFullScreen';
 
 interface Props {
   appId: string;
   nodeId: string;
   config: ClientConfigResponse;
+  templateName: string;
 }
 
-export function FilePerUserConfig({ appId, nodeId, config }: Props) {
+function countryFlag(code: string): string {
+  return [...code.toUpperCase()]
+    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
+}
+
+export function FilePerUserConfig({ appId, nodeId, config, templateName }: Props) {
   const [qrValue, setQrValue] = useState<string | null>(null);
   const [qrTitle, setQrTitle] = useState('');
   const [loadingIndex, setLoadingIndex] = useState<number | null>(null);
 
   const activeNode = useNodeStore((s) => s.activeNode);
+  const { remoteFileGroups } = useHubRemoteConfigs(templateName);
   const files = config.files ?? [];
 
   const fetchFileContent = async (index: number): Promise<string> => {
@@ -113,6 +122,31 @@ export function FilePerUserConfig({ appId, nodeId, config }: Props) {
           </View>
         ))}
       </View>
+
+      {/* Remote node files (via Hub) */}
+      {remoteFileGroups.map((group) => (
+        <View key={group.nodeId} className="bg-gray-900 rounded-xl p-4">
+          <View className="flex-row items-center gap-1.5 mb-3">
+            {group.nodeCountry && <Text className="text-xs">{countryFlag(group.nodeCountry)}</Text>}
+            <Text className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest">
+              {group.nodeName}
+            </Text>
+          </View>
+          {group.files.map((file) => (
+            <View
+              key={file.index}
+              className="flex-row items-center py-2 border-b border-gray-800 last:border-b-0"
+            >
+              <View className="w-6 h-6 rounded bg-purple-500/20 items-center justify-center mr-3">
+                <Text className="text-purple-400 text-[10px] font-semibold">{file.index}</Text>
+              </View>
+              <Text className="flex-1 text-gray-300 text-sm font-mono" numberOfLines={1}>
+                {file.name}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ))}
 
       <QRFullScreen
         visible={!!qrValue}

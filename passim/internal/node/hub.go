@@ -21,6 +21,7 @@ type NodeInfo struct {
 	ID         string          `json:"id"`
 	Name       string          `json:"name"`
 	Address    string          `json:"address"`
+	APIKey     string          `json:"api_key,omitempty"`
 	Status     string          `json:"status"`
 	Version    string          `json:"version,omitempty"`
 	Country    string          `json:"country,omitempty"`
@@ -381,6 +382,7 @@ func (h *Hub) buildNodeInfo(rc *RemoteConn) *NodeInfo {
 		ID:        rc.info.ID,
 		Name:      rc.info.Name,
 		Address:   rc.info.Address,
+		APIKey:    rc.info.APIKey,
 		Status:    rc.status,
 		Version:   rc.version,
 		Country:   rc.info.Country,

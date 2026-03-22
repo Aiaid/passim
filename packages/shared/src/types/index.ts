@@ -193,6 +193,7 @@ export interface RemoteNode {
   id: string;
   name: string;
   address: string;
+  api_key?: string;
   status: 'connecting' | 'connected' | 'disconnected';
   version?: string;
   country?: string;

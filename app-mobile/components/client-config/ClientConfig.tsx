@@ -59,7 +59,7 @@ export function ClientConfig({ nodeId, appId, templateName }: Props) {
         <URLConfig appId={appId} nodeId={nodeId} config={config} templateName={templateName} />
       )}
       {config.type === 'file_per_user' && (
-        <FilePerUserConfig appId={appId} nodeId={nodeId} config={config} />
+        <FilePerUserConfig appId={appId} nodeId={nodeId} config={config} templateName={templateName} />
       )}
 
       {/* Share */}

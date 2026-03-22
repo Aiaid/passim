@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useNodeStore } from '@/stores/node-store';
+import { getNodeApi } from '@/lib/api';
 import { useTranslation } from '@/lib/i18n';
 
 type Mode = 'choose' | 'manual';
@@ -59,7 +60,23 @@ export default function AddNodeScreen() {
       const status = statusRes.ok ? await statusRes.json() : null;
       const name = status?.node?.name || trimmedHost;
 
-      await addNode({ host: trimmedHost, token, name, apiKey: apiKey.trim() });
+      const newNodeId = await addNode({ host: trimmedHost, token, name, apiKey: apiKey.trim() });
+
+      // Register on Hub (best effort)
+      const hubNodeId = useNodeStore.getState().hubNodeId;
+      if (hubNodeId) {
+        try {
+          const result = await getNodeApi(hubNodeId).addNode({
+            address: trimmedHost,
+            api_key: apiKey.trim(),
+            name,
+          });
+          await useNodeStore.getState().updateNodeHubRemoteId(newNodeId, result.id);
+        } catch {
+          // Hub unreachable — node added locally, will sync later
+        }
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (err: unknown) {
