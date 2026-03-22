@@ -141,7 +141,7 @@ export default function SettingsScreen() {
   const queryClient = useQueryClient();
 
   // Stores
-  const { nodes, activeNode, activeNodeId, removeNode, setActiveNode } = useNodeStore();
+  const { activeNode, activeNodeId, removeNode } = useNodeStore();
   const { biometricEnabled, setBiometricEnabled } = useAuthStore();
   const { theme, language, pushEnabled, setTheme, setLanguage, setPushEnabled } =
     usePreferencesStore();
@@ -330,31 +330,7 @@ export default function SettingsScreen() {
         <Text className="text-2xl font-bold text-white mt-4 mb-6">{t('settings.title')}</Text>
 
         {/* ── Nodes ── top, visually separated */}
-        <SettingsSection title={t('mobile.nodes')}>
-          {nodes.map((node) => (
-            <SettingsRow
-              key={node.id}
-              label={node.name}
-              value={node.id === activeNodeId ? t('mobile.active') : undefined}
-              onPress={() => setActiveNode(node.id)}
-              right={
-                node.id === activeNodeId ? (
-                  <Ionicons name="checkmark-circle" size={20} color="#30d158" />
-                ) : undefined
-              }
-            />
-          ))}
-          <SettingsRow
-            label={t('mobile.add_node_btn')}
-            onPress={() => router.push('/nodes/add')}
-            chevron
-          />
-        </SettingsSection>
-
-        {/* ── Node settings ── changes per active node */}
-        <Text className="text-gray-500 text-xs uppercase tracking-wider mb-3 px-1">
-          {activeNode?.name ?? '--'}
-        </Text>
+        {/* ── Node settings ── per active node */}
 
         <SettingsSection title={t('settings.general')}>
           <SettingsRow testID="setting-node-name" label={t('settings.node_name')} value={nodeName} onPress={handleEditNodeName} chevron />
