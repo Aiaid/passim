@@ -28,32 +28,32 @@ export interface MigrateResult {
 }
 
 /**
- * Query the Hub node's registered remote nodes.
+ * Query the Hub node's (nodes[0]) registered remote nodes.
  */
 export function useHubNodes() {
-  const hubNodeId = useNodeStore((s) => s.hubNodeId);
+  const hubNode = useNodeStore((s) => s.hubNode);
 
   return useQuery({
-    queryKey: qk.hubNodes(hubNodeId ?? ''),
-    queryFn: () => getNodeApi(hubNodeId!).getNodes(),
-    enabled: !!hubNodeId,
+    queryKey: qk.hubNodes(hubNode?.id ?? ''),
+    queryFn: () => getNodeApi(hubNode!.id).getNodes(),
+    enabled: !!hubNode,
     staleTime: 30_000,
   });
 }
 
 /**
  * Migrate local nodes to Hub + discover Hub nodes not in App.
- * Called after setting a Hub node.
+ * Called when the first node is added or on app startup.
  */
 export function useMigrateNodesToHub() {
   return useMutation({
     mutationFn: async (): Promise<MigrateResult> => {
       const store = useNodeStore.getState();
-      const { nodes, hubNodeId, updateNodeHubRemoteId, addNode } = store;
+      const { nodes, hubNode, updateNodeHubRemoteId, addNode } = store;
 
-      if (!hubNodeId) throw new Error('No Hub node set');
+      if (!hubNode) throw new Error('No Hub node');
 
-      const hubApi = getNodeApi(hubNodeId);
+      const hubApi = getNodeApi(hubNode.id);
       const result: MigrateResult = { synced: 0, discovered: 0, skipped: 0, noKey: 0, failed: 0 };
 
       // Step 1: Get Hub's existing remote nodes
@@ -71,11 +71,10 @@ export function useMigrateNodesToHub() {
 
       // Step 2: Register local nodes on Hub (with dedup)
       for (const node of nodes) {
-        if (node.id === hubNodeId) continue; // Skip Hub itself
+        if (node.id === hubNode.id) continue; // Skip Hub itself
 
         const existing = hubAddressMap.get(node.host);
         if (existing) {
-          // Already on Hub — just record the mapping
           await updateNodeHubRemoteId(node.id, existing.id);
           result.skipped++;
           continue;
@@ -102,11 +101,10 @@ export function useMigrateNodesToHub() {
       // Step 3: Discover Hub nodes not in App
       const localHosts = new Set(nodes.map((n) => n.host));
       for (const remote of hubRemotes) {
-        if (localHosts.has(remote.address)) continue; // Already local
-        if (!remote.api_key) continue; // Can't direct-connect without key
+        if (localHosts.has(remote.address)) continue;
+        if (!remote.api_key) continue;
 
         try {
-          // Login directly to the discovered node
           const loginRes = await fetch(`https://${remote.address}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -115,7 +113,6 @@ export function useMigrateNodesToHub() {
           if (!loginRes.ok) throw new Error('login failed');
           const loginData = await loginRes.json();
 
-          // Get node name from status
           let name = remote.name || remote.address;
           try {
             const statusRes = await fetch(`https://${remote.address}/api/status`, {
@@ -126,7 +123,7 @@ export function useMigrateNodesToHub() {
               name = status?.node?.name || name;
             }
           } catch {
-            // ignore status fetch failure
+            // ignore
           }
 
           await addNode({
@@ -151,22 +148,21 @@ export function useMigrateNodesToHub() {
  * Fetch remote node client configs via the Hub, aggregating URL and file_per_user configs.
  */
 export function useHubRemoteConfigs(templateName: string) {
-  const hubNodeId = useNodeStore((s) => s.hubNodeId);
+  const hubNode = useNodeStore((s) => s.hubNode);
+  const hubId = hubNode?.id;
   const { data: remoteNodes } = useHubNodes();
 
   const connectedNodes = (remoteNodes ?? []).filter((n) => n.status === 'connected');
 
-  // Step 1: Fetch apps from each connected remote node (via Hub proxy)
   const nodeAppQueries = useQueries({
     queries: connectedNodes.map((node) => ({
-      queryKey: qk.hubNodeApps(hubNodeId!, node.id),
-      queryFn: () => getNodeApi(hubNodeId!).getNodeApps(node.id),
+      queryKey: qk.hubNodeApps(hubId!, node.id),
+      queryFn: () => getNodeApi(hubId!).getNodeApps(node.id),
       staleTime: 30_000,
-      enabled: !!hubNodeId && !!templateName,
+      enabled: !!hubId && !!templateName,
     })),
   });
 
-  // Step 2: Find matching apps per node
   const matchingApps: { nodeId: string; nodeName: string; nodeCountry?: string; appId: string }[] = [];
   connectedNodes.forEach((node, i) => {
     const apps = nodeAppQueries[i]?.data;
@@ -182,17 +178,15 @@ export function useHubRemoteConfigs(templateName: string) {
     }
   });
 
-  // Step 3: Fetch client configs for matching apps
   const configQueries = useQueries({
     queries: matchingApps.map(({ nodeId, appId }) => ({
-      queryKey: ['hub-nodes', hubNodeId, nodeId, appId, 'client-config'] as const,
-      queryFn: () => getNodeApi(hubNodeId!).getNodeAppClientConfig(nodeId, appId),
+      queryKey: ['hub-nodes', hubId, nodeId, appId, 'client-config'] as const,
+      queryFn: () => getNodeApi(hubId!).getNodeAppClientConfig(nodeId, appId),
       staleTime: 60_000,
-      enabled: !!hubNodeId,
+      enabled: !!hubId,
     })),
   });
 
-  // Build remote groups
   const remoteGroups: NodeURLGroup[] = [];
   const remoteFileGroups: RemoteFileGroup[] = [];
 

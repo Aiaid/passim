@@ -24,11 +24,11 @@ interface NodeState {
   nodes: NodeInfo[];
   activeNodeId: string | null;
   activeNode: NodeInfo | null;
-  hubNodeId: string | null;
+  /** The first node (nodes[0]) is always the Hub. */
+  hubNode: NodeInfo | null;
   addNode: (node: Omit<NodeInfo, 'id'>) => Promise<string>;
   removeNode: (id: string) => Promise<void>;
   setActiveNode: (id: string) => void;
-  setHubNode: (id: string | null) => Promise<void>;
   updateNodeName: (id: string, name: string) => Promise<void>;
   updateNodeHubRemoteId: (nodeId: string, hubRemoteId: string) => Promise<void>;
   loadNodes: () => Promise<void>;
@@ -46,7 +46,7 @@ export const useNodeStore = create<NodeState>((set, get) => ({
   nodes: [],
   activeNodeId: null,
   activeNode: null,
-  hubNodeId: null,
+  hubNode: null,
 
   addNode: async (node) => {
     const id = generateId();
@@ -57,44 +57,38 @@ export const useNodeStore = create<NodeState>((set, get) => ({
       nodes,
       activeNodeId: id,
       activeNode: newNode,
+      hubNode: nodes[0],
     });
     return id;
   },
 
   removeNode: async (id) => {
     const node = get().nodes.find((n) => n.id === id);
-    const hubNodeId = get().hubNodeId;
+    const hubNode = get().hubNode;
 
     // Best-effort: delete from Hub if this node is registered there
-    if (hubNodeId && hubNodeId !== id && node?.hubRemoteId) {
+    if (hubNode && hubNode.id !== id && node?.hubRemoteId) {
       try {
-        await getNodeApi(hubNodeId).removeNode(node.hubRemoteId);
+        await getNodeApi(hubNode.id).removeNode(node.hubRemoteId);
       } catch {
         // Hub unreachable or already deleted — ignore
       }
     }
 
-    const nodes = get().nodes.filter((n) => n.id !== id);
-    await persistNodes(nodes);
+    let nodes = get().nodes.filter((n) => n.id !== id);
 
-    // If deleting the Hub itself, clear hub state + all hubRemoteIds
-    let newHubNodeId = hubNodeId;
-    if (id === hubNodeId) {
-      newHubNodeId = null;
-      await SecureStore.deleteItemAsync('passim-hub-id');
-      // Clear all hubRemoteIds since they belong to the old Hub
-      for (const n of nodes) {
-        n.hubRemoteId = undefined;
-      }
-      await persistNodes(nodes);
+    // If deleting the Hub (nodes[0]), clear all hubRemoteIds
+    if (hubNode && id === hubNode.id) {
+      nodes = nodes.map((n) => ({ ...n, hubRemoteId: undefined }));
     }
 
+    await persistNodes(nodes);
     const activeNodeId = get().activeNodeId === id ? (nodes[0]?.id ?? null) : get().activeNodeId;
     set({
       nodes,
       activeNodeId,
       activeNode: nodes.find((n) => n.id === activeNodeId) ?? null,
-      hubNodeId: newHubNodeId,
+      hubNode: nodes[0] ?? null,
     });
   },
 
@@ -103,32 +97,13 @@ export const useNodeStore = create<NodeState>((set, get) => ({
     if (node) set({ activeNodeId: id, activeNode: node });
   },
 
-  setHubNode: async (id) => {
-    if (id) {
-      await SecureStore.setItemAsync('passim-hub-id', id);
-    } else {
-      await SecureStore.deleteItemAsync('passim-hub-id');
-    }
-
-    // Clear all hubRemoteIds — new Hub has different mapping
-    const nodes = get().nodes.map((n) => ({ ...n, hubRemoteId: undefined }));
-    await persistNodes(nodes);
-
-    const activeNode = get().activeNode;
-    set({
-      hubNodeId: id,
-      nodes,
-      activeNode: activeNode ? nodes.find((n) => n.id === activeNode.id) ?? null : null,
-    });
-  },
-
   updateNodeName: async (id, name) => {
     const nodes = get().nodes.map((n) => n.id === id ? { ...n, name } : n);
     await persistNodes(nodes);
     const activeNode = get().activeNodeId === id
       ? nodes.find((n) => n.id === id) ?? get().activeNode
       : get().activeNode;
-    set({ nodes, activeNode });
+    set({ nodes, activeNode, hubNode: nodes[0] ?? null });
   },
 
   updateNodeHubRemoteId: async (nodeId, hubRemoteId) => {
@@ -139,24 +114,20 @@ export const useNodeStore = create<NodeState>((set, get) => ({
     const activeNode = get().activeNodeId === nodeId
       ? nodes.find((n) => n.id === nodeId) ?? get().activeNode
       : get().activeNode;
-    set({ nodes, activeNode });
+    set({ nodes, activeNode, hubNode: nodes[0] ?? null });
   },
 
   loadNodes: async () => {
-    const [raw, hubId] = await Promise.all([
-      SecureStore.getItemAsync('passim-nodes'),
-      SecureStore.getItemAsync('passim-hub-id'),
-    ]);
+    const raw = await SecureStore.getItemAsync('passim-nodes');
     if (!raw) return;
     try {
       const nodes: NodeInfo[] = JSON.parse(raw);
       const activeNodeId = nodes[0]?.id ?? null;
-      const validHubId = hubId && nodes.some((n) => n.id === hubId) ? hubId : null;
       set({
         nodes,
         activeNodeId,
         activeNode: nodes.find((n) => n.id === activeNodeId) ?? null,
-        hubNodeId: validHubId,
+        hubNode: nodes[0] ?? null,
       });
     } catch {
       // corrupted storage, ignore

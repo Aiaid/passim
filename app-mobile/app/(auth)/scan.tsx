@@ -91,10 +91,10 @@ export default function ScanScreen() {
         });
 
         // Register on Hub (best effort)
-        const hubNodeId = useNodeStore.getState().hubNodeId;
-        if (hubNodeId) {
+        const hubNode = useNodeStore.getState().hubNode;
+        if (hubNode && hubNode.id !== newNodeId) {
           try {
-            const result = await getNodeApi(hubNodeId).addNode({
+            const result = await getNodeApi(hubNode.id).addNode({
               address: payload.host,
               api_key: payload.key,
               name: payload.name || name,

@@ -146,12 +146,12 @@ export function URLConfig({ appId, nodeId, config, templateName }: Props) {
       )}
 
       {/* No Hub prompt */}
-      {totalNodes <= 1 && !useNodeStore.getState().hubNodeId && (
+      {totalNodes <= 1 && useNodeStore.getState().nodes.length <= 1 && (
         <View className="bg-gray-900/50 rounded-xl p-4 flex-row items-center gap-3">
           <Ionicons name="git-network-outline" size={20} color="#5e5ce6" />
           <View className="flex-1">
             <Text className="text-gray-400 text-xs">
-              Set a Hub node to aggregate configs from multiple nodes
+              Add remote nodes to aggregate configs from multiple nodes
             </Text>
           </View>
         </View>

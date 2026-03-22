@@ -21,7 +21,7 @@ import { useTranslation } from '@/lib/i18n';
 
 export default function DashboardScreen() {
   const { t } = useTranslation();
-  const { nodes, activeNodeId, setActiveNode, activeNode, hubNodeId } = useNodeStore();
+  const { nodes, activeNodeId, setActiveNode, activeNode } = useNodeStore();
   const nodeId = activeNodeId ?? '';
   const { getNodeSSE } = useMultiNodeSSE();
   const sse = getNodeSSE(nodeId);
@@ -116,7 +116,6 @@ export default function DashboardScreen() {
                       }`}
                     >
                       {node.name}
-                      {node.id === hubNodeId ? ' ⚡' : ''}
                     </Text>
                   </TouchableOpacity>
                 ))}

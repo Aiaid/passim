@@ -63,10 +63,10 @@ export default function AddNodeScreen() {
       const newNodeId = await addNode({ host: trimmedHost, token, name, apiKey: apiKey.trim() });
 
       // Register on Hub (best effort)
-      const hubNodeId = useNodeStore.getState().hubNodeId;
-      if (hubNodeId) {
+      const hubNode = useNodeStore.getState().hubNode;
+      if (hubNode && hubNode.id !== newNodeId) {
         try {
-          const result = await getNodeApi(hubNodeId).addNode({
+          const result = await getNodeApi(hubNode.id).addNode({
             address: trimmedHost,
             api_key: apiKey.trim(),
             name,
