@@ -3,7 +3,7 @@ import {
   View,
   Text,
   Pressable,
-  FlatList,
+  ScrollView,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -93,6 +93,9 @@ export default function NodesScreen() {
   const setActiveNode = useNodeStore((s) => s.setActiveNode);
   const [refreshing, setRefreshing] = useState(false);
 
+  const hubNode = nodes[0] ?? null;
+  const remoteNodes = nodes.slice(1);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -103,55 +106,73 @@ export default function NodesScreen() {
     setRefreshing(false);
   }, []);
 
-  const renderNode = useCallback(
-    ({ item }: { item: { id: string } }) => (
-      <View className="mb-3">
-        <NodeCard
-          nodeId={item.id}
-          onPress={() => {
-            setActiveNode(item.id);
-            router.push(`/nodes/${item.id}`);
-          }}
-        />
-      </View>
-    ),
-    [setActiveNode],
-  );
-
   return (
     <View className="flex-1 bg-black">
-      <FlatList
+      <ScrollView
         className="flex-1 px-4"
-        data={nodes}
-        keyExtractor={(item) => item.id}
-        renderItem={renderNode}
+        contentContainerStyle={{ paddingTop: top, paddingBottom: 32 }}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#666"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#666" />
         }
-        ListHeaderComponent={
-          <View className="flex-row items-center justify-between mt-4 mb-6">
-            <Text className="text-2xl font-bold text-white">{t('nav.nodes')}</Text>
-            <Pressable
-              testID="btn-add-node"
-              className="bg-primary rounded-lg px-4 py-2"
-              onPress={() => router.push('/nodes/add')}
-            >
-              <Text className="text-black font-semibold">{t('node.add')}</Text>
-            </Pressable>
-          </View>
-        }
-        ListEmptyComponent={
+      >
+        {/* Header */}
+        <View className="flex-row items-center justify-between mt-4 mb-6">
+          <Text className="text-2xl font-bold text-white">{t('nav.nodes')}</Text>
+          <Pressable
+            testID="btn-add-node"
+            className="bg-primary rounded-lg px-4 py-2"
+            onPress={() => router.push('/nodes/add')}
+          >
+            <Text className="text-black font-semibold">{t('node.add')}</Text>
+          </Pressable>
+        </View>
+
+        {/* Hub Node */}
+        {hubNode && (
+          <>
+            <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2 px-1">
+              Hub
+            </Text>
+            <View className="mb-6">
+              <NodeCard
+                nodeId={hubNode.id}
+                onPress={() => {
+                  setActiveNode(hubNode.id);
+                  router.push(`/nodes/${hubNode.id}`);
+                }}
+              />
+            </View>
+          </>
+        )}
+
+        {/* Remote Nodes */}
+        {remoteNodes.length > 0 && (
+          <>
+            <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2 px-1">
+              {t('mobile.remote_nodes') ?? 'Remote Nodes'} ({remoteNodes.length})
+            </Text>
+            {remoteNodes.map((node) => (
+              <View key={node.id} className="mb-3">
+                <NodeCard
+                  nodeId={node.id}
+                  onPress={() => {
+                    setActiveNode(node.id);
+                    router.push(`/nodes/${node.id}`);
+                  }}
+                />
+              </View>
+            ))}
+          </>
+        )}
+
+        {/* Empty state */}
+        {!hubNode && (
           <View className="items-center mt-12">
             <Ionicons name="server-outline" size={48} color="#444" />
             <Text className="text-gray-500 mt-3">{t('mobile.no_remote_nodes')}</Text>
           </View>
-        }
-        contentContainerStyle={{ paddingTop: top, paddingBottom: 32 }}
-      />
+        )}
+      </ScrollView>
     </View>
   );
 }

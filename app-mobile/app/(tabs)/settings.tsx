@@ -141,7 +141,7 @@ export default function SettingsScreen() {
   const queryClient = useQueryClient();
 
   // Stores
-  const { activeNode, activeNodeId, removeNode } = useNodeStore();
+  const { nodes, activeNode, activeNodeId, removeNode } = useNodeStore();
   const { biometricEnabled, setBiometricEnabled } = useAuthStore();
   const { theme, language, pushEnabled, setTheme, setLanguage, setPushEnabled } =
     usePreferencesStore();
@@ -329,9 +329,19 @@ export default function SettingsScreen() {
       <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingTop: top, paddingBottom: 48 }}>
         <Text className="text-2xl font-bold text-white mt-4 mb-6">{t('settings.title')}</Text>
 
-        {/* ── Nodes ── top, visually separated */}
-        {/* ── Node settings ── per active node */}
+        {/* ── Remote Nodes ── */}
+        {nodes.length > 1 && (
+          <SettingsSection title={t('mobile.remote_nodes') ?? 'Remote Nodes'}>
+            <SettingsRow
+              label={t('mobile.connected_nodes') ?? 'Connected Nodes'}
+              value={`${nodes.length - 1}`}
+              onPress={() => router.push('/(tabs)/nodes')}
+              chevron
+            />
+          </SettingsSection>
+        )}
 
+        {/* ── Node settings ── per active node */}
         <SettingsSection title={t('settings.general')}>
           <SettingsRow testID="setting-node-name" label={t('settings.node_name')} value={nodeName} onPress={handleEditNodeName} chevron />
           <SettingsRow
