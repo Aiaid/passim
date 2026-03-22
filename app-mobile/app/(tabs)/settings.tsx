@@ -329,42 +329,53 @@ export default function SettingsScreen() {
       <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingTop: top, paddingBottom: 48 }}>
         <Text className="text-2xl font-bold text-white mt-4 mb-4">{t('settings.title')}</Text>
 
-        {/* ── Node Selector ── */}
+        {/* ── Node Picker (pill style, same as dashboard) ── */}
         {nodes.length > 0 && (
-          <View className="mb-6">
-            {/* Hub */}
-            <Text className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-1.5 px-1">
-              Hub
-            </Text>
-            <Pressable
-              onPress={() => setActiveNode(nodes[0].id)}
-              className={`rounded-xl px-4 py-3 mb-2 ${activeNodeId === nodes[0].id ? 'bg-green-600/20 border border-green-600' : 'bg-gray-900'}`}
-            >
-              <Text className={`text-sm font-medium ${activeNodeId === nodes[0].id ? 'text-green-400' : 'text-gray-400'}`}>
-                {nodes[0].name}
-              </Text>
-            </Pressable>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="mb-6"
+          >
+            <View className="flex-row gap-2 items-center">
+              {/* Hub */}
+              {nodes[0] && (
+                <Pressable
+                  onPress={() => setActiveNode(nodes[0].id)}
+                  className={`px-4 py-2 rounded-full ${
+                    activeNodeId === nodes[0].id ? 'bg-green-600' : 'bg-gray-900'
+                  }`}
+                >
+                  <Text className={`text-sm font-medium ${
+                    activeNodeId === nodes[0].id ? 'text-white' : 'text-gray-400'
+                  }`}>
+                    {nodes[0].name}
+                  </Text>
+                </Pressable>
+              )}
 
-            {/* Remote */}
-            {nodes.length > 1 && (
-              <>
-                <Text className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-1.5 mt-2 px-1">
-                  {t('mobile.remote_nodes') ?? 'Remote'} ({nodes.length - 1})
-                </Text>
-                {nodes.slice(1).map((node) => (
-                  <Pressable
-                    key={node.id}
-                    onPress={() => setActiveNode(node.id)}
-                    className={`rounded-xl px-4 py-3 mb-2 ${activeNodeId === node.id ? 'bg-purple-600/20 border border-purple-600' : 'bg-gray-900'}`}
-                  >
-                    <Text className={`text-sm font-medium ${activeNodeId === node.id ? 'text-purple-400' : 'text-gray-400'}`}>
-                      {node.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </>
-            )}
-          </View>
+              {/* Separator */}
+              {nodes.length > 1 && (
+                <View className="w-px h-5 bg-gray-700 mx-1" />
+              )}
+
+              {/* Remote */}
+              {nodes.slice(1).map((node) => (
+                <Pressable
+                  key={node.id}
+                  onPress={() => setActiveNode(node.id)}
+                  className={`px-4 py-2 rounded-full ${
+                    activeNodeId === node.id ? 'bg-purple-600' : 'bg-gray-900'
+                  }`}
+                >
+                  <Text className={`text-sm font-medium ${
+                    activeNodeId === node.id ? 'text-white' : 'text-gray-400'
+                  }`}>
+                    {node.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
         )}
 
         {/* ── Node settings ── per selected node */}

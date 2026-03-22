@@ -77,6 +77,7 @@ export default function DashboardScreen() {
       <GlobeView
         nodeStatuses={globeNodeStatuses}
         activeNodeId={activeNodeId}
+        hubNodeId={nodes[0]?.id}
         onNodeSelect={setActiveNode}
         fullscreen
       />
@@ -91,28 +92,52 @@ export default function DashboardScreen() {
               <StatusDot status={isConnected ? 'connected' : 'disconnected'} size={10} />
             </View>
 
-            {/* Node picker pills */}
+            {/* Node picker pills — Hub | Remote */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               className="mb-2"
             >
-              <View className="flex-row gap-2">
-                {nodes.map((node) => (
+              <View className="flex-row gap-2 items-center">
+                {/* Hub node (nodes[0]) */}
+                {nodes[0] && (
                   <TouchableOpacity
-                    key={node.id}
-                    onPress={() => setActiveNode(node.id)}
+                    onPress={() => setActiveNode(nodes[0].id)}
                     className={`px-4 py-2 rounded-full ${
-                      node.id === activeNodeId
+                      nodes[0].id === activeNodeId
                         ? 'bg-green-600'
                         : 'bg-gray-800/70'
                     }`}
                   >
                     <Text
                       className={`text-sm font-medium ${
-                        node.id === activeNodeId
-                          ? 'text-white'
-                          : 'text-gray-400'
+                        nodes[0].id === activeNodeId ? 'text-white' : 'text-gray-400'
+                      }`}
+                    >
+                      {nodes[0].name}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Separator */}
+                {nodes.length > 1 && (
+                  <View className="w-px h-5 bg-gray-700 mx-1" />
+                )}
+
+                {/* Remote nodes */}
+                {nodes.slice(1).map((node) => (
+                  <TouchableOpacity
+                    key={node.id}
+                    onPress={() => setActiveNode(node.id)}
+                    className={`px-4 py-2 rounded-full ${
+                      node.id === activeNodeId
+                        ? 'bg-purple-600'
+                        : 'bg-gray-800/70'
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm font-medium ${
+                        node.id === activeNodeId ? 'text-white' : 'text-gray-400'
                       }`}
                     >
                       {node.name}

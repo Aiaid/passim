@@ -47,14 +47,15 @@ export interface GlobeNodeStatus {
 interface GlobeViewProps {
   nodeStatuses: GlobeNodeStatus[];
   activeNodeId?: string | null;
+  hubNodeId?: string | null;
   fullscreen?: boolean;
   onNodeSelect?: (nodeId: string) => void;
 }
 
-export function GlobeView({ nodeStatuses, activeNodeId, fullscreen, onNodeSelect }: GlobeViewProps) {
+export function GlobeView({ nodeStatuses, activeNodeId, hubNodeId, fullscreen, onNodeSelect }: GlobeViewProps) {
   const { panResponder, getRotation, getVelocity } = useGlobeGesture();
-  const propsRef = useRef({ nodeStatuses, activeNodeId });
-  propsRef.current = { nodeStatuses, activeNodeId };
+  const propsRef = useRef({ nodeStatuses, activeNodeId, hubNodeId });
+  propsRef.current = { nodeStatuses, activeNodeId, hubNodeId };
 
   const [billboards, setBillboards] = useState<BillboardData[]>([]);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -195,7 +196,7 @@ export function GlobeView({ nodeStatuses, activeNodeId, fullscreen, onNodeSelect
     }
 
     function syncMarkers() {
-      const { nodeStatuses: ns, activeNodeId: activeId } = propsRef.current;
+      const { nodeStatuses: ns, activeNodeId: activeId, hubNodeId: hubId } = propsRef.current;
       const entries: MarkerEntry[] = [];
 
       for (const { nodeId, status: s, isConnected } of ns) {
@@ -203,9 +204,13 @@ export function GlobeView({ nodeStatuses, activeNodeId, fullscreen, onNodeSelect
         const cc = COUNTRY_COORDS[s.node.country.toUpperCase()];
         if (!cc) continue;
 
+        // Hub = green, Remote = purple, disconnected = gray
+        const isHub = nodeId === hubId;
+        const connectedColor = isHub ? 0x30d158 : 0x5e5ce6;
+
         entries.push({
           pos: latLonToPos(cc[0], cc[1], EARTH_RADIUS * 1.01),
-          color: isConnected ? 0x30d158 : 0x666666,
+          color: isConnected ? connectedColor : 0x666666,
           isActive: nodeId === activeId,
           nodeId,
           name: s.node.name ?? nodeId,
