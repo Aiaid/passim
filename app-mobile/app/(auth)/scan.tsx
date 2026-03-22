@@ -86,6 +86,7 @@ export default function ScanScreen() {
           host: payload.host,
           token,
           name: payload.name || name,
+          apiKey: payload.key,
         });
         router.replace('/(tabs)');
       } catch (err) {

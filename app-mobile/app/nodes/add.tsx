@@ -59,7 +59,7 @@ export default function AddNodeScreen() {
       const status = statusRes.ok ? await statusRes.json() : null;
       const name = status?.node?.name || trimmedHost;
 
-      await addNode({ host: trimmedHost, token, name });
+      await addNode({ host: trimmedHost, token, name, apiKey: apiKey.trim() });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (err: unknown) {
