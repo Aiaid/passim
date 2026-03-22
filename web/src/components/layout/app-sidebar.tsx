@@ -123,7 +123,7 @@ export function AppSidebar() {
             </SidebarMenuItem>
           )}
           {/* Remote node update indicators */}
-          {nodesWithUpdates.map((node, i) => {
+          {nodesWithUpdates.map((node) => {
             const info = nodeUpdateChecks[connectedNodes.indexOf(node)]?.data;
             return (
               <SidebarMenuItem key={node.id}>
