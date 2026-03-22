@@ -141,7 +141,7 @@ export default function SettingsScreen() {
   const queryClient = useQueryClient();
 
   // Stores
-  const { nodes, activeNode, activeNodeId, removeNode, setActiveNode } = useNodeStore();
+  const { nodes, activeNode, activeNodeId, hubNodeId, removeNode, setActiveNode, setHubNode } = useNodeStore();
   const { biometricEnabled, setBiometricEnabled } = useAuthStore();
   const { theme, language, pushEnabled, setTheme, setLanguage, setPushEnabled } =
     usePreferencesStore();
@@ -351,6 +351,38 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
+        {/* ── Hub ── */}
+        <SettingsSection title="Hub">
+          <SettingsRow
+            label={t('mobile.hub_node') ?? 'Hub Node'}
+            value={hubNodeId ? nodes.find((n) => n.id === hubNodeId)?.name ?? '--' : t('mobile.not_set') ?? 'Not Set'}
+            onPress={() => {
+              const options = [
+                ...nodes.map((n) => n.name || n.host),
+                t('mobile.none') ?? 'None',
+                t('common.cancel'),
+              ];
+              Alert.alert(
+                t('mobile.select_hub') ?? 'Select Hub Node',
+                t('mobile.select_hub_desc') ?? 'Choose a node to aggregate configs from all nodes',
+                [
+                  ...nodes.map((n) => ({
+                    text: `${n.name}${n.id === hubNodeId ? ' ✓' : ''}`,
+                    onPress: () => setHubNode(n.id),
+                  })),
+                  {
+                    text: t('mobile.none') ?? 'None',
+                    style: 'destructive' as const,
+                    onPress: () => setHubNode(null),
+                  },
+                  { text: t('common.cancel'), style: 'cancel' as const },
+                ],
+              );
+            }}
+            chevron
+          />
+        </SettingsSection>
+
         {/* ── Node settings ── changes per active node */}
         <Text className="text-gray-500 text-xs uppercase tracking-wider mb-3 px-1">
           {activeNode?.name ?? '--'}
@@ -360,7 +392,7 @@ export default function SettingsScreen() {
           <SettingsRow testID="setting-node-name" label={t('settings.node_name')} value={nodeName} onPress={handleEditNodeName} chevron />
           <SettingsRow
             label={t('settings.api_key')}
-            value={apiKeyRevealed ? activeNode?.token ?? '--' : '••••••••'}
+            value={apiKeyRevealed ? (activeNode?.apiKey ?? activeNode?.token ?? '--') : '••••••••'}
             onPress={handleCopyApiKey}
             right={
               <Pressable onPress={() => setApiKeyRevealed(!apiKeyRevealed)} hitSlop={8}>

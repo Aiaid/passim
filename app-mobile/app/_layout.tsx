@@ -12,8 +12,6 @@ import { useAuthStore } from '@/stores/auth-store';
 import { usePreferencesStore } from '@/stores/preferences-store';
 import '../global.css';
 
-const LOCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 2, staleTime: 30_000 },
@@ -23,7 +21,7 @@ const queryClient = new QueryClient({
 function AppContent() {
   const [isReady, setIsReady] = useState(false);
   const [locked, setLocked] = useState(false);
-  const backgroundTimeRef = useRef<number | null>(null);
+  const authenticatingRef = useRef(false);
 
   useEffect(() => {
     async function loadStores() {
@@ -38,28 +36,39 @@ function AppContent() {
   }, []);
 
   const authenticate = useCallback(async () => {
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Unlock Passim',
-      cancelLabel: 'Cancel',
-      disableDeviceFallback: false,
-    });
-    if (result.success) setLocked(false);
+    if (authenticatingRef.current) return;
+    authenticatingRef.current = true;
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Unlock Passim',
+        cancelLabel: 'Cancel',
+        disableDeviceFallback: false,
+      });
+      if (result.success) setLocked(false);
+    } finally {
+      authenticatingRef.current = false;
+    }
   }, []);
+
+  // Auto-trigger Face ID when locked
+  useEffect(() => {
+    if (locked) authenticate();
+  }, [locked, authenticate]);
 
   // Track app state changes for lock screen
   useEffect(() => {
+    // Only track real background→active transitions.
+    // Face ID itself causes inactive→active which we must ignore.
+    let wasBackground = false;
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
       const biometricEnabled = useAuthStore.getState().biometricEnabled;
       if (!biometricEnabled) return;
 
-      if (state === 'background' || state === 'inactive') {
-        backgroundTimeRef.current = Date.now();
-      } else if (state === 'active' && backgroundTimeRef.current) {
-        const elapsed = Date.now() - backgroundTimeRef.current;
-        backgroundTimeRef.current = null;
-        if (elapsed >= LOCK_TIMEOUT_MS) {
-          setLocked(true);
-        }
+      if (state === 'background') {
+        wasBackground = true;
+      } else if (state === 'active' && wasBackground && !authenticatingRef.current) {
+        wasBackground = false;
+        setLocked(true);
       }
     });
     return () => sub.remove();
@@ -73,22 +82,6 @@ function AppContent() {
     );
   }
 
-  if (locked) {
-    return (
-      <View className="flex-1 bg-black items-center justify-center">
-        <Ionicons name="lock-closed" size={48} color="#666" />
-        <View className="mt-6">
-          <View
-            className="bg-gray-900 rounded-xl px-8 py-3"
-            onTouchEnd={authenticate}
-          >
-            <Ionicons name="finger-print-outline" size={32} color="#30d158" style={{ alignSelf: 'center' }} />
-          </View>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <>
       <StatusBar style="light" />
@@ -96,6 +89,20 @@ function AppContent() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
       </Stack>
+      {/* Lock overlay — keeps Stack mounted to preserve navigation state */}
+      {locked && (
+        <View className="absolute inset-0 bg-black items-center justify-center" style={{ zIndex: 999 }}>
+          <Ionicons name="lock-closed" size={48} color="#666" />
+          <View className="mt-6">
+            <View
+              className="bg-gray-900 rounded-xl px-8 py-3"
+              onTouchEnd={authenticate}
+            >
+              <Ionicons name="finger-print-outline" size={32} color="#30d158" style={{ alignSelf: 'center' }} />
+            </View>
+          </View>
+        </View>
+      )}
     </>
   );
 }

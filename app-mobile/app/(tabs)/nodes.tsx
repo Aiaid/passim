@@ -6,6 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,11 +22,31 @@ function NodeCard({ nodeId, onPress }: { nodeId: string; onPress: () => void }) 
   const { t } = useTranslation();
   const node = useNodeStore((s) => s.nodes.find((n) => n.id === nodeId));
   const activeNodeId = useNodeStore((s) => s.activeNodeId);
+  const hubNodeId = useNodeStore((s) => s.hubNodeId);
+  const setHubNode = useNodeStore((s) => s.setHubNode);
   const { data: status, isLoading } = useStatus(nodeId);
   const { getNodeSSE } = useMultiNodeSSE();
   const sse = getNodeSSE(nodeId);
 
   const isActive = nodeId === activeNodeId;
+  const isHub = nodeId === hubNodeId;
+
+  const handleLongPress = () => {
+    Alert.alert(
+      isHub ? 'Remove Hub' : 'Set as Hub',
+      isHub
+        ? 'Remove this node as the Hub?'
+        : 'Use this node to aggregate configs from all nodes?',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: isHub ? 'Remove' : 'Set as Hub',
+          style: isHub ? 'destructive' : 'default',
+          onPress: () => setHubNode(isHub ? null : nodeId),
+        },
+      ],
+    );
+  };
   const connected = sse.isConnected;
   const nodeStatus = sse.status ?? status;
   const flag = nodeStatus?.node?.country ? countryFlag(nodeStatus.node.country) : '';
@@ -35,6 +56,7 @@ function NodeCard({ nodeId, onPress }: { nodeId: string; onPress: () => void }) 
     <Pressable
       className={`bg-gray-900 rounded-xl p-4 active:opacity-70 ${isActive ? 'border border-green-600' : ''}`}
       onPress={onPress}
+      onLongPress={handleLongPress}
     >
       <View className="flex-row items-center justify-between mb-3">
         <View className="flex-row items-center gap-2 flex-1">
@@ -42,6 +64,11 @@ function NodeCard({ nodeId, onPress }: { nodeId: string; onPress: () => void }) 
           <Text className="text-white font-semibold text-base" numberOfLines={1}>
             {nodeName}
           </Text>
+          {isHub && (
+            <View className="bg-blue-500/20 px-1.5 py-0.5 rounded">
+              <Text className="text-blue-400 text-[10px] font-semibold">HUB</Text>
+            </View>
+          )}
           {nodeStatus?.node?.version ? (
             <Text className="text-gray-600 text-[10px] font-mono">{nodeStatus.node.version}</Text>
           ) : null}
