@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useNodeStore } from '@/stores/node-store';
 import { getNodeApi } from '@/lib/api';
+import { syncWithHub } from '@/hooks/use-hub';
 import { useTranslation } from '@/lib/i18n';
 
 type Mode = 'choose' | 'manual';
@@ -60,20 +61,26 @@ export default function AddNodeScreen() {
       const status = statusRes.ok ? await statusRes.json() : null;
       const name = status?.node?.name || trimmedHost;
 
+      const isFirstNode = useNodeStore.getState().nodes.length === 0;
       const newNodeId = await addNode({ host: trimmedHost, token, name, apiKey: apiKey.trim() });
 
-      // Register on Hub (best effort)
-      const hubNode = useNodeStore.getState().hubNode;
-      if (hubNode && hubNode.id !== newNodeId) {
-        try {
-          const result = await getNodeApi(hubNode.id).addNode({
-            address: trimmedHost,
-            api_key: apiKey.trim(),
-            name,
-          });
-          await useNodeStore.getState().updateNodeHubRemoteId(newNodeId, result.id);
-        } catch {
-          // Hub unreachable — node added locally, will sync later
+      if (isFirstNode) {
+        // First node = Hub. Discover its remote nodes in background.
+        syncWithHub().catch(() => {});
+      } else {
+        // Register on Hub (best effort)
+        const hubNode = useNodeStore.getState().hubNode;
+        if (hubNode && hubNode.id !== newNodeId) {
+          try {
+            const result = await getNodeApi(hubNode.id).addNode({
+              address: trimmedHost,
+              api_key: apiKey.trim(),
+              name,
+            });
+            await useNodeStore.getState().updateNodeHubRemoteId(newNodeId, result.id);
+          } catch {
+            // Hub unreachable — will sync later
+          }
         }
       }
 

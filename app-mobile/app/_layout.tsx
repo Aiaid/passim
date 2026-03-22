@@ -8,6 +8,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { Ionicons } from '@expo/vector-icons';
 import { I18nProvider } from '@/lib/i18n';
 import { useNodeStore } from '@/stores/node-store';
+import { syncWithHub } from '@/hooks/use-hub';
 import { useAuthStore } from '@/stores/auth-store';
 import { usePreferencesStore } from '@/stores/preferences-store';
 import '../global.css';
@@ -31,6 +32,11 @@ function AppContent() {
         usePreferencesStore.getState().loadPreferences(),
       ]);
       setIsReady(true);
+
+      // Sync with Hub in background (discover remote nodes)
+      if (useNodeStore.getState().hubNode) {
+        syncWithHub().catch(() => {});
+      }
     }
     loadStores();
   }, []);

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useNodeStore } from '@/stores/node-store';
 import { getNodeApi } from '@/lib/api';
+import { syncWithHub } from '@/hooks/use-hub';
 import { useTranslation } from '@/lib/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -83,6 +84,7 @@ export default function ScanScreen() {
       try {
         const { token, name } = await loginToNode(payload.host, payload.key);
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const isFirstNode = useNodeStore.getState().nodes.length === 0;
         const newNodeId = await addNode({
           host: payload.host,
           token,
@@ -90,18 +92,21 @@ export default function ScanScreen() {
           apiKey: payload.key,
         });
 
-        // Register on Hub (best effort)
-        const hubNode = useNodeStore.getState().hubNode;
-        if (hubNode && hubNode.id !== newNodeId) {
-          try {
-            const result = await getNodeApi(hubNode.id).addNode({
-              address: payload.host,
-              api_key: payload.key,
-              name: payload.name || name,
-            });
-            await useNodeStore.getState().updateNodeHubRemoteId(newNodeId, result.id);
-          } catch {
-            // Hub unreachable — will sync later
+        if (isFirstNode) {
+          syncWithHub().catch(() => {});
+        } else {
+          const hubNode = useNodeStore.getState().hubNode;
+          if (hubNode && hubNode.id !== newNodeId) {
+            try {
+              const result = await getNodeApi(hubNode.id).addNode({
+                address: payload.host,
+                api_key: payload.key,
+                name: payload.name || name,
+              });
+              await useNodeStore.getState().updateNodeHubRemoteId(newNodeId, result.id);
+            } catch {
+              // Hub unreachable — will sync later
+            }
           }
         }
 

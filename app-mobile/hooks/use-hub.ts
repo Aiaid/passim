@@ -42,106 +42,109 @@ export function useHubNodes() {
 }
 
 /**
- * Migrate local nodes to Hub + discover Hub nodes not in App.
- * Called when the first node is added or on app startup.
+ * Sync local nodes to Hub + discover Hub nodes not in App.
+ * Pure function — can be called from hooks, components, or startup logic.
  */
-export function useMigrateNodesToHub() {
-  return useMutation({
-    mutationFn: async (): Promise<MigrateResult> => {
-      const store = useNodeStore.getState();
-      const { nodes, hubNode, updateNodeHubRemoteId, addNode } = store;
+export async function syncWithHub(): Promise<MigrateResult> {
+  const store = useNodeStore.getState();
+  const { nodes, hubNode, updateNodeHubRemoteId, addNode } = store;
 
-      if (!hubNode) throw new Error('No Hub node');
+  if (!hubNode) throw new Error('No Hub node');
 
-      const hubApi = getNodeApi(hubNode.id);
-      const result: MigrateResult = { synced: 0, discovered: 0, skipped: 0, noKey: 0, failed: 0 };
+  const hubApi = getNodeApi(hubNode.id);
+  const result: MigrateResult = { synced: 0, discovered: 0, skipped: 0, noKey: 0, failed: 0 };
 
-      // Step 1: Get Hub's existing remote nodes
-      let hubRemotes: RemoteNode[];
+  // Step 1: Get Hub's existing remote nodes
+  let hubRemotes: RemoteNode[];
+  try {
+    hubRemotes = await hubApi.getNodes();
+  } catch {
+    throw new Error('Hub unreachable');
+  }
+
+  const hubAddressMap = new Map<string, RemoteNode>();
+  for (const r of hubRemotes) {
+    hubAddressMap.set(r.address, r);
+  }
+
+  // Step 2: Register local nodes on Hub (with dedup)
+  for (const node of nodes) {
+    if (node.id === hubNode.id) continue;
+
+    const existing = hubAddressMap.get(node.host);
+    if (existing) {
+      await updateNodeHubRemoteId(node.id, existing.id);
+      result.skipped++;
+      continue;
+    }
+
+    if (!node.apiKey) {
+      result.noKey++;
+      continue;
+    }
+
+    try {
+      const remote = await hubApi.addNode({
+        address: node.host,
+        api_key: node.apiKey,
+        name: node.name,
+      });
+      await updateNodeHubRemoteId(node.id, remote.id);
+      result.synced++;
+    } catch {
+      result.failed++;
+    }
+  }
+
+  // Step 3: Discover Hub nodes not in App
+  const localHosts = new Set(nodes.map((n) => n.host));
+  for (const remote of hubRemotes) {
+    if (localHosts.has(remote.address)) continue;
+    if (!remote.api_key) continue;
+
+    try {
+      const loginRes = await fetch(`https://${remote.address}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: remote.api_key }),
+      });
+      if (!loginRes.ok) throw new Error('login failed');
+      const loginData = await loginRes.json();
+
+      let name = remote.name || remote.address;
       try {
-        hubRemotes = await hubApi.getNodes();
+        const statusRes = await fetch(`https://${remote.address}/api/status`, {
+          headers: { Authorization: `Bearer ${loginData.token}` },
+        });
+        if (statusRes.ok) {
+          const status = await statusRes.json();
+          name = status?.node?.name || name;
+        }
       } catch {
-        throw new Error('Hub unreachable');
+        // ignore
       }
 
-      const hubAddressMap = new Map<string, RemoteNode>();
-      for (const r of hubRemotes) {
-        hubAddressMap.set(r.address, r);
-      }
+      await addNode({
+        host: remote.address,
+        token: loginData.token,
+        apiKey: remote.api_key,
+        name,
+        hubRemoteId: remote.id,
+      });
+      result.discovered++;
+    } catch {
+      result.failed++;
+    }
+  }
 
-      // Step 2: Register local nodes on Hub (with dedup)
-      for (const node of nodes) {
-        if (node.id === hubNode.id) continue; // Skip Hub itself
+  return result;
+}
 
-        const existing = hubAddressMap.get(node.host);
-        if (existing) {
-          await updateNodeHubRemoteId(node.id, existing.id);
-          result.skipped++;
-          continue;
-        }
-
-        if (!node.apiKey) {
-          result.noKey++;
-          continue;
-        }
-
-        try {
-          const remote = await hubApi.addNode({
-            address: node.host,
-            api_key: node.apiKey,
-            name: node.name,
-          });
-          await updateNodeHubRemoteId(node.id, remote.id);
-          result.synced++;
-        } catch {
-          result.failed++;
-        }
-      }
-
-      // Step 3: Discover Hub nodes not in App
-      const localHosts = new Set(nodes.map((n) => n.host));
-      for (const remote of hubRemotes) {
-        if (localHosts.has(remote.address)) continue;
-        if (!remote.api_key) continue;
-
-        try {
-          const loginRes = await fetch(`https://${remote.address}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: remote.api_key }),
-          });
-          if (!loginRes.ok) throw new Error('login failed');
-          const loginData = await loginRes.json();
-
-          let name = remote.name || remote.address;
-          try {
-            const statusRes = await fetch(`https://${remote.address}/api/status`, {
-              headers: { Authorization: `Bearer ${loginData.token}` },
-            });
-            if (statusRes.ok) {
-              const status = await statusRes.json();
-              name = status?.node?.name || name;
-            }
-          } catch {
-            // ignore
-          }
-
-          await addNode({
-            host: remote.address,
-            token: loginData.token,
-            apiKey: remote.api_key,
-            name,
-            hubRemoteId: remote.id,
-          });
-          result.discovered++;
-        } catch {
-          result.failed++;
-        }
-      }
-
-      return result;
-    },
-  });
+/**
+ * React hook wrapper for syncWithHub.
+ */
+export function useSyncWithHub() {
+  return useMutation({ mutationFn: syncWithHub });
 }
 
 /**

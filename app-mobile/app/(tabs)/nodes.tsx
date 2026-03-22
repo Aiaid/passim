@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useStatus } from '@/hooks/use-node';
 import { useNodeStore } from '@/stores/node-store';
+import { syncWithHub } from '@/hooks/use-hub';
 import { useMultiNodeSSE } from '@/hooks/use-sse';
 import { countryFlag } from '@/lib/utils';
 import { StatusDot } from '@/components/StatusDot';
@@ -94,8 +95,12 @@ export default function NodesScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // SSE handles real-time updates; pull-to-refresh is just a visual affordance
-    setTimeout(() => setRefreshing(false), 500);
+    try {
+      await syncWithHub();
+    } catch {
+      // Hub unreachable — ignore
+    }
+    setRefreshing(false);
   }, []);
 
   const renderNode = useCallback(
