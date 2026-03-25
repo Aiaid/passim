@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -27,10 +28,28 @@ type SystemMetrics struct {
 	Load1        float64 `json:"load_1"`
 	Load5        float64 `json:"load_5"`
 	Load15       float64 `json:"load_15"`
-	NetBytesSent uint64  `json:"net_bytes_sent"`
-	NetBytesRecv uint64  `json:"net_bytes_recv"`
+	NetBytesSent uint64  `json:"net_bytes_sent"` // rate: bytes/s
+	NetBytesRecv uint64  `json:"net_bytes_recv"` // rate: bytes/s
 	OS           string  `json:"os"`
 	Kernel       string  `json:"kernel"`
+}
+
+var (
+	prevMu       sync.Mutex
+	prevTime     time.Time
+	prevSent     uint64
+	prevRecv     uint64
+	prevHasValue bool
+)
+
+// resetPrev resets the previous sample state (for testing).
+func resetPrev() {
+	prevMu.Lock()
+	prevHasValue = false
+	prevSent = 0
+	prevRecv = 0
+	prevTime = time.Time{}
+	prevMu.Unlock()
 }
 
 func Collect(ctx context.Context) (*SystemMetrics, error) {
@@ -74,8 +93,23 @@ func Collect(ctx context.Context) (*SystemMetrics, error) {
 	}
 
 	if counters, err := net.IOCountersWithContext(ctx, false); err == nil && len(counters) > 0 {
-		m.NetBytesSent = counters[0].BytesSent
-		m.NetBytesRecv = counters[0].BytesRecv
+		now := time.Now()
+		sent := counters[0].BytesSent
+		recv := counters[0].BytesRecv
+
+		prevMu.Lock()
+		if prevHasValue {
+			dt := now.Sub(prevTime).Seconds()
+			if dt > 0 {
+				m.NetBytesSent = uint64(float64(sent-prevSent) / dt)
+				m.NetBytesRecv = uint64(float64(recv-prevRecv) / dt)
+			}
+		}
+		prevTime = now
+		prevSent = sent
+		prevRecv = recv
+		prevHasValue = true
+		prevMu.Unlock()
 	}
 
 	return m, nil

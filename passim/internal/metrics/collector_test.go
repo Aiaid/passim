@@ -6,6 +6,7 @@ import (
 )
 
 func TestCollect_ReturnsNonZeroValues(t *testing.T) {
+	resetPrev()
 	m, err := Collect(context.Background())
 	if err != nil {
 		t.Fatalf("Collect() returned error: %v", err)
@@ -35,6 +36,7 @@ func TestCollect_ReturnsNonZeroValues(t *testing.T) {
 }
 
 func TestCollect_CPUModelNotEmpty(t *testing.T) {
+	resetPrev()
 	m, err := Collect(context.Background())
 	if err != nil {
 		t.Fatalf("Collect() returned error: %v", err)
@@ -47,6 +49,7 @@ func TestCollect_CPUModelNotEmpty(t *testing.T) {
 }
 
 func TestCollect_MemoryUsageReasonable(t *testing.T) {
+	resetPrev()
 	m, err := Collect(context.Background())
 	if err != nil {
 		t.Fatalf("Collect() returned error: %v", err)
@@ -61,6 +64,7 @@ func TestCollect_MemoryUsageReasonable(t *testing.T) {
 }
 
 func TestCollect_DiskUsageReasonable(t *testing.T) {
+	resetPrev()
 	m, err := Collect(context.Background())
 	if err != nil {
 		t.Fatalf("Collect() returned error: %v", err)
@@ -71,5 +75,46 @@ func TestCollect_DiskUsageReasonable(t *testing.T) {
 	}
 	if m.DiskPercent < 0 || m.DiskPercent > 100 {
 		t.Errorf("DiskPercent out of range: %f", m.DiskPercent)
+	}
+}
+
+func TestCollect_NetworkRateZeroOnFirstSample(t *testing.T) {
+	resetPrev()
+	m, err := Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect() returned error: %v", err)
+	}
+
+	// First call has no previous sample, so rate should be 0
+	if m.NetBytesSent != 0 {
+		t.Errorf("expected NetBytesSent=0 on first sample, got %d", m.NetBytesSent)
+	}
+	if m.NetBytesRecv != 0 {
+		t.Errorf("expected NetBytesRecv=0 on first sample, got %d", m.NetBytesRecv)
+	}
+}
+
+func TestCollect_NetworkRateNonNegativeOnSecondSample(t *testing.T) {
+	resetPrev()
+	// First sample seeds the previous values
+	_, err := Collect(context.Background())
+	if err != nil {
+		t.Fatalf("first Collect() returned error: %v", err)
+	}
+
+	// Second sample should compute a rate >= 0
+	m2, err := Collect(context.Background())
+	if err != nil {
+		t.Fatalf("second Collect() returned error: %v", err)
+	}
+
+	// Rate should be non-negative (can be 0 if no traffic between samples)
+	// Just verify it doesn't return impossibly large values (old cumulative bug)
+	const maxReasonableRate = 10 * 1024 * 1024 * 1024 // 10 GB/s
+	if m2.NetBytesSent > maxReasonableRate {
+		t.Errorf("NetBytesSent rate looks like cumulative, not rate: %d", m2.NetBytesSent)
+	}
+	if m2.NetBytesRecv > maxReasonableRate {
+		t.Errorf("NetBytesRecv rate looks like cumulative, not rate: %d", m2.NetBytesRecv)
 	}
 }
