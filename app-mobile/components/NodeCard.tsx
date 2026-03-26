@@ -1,6 +1,6 @@
 import { View, Text, Pressable } from 'react-native';
 import type { RemoteNode } from '@passim/shared/types';
-import { countryFlag } from '@/lib/utils';
+import { countryFlag, formatNetworkRate } from '@/lib/utils';
 import { StatusDot } from '@/components/StatusDot';
 
 export interface NodeCardProps {
@@ -49,6 +49,10 @@ export function NodeCard({ node, onPress }: NodeCardProps) {
         <View className="mb-2">
           <BarGauge label="CPU" value={node.metrics.cpu_percent} />
           <BarGauge label="MEM" value={node.metrics.memory_percent} />
+          <View className="flex-row items-center gap-3 mt-1.5">
+            <Text className="text-gray-400 text-xs">↓ {formatNetworkRate(node.metrics.net_bytes_recv)}</Text>
+            <Text className="text-gray-400 text-xs">↑ {formatNetworkRate(node.metrics.net_bytes_sent)}</Text>
+          </View>
         </View>
       ) : null}
 

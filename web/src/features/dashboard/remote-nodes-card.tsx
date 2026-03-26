@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { useEventStream } from '@/hooks/use-event-stream';
-import { cn } from '@/lib/utils';
+import { cn, formatNetworkRate } from '@/lib/utils';
 import { api, type RemoteNode } from '@/lib/api-client';
 
 function countryFlag(code: string): string {
@@ -113,6 +113,10 @@ function NodeRow({ node, onClick }: { node: RemoteNode; onClick?: () => void }) 
             <span className="text-[10px] text-muted-foreground w-6 shrink-0">DISK</span>
             <MetricBar value={m.disk_percent} color="var(--color-chart-4)" />
             <span className="text-[10px] text-muted-foreground tabular-nums w-7 text-right">{m.disk_percent.toFixed(0)}%</span>
+          </div>
+          <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-0.5 tabular-nums">
+            <span>↓ {formatNetworkRate(m.net_bytes_recv)}</span>
+            <span>↑ {formatNetworkRate(m.net_bytes_sent)}</span>
           </div>
         </div>
       )}

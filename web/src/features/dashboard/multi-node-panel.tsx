@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { useEventStream } from '@/hooks/use-event-stream';
 import { api, type RemoteNode, type AppResponse, type TemplateSummary } from '@/lib/api-client';
-import { cn, formatUptime } from '@/lib/utils';
+import { cn, formatUptime, formatNetworkRate } from '@/lib/utils';
 
 export interface MultiNodePanelProps {
   onNodeClick?: (nodeId: string) => void;
@@ -135,6 +135,10 @@ function RemoteNodeRow({ node, expanded, onToggle, onDetail }: {
               <MetricBar label="CPU" percent={node.metrics.cpu_percent} color="var(--color-chart-1)" />
               <MetricBar label="MEM" percent={node.metrics.memory_percent} color="var(--color-chart-2)" />
               <MetricBar label="DSK" percent={node.metrics.disk_percent} color="var(--color-chart-4)" />
+              <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-1 tabular-nums">
+                <span>↓ {formatNetworkRate(node.metrics.net_bytes_recv)}</span>
+                <span>↑ {formatNetworkRate(node.metrics.net_bytes_sent)}</span>
+              </div>
               <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5 pt-1.5 border-t border-border">
                 <span className="font-mono">{node.address}</span>
                 {onDetail && (
