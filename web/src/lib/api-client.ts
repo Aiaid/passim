@@ -229,7 +229,7 @@ export interface StatusResponse {
     cpu: { usage_percent: number; cores: number; model: string };
     memory: { total_bytes: number; used_bytes: number; usage_percent: number };
     disk: { total_bytes: number; used_bytes: number; usage_percent: number };
-    network: { rx_bytes: number; tx_bytes: number };
+    network: { rx_rate: number; tx_rate: number };
     load: { load1: number; load5: number; load15: number };
     os: string;
     kernel: string;

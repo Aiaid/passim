@@ -35,9 +35,11 @@ type NodeInfo struct {
 
 // NodeMetrics holds lightweight metrics from a remote node.
 type NodeMetrics struct {
-	CPUPercent    float64            `json:"cpu_percent"`
+	CPUPercent    float64           `json:"cpu_percent"`
 	MemoryPercent float64           `json:"memory_percent"`
 	DiskPercent   float64           `json:"disk_percent"`
+	NetBytesSent  uint64            `json:"net_bytes_sent"`
+	NetBytesRecv  uint64            `json:"net_bytes_recv"`
 	Containers    ContainersSummary `json:"containers"`
 }
 

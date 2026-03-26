@@ -347,8 +347,8 @@ func buildStatusResponse(ctx context.Context, deps Deps, cache *metricsCache) st
 				UsagePercent: m.DiskPercent,
 			},
 			Network: networkInfo{
-				RxBytes: m.NetBytesRecv,
-				TxBytes: m.NetBytesSent,
+				RxRate: m.NetBytesRecv,
+				TxRate: m.NetBytesSent,
 			},
 			Load: loadInfo{
 				Load1:  m.Load1,

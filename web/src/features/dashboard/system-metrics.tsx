@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Cpu, MemoryStick, HardDrive, Network } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useEventStream } from '@/hooks/use-event-stream';
-import { formatBytes } from '@/lib/utils';
+import { formatBytes, formatNetworkRate } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 
 interface GaugeCardProps {
@@ -152,13 +152,13 @@ export function SystemMetrics() {
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{t('dashboard.rx')}</span>
               <span className="text-sm font-bold tabular-nums">
-                {formatBytes(latest.net_bytes_recv ?? 0)}/s
+                {formatNetworkRate(latest.net_bytes_recv ?? 0)}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{t('dashboard.tx')}</span>
               <span className="text-sm font-bold tabular-nums">
-                {formatBytes(latest.net_bytes_sent ?? 0)}/s
+                {formatNetworkRate(latest.net_bytes_sent ?? 0)}
               </span>
             </div>
           </div>

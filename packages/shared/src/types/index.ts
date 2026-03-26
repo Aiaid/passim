@@ -14,7 +14,7 @@ export interface StatusResponse {
     cpu: { usage_percent: number; cores: number; model: string };
     memory: { total_bytes: number; used_bytes: number; usage_percent: number };
     disk: { total_bytes: number; used_bytes: number; usage_percent: number };
-    network: { rx_bytes: number; tx_bytes: number };
+    network: { rx_rate: number; tx_rate: number };
     load: { load1: number; load5: number; load15: number };
     os: string;
     kernel: string;
@@ -205,6 +205,8 @@ export interface RemoteNode {
     cpu_percent: number;
     memory_percent: number;
     disk_percent: number;
+    net_bytes_sent: number;
+    net_bytes_recv: number;
     containers: { running: number; total: number };
   };
   containers?: Array<{ name: string; state: string; image: string }>;

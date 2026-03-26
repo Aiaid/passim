@@ -53,8 +53,8 @@ type diskInfo struct {
 }
 
 type networkInfo struct {
-	RxBytes uint64 `json:"rx_bytes"`
-	TxBytes uint64 `json:"tx_bytes"`
+	RxRate uint64 `json:"rx_rate"`
+	TxRate uint64 `json:"tx_rate"`
 }
 
 type loadInfo struct {
@@ -215,8 +215,8 @@ func statusHandler(deps Deps) gin.HandlerFunc {
 					UsagePercent: m.DiskPercent,
 				},
 				Network: networkInfo{
-					RxBytes: m.NetBytesRecv,
-					TxBytes: m.NetBytesSent,
+					RxRate: m.NetBytesRecv,
+					TxRate: m.NetBytesSent,
 				},
 				Load: loadInfo{
 					Load1:  m.Load1,

@@ -244,9 +244,11 @@ func (h *Hub) handleSSEEvent(rc *RemoteConn, nodeID, eventType, data string) {
 		// Remote node sends metrics.SystemMetrics which uses "mem_percent",
 		// not "memory_percent". Parse with matching field names.
 		var raw struct {
-			CPUPercent  float64 `json:"cpu_percent"`
-			MemPercent  float64 `json:"mem_percent"`
-			DiskPercent float64 `json:"disk_percent"`
+			CPUPercent   float64 `json:"cpu_percent"`
+			MemPercent   float64 `json:"mem_percent"`
+			DiskPercent  float64 `json:"disk_percent"`
+			NetBytesSent uint64  `json:"net_bytes_sent"`
+			NetBytesRecv uint64  `json:"net_bytes_recv"`
 		}
 		if err := json.Unmarshal([]byte(data), &raw); err != nil {
 			log.Printf("[hub] node %s: failed to parse metrics: %v", nodeID, err)
@@ -257,6 +259,8 @@ func (h *Hub) handleSSEEvent(rc *RemoteConn, nodeID, eventType, data string) {
 			CPUPercent:    raw.CPUPercent,
 			MemoryPercent: raw.MemPercent,
 			DiskPercent:   raw.DiskPercent,
+			NetBytesSent:  raw.NetBytesSent,
+			NetBytesRecv:  raw.NetBytesRecv,
 		}
 		rc.mu.Unlock()
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cn, formatBytes, formatUptime, localized } from './utils'
+import { cn, formatBytes, formatNetworkRate, formatUptime, localized } from './utils'
 
 describe('formatBytes', () => {
   it('returns "0 B" for 0 bytes', () => {
@@ -16,6 +16,32 @@ describe('formatBytes', () => {
 
   it('returns "1 GB" for 1073741824 bytes', () => {
     expect(formatBytes(1073741824)).toBe('1 GB')
+  })
+})
+
+describe('formatNetworkRate', () => {
+  it('returns "0 B/s" for 0', () => {
+    expect(formatNetworkRate(0)).toBe('0 B/s')
+  })
+
+  it('returns "500 B/s" for 500', () => {
+    expect(formatNetworkRate(500)).toBe('500 B/s')
+  })
+
+  it('returns "1.0 KB/s" for 1024', () => {
+    expect(formatNetworkRate(1024)).toBe('1.0 KB/s')
+  })
+
+  it('returns "1.5 KB/s" for 1536', () => {
+    expect(formatNetworkRate(1536)).toBe('1.5 KB/s')
+  })
+
+  it('returns "10 KB/s" for 10240', () => {
+    expect(formatNetworkRate(10240)).toBe('10 KB/s')
+  })
+
+  it('returns "1.0 MB/s" for 1048576', () => {
+    expect(formatNetworkRate(1048576)).toBe('1.0 MB/s')
   })
 })
 

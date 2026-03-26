@@ -128,7 +128,7 @@ describe('EventStreamProvider', () => {
           cpu: { usage_percent: 10, cores: 4, model: 'test' },
           memory: { total_bytes: 8000, used_bytes: 4000, usage_percent: 50 },
           disk: { total_bytes: 100, used_bytes: 50, usage_percent: 50 },
-          network: { rx_bytes: 0, tx_bytes: 0 },
+          network: { rx_rate: 0, tx_rate: 0 },
           load: { load1: 1, load5: 1, load15: 1 },
           os: 'linux',
           kernel: '5.0',
