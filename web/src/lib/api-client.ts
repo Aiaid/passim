@@ -414,6 +414,8 @@ export interface RemoteNode {
     cpu_percent: number;
     memory_percent: number;
     disk_percent: number;
+    net_bytes_sent: number;
+    net_bytes_recv: number;
     containers: { running: number; total: number };
   };
   containers?: Array<{ name: string; state: string; image: string }>;
