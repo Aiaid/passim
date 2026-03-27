@@ -15,14 +15,19 @@
       "supportsTablet": true,
       "bundleIdentifier": "io.passim.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Scan QR code to connect to your Passim server"
+        "NSCameraUsageDescription": "Scan QR code to connect to your Passim server",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#000000"
       },
-      "package": "io.passim.app"
+      "package": "io.passim.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -40,7 +45,15 @@
           "color": "#30d158"
         }
       ],
-      "expo-asset"
-    ]
+      "expo-asset",
+      "expo-sharing"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ccdf2aa5-7aaf-4980-a9c1-f5c1619381f1"
+      }
+    },
+    "owner": "anend"
   }
 }
