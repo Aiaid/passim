@@ -45,8 +45,7 @@
           "color": "#30d158"
         }
       ],
-      "expo-asset",
-      "expo-sharing"
+      "expo-asset"
     ],
     "extra": {
       "router": {},
