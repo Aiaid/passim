@@ -1,0 +1,74 @@
+# US-10.6: Deploy to multiple targets
+# Verifies the deploy flow with target selection: Apps tab -> Deploy ->
+# template list -> select template -> configure -> select targets -> deploy.
+# Requires at least one remote node to be connected.
+
+appId: io.passim.app
+env:
+  TEST_HOST: "localhost:8443"
+  TEST_API_KEY: ""
+---
+# Start from a connected dashboard
+- runFlow: helpers/setup-node.yaml
+
+# Navigate to the Apps tab
+- tapOn: "Apps"
+
+# Tap the deploy button to open the marketplace/template list
+- tapOn:
+    id: "btn-deploy"
+
+# Template list should appear
+- extendedWaitUntil:
+    visible:
+      id: "template-list"
+    timeout: 10000
+
+# Select a template (WireGuard is the primary app template)
+- tapOn:
+    id: "template-wireguard"
+    optional: true
+
+# If template-wireguard is not found, tap the first visible template
+- tapOn:
+    text: ".*"
+    index: 0
+    optional: true
+
+# Step 1 -> Step 2: Configuration
+- tapOn:
+    text: "Next"
+
+# Wait for configure step
+- extendedWaitUntil:
+    visible:
+      text: "Configure"
+    timeout: 5000
+
+# Step 2 -> Step 3: Target Selection (only appears if remote nodes exist)
+- tapOn:
+    text: "Next"
+    optional: true
+
+# If target selection step appears, verify node targets are shown
+- extendedWaitUntil:
+    visible:
+      text: "Select Targets"
+    timeout: 3000
+    optional: true
+
+# Deploy button should be present
+- extendedWaitUntil:
+    visible:
+      id: "btn-deploy-confirm"
+    timeout: 5000
+
+# Confirm the deployment
+- tapOn:
+    id: "btn-deploy-confirm"
+
+# Wait for deployment to complete and return to the apps list
+- extendedWaitUntil:
+    visible:
+      id: "app-list"
+    timeout: 30000
