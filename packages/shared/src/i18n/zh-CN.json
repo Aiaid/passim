@@ -396,5 +396,17 @@
     "done": "完成",
     "view_apps": "查看应用",
     "node_offline": "离线"
+  },
+  "share": {
+    "your_connection": "你的连接",
+    "unavailable": "链接不可用",
+    "unavailable_desc": "此分享链接已过期或已撤销。请联系发送者获取新链接。",
+    "missing_host": "无效的分享链接",
+    "missing_host_desc": "此分享链接缺少服务器地址。请打开完整的分享链接。",
+    "limitations": "已知限制",
+    "how_to_connect": "如何连接",
+    "download_all_zip": "下载全部 (ZIP)",
+    "download_failed": "文件下载失败",
+    "qr_failed": "加载二维码内容失败"
   }
 }

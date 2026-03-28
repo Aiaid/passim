@@ -396,5 +396,17 @@
     "done": "Done",
     "view_apps": "View Apps",
     "node_offline": "Offline"
+  },
+  "share": {
+    "your_connection": "Your Connection",
+    "unavailable": "Link unavailable",
+    "unavailable_desc": "This share link has expired or been revoked. Ask the sender for a new link.",
+    "missing_host": "Invalid share link",
+    "missing_host_desc": "This share link is missing the server address. Please open the full share URL.",
+    "limitations": "Limitations",
+    "how_to_connect": "How to Connect",
+    "download_all_zip": "Download All (ZIP)",
+    "download_failed": "Failed to download file",
+    "qr_failed": "Failed to load QR content"
   }
 }

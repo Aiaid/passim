@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ActivityIndicator, AppState, type AppStateStatus } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as Linking from 'expo-linking';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Ionicons } from '@expo/vector-icons';
 import { I18nProvider } from '@/lib/i18n';
@@ -80,6 +81,33 @@ function AppContent() {
     return () => sub.remove();
   }, []);
 
+  // Handle deep links for share URLs (https://host/s/{token})
+  useEffect(() => {
+    function handleURL(event: { url: string }) {
+      try {
+        const parsed = new URL(event.url);
+        // Match /s/{token} path pattern
+        const match = parsed.pathname.match(/^\/s\/([^/]+)$/);
+        if (match) {
+          const token = match[1];
+          const host = parsed.host;
+          router.push({ pathname: '/share/[token]', params: { token, host } });
+        }
+      } catch {
+        // Not a valid URL, ignore
+      }
+    }
+
+    // Handle URL that launched the app
+    Linking.getInitialURL().then((url) => {
+      if (url) handleURL({ url });
+    });
+
+    // Handle URLs while app is running
+    const sub = Linking.addEventListener('url', handleURL);
+    return () => sub.remove();
+  }, []);
+
   if (!isReady) {
     return (
       <View className="flex-1 bg-black items-center justify-center">
@@ -94,6 +122,7 @@ function AppContent() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="share/[token]" />
       </Stack>
       {/* Lock overlay — keeps Stack mounted to preserve navigation state */}
       {locked && (
