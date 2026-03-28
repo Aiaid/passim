@@ -6,7 +6,6 @@ import * as THREE from 'three';
 import { api, type StatusResponse, type RemoteNode } from '@/lib/api-client';
 import { usePreferencesStore } from '@/stores/preferences-store';
 import { useEventStream } from '@/hooks/use-event-stream';
-import { formatUptime } from '@/lib/utils';
 
 // ── Country code → approximate lat/lon ──────────────────────────────
 const COUNTRY_COORDS: Record<string, [number, number]> = {
@@ -278,15 +277,15 @@ function MarkerBillboard({
             <div className="node-billboard-stat">
               <span className="node-billboard-stat-value">{containers.running}</span>
               <span className="node-billboard-stat-label">
-                {containers.running === 1 ? 'CTR' : 'CTRs'}
+                CTR
               </span>
             </div>
           </div>
 
           {/* Footer */}
           <div className="node-billboard-footer">
+            {node.version && <span>{node.version}</span>}
             <span>{node.public_ip ?? '—'}</span>
-            <span>up {formatUptime(node.uptime)}</span>
           </div>
 
           {/* Triangle pointer */}
@@ -597,12 +596,12 @@ function LocalBillboardCol({ data }: { data: StatusResponse }) {
         <div className="node-billboard-divider" />
         <div className="node-billboard-stat">
           <span className="node-billboard-stat-value">{containers.running}</span>
-          <span className="node-billboard-stat-label">{containers.running === 1 ? 'CTR' : 'CTRs'}</span>
+          <span className="node-billboard-stat-label">CTR</span>
         </div>
       </div>
       <div className="node-billboard-footer">
+        {node.version && <span>{node.version}</span>}
         <span>{node.public_ip ?? '—'}</span>
-        <span>up {formatUptime(node.uptime)}</span>
       </div>
     </>
   );

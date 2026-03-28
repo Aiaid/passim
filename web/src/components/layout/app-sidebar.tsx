@@ -82,6 +82,11 @@ export function AppSidebar() {
             </>
           )}
         </Link>
+        {state !== 'collapsed' && versionInfo?.version && (
+          <span className="text-[10px] font-mono text-muted-foreground/40 -mt-1 ml-1">
+            {versionInfo.version}
+          </span>
+        )}
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -153,16 +158,6 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
-          {/* Version display */}
-          {state !== 'collapsed' && versionInfo?.version && (
-            <SidebarMenuItem>
-              <div className="px-3 py-1.5">
-                <span className="text-xs font-mono text-muted-foreground/50">
-                  {versionInfo.version}
-                </span>
-              </div>
-            </SidebarMenuItem>
-          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
