@@ -193,9 +193,27 @@ export default function NodeDetailScreen() {
                 {t('dashboard.containers')}
               </Text>
               <View className="gap-3 mb-6">
-                {containers.map((container: Container) => (
-                  <ContainerCard key={container.Id} container={container} />
-                ))}
+                {containers.map((container: Container) => {
+                  const cName = container.Names[0]?.replace(/^\//, '') ?? container.Id.slice(0, 12);
+                  return (
+                    <ContainerCard
+                      key={container.Id}
+                      container={container}
+                      onViewLogs={() => {
+                        router.push({
+                          pathname: '/containers/[id]/logs',
+                          params: { id: container.Id, name: cName },
+                        });
+                      }}
+                      onViewTerminal={() => {
+                        router.push({
+                          pathname: '/containers/[id]/terminal',
+                          params: { id: container.Id, name: cName },
+                        });
+                      }}
+                    />
+                  );
+                })}
               </View>
             </>
           ) : null}

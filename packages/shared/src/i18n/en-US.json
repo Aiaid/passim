@@ -164,7 +164,14 @@
     "confirm_remove_title": "Remove Container",
     "no_containers": "No containers",
     "no_containers_desc": "Containers will appear here after deploying apps",
-    "id": "ID"
+    "id": "ID",
+    "auto_scroll": "Auto-scroll",
+    "no_logs": "No logs available",
+    "view_logs": "Logs",
+    "view_terminal": "Terminal",
+    "terminal_placeholder": "Type a command...",
+    "terminal_reconnect": "Reconnect",
+    "terminal_session_ended": "— session ended —"
   },
   "app": {
     "title": "Apps",

@@ -164,7 +164,14 @@
     "confirm_remove_title": "删除容器",
     "no_containers": "没有容器",
     "no_containers_desc": "部署应用后将在此显示容器",
-    "id": "ID"
+    "id": "ID",
+    "auto_scroll": "自动滚动",
+    "no_logs": "暂无日志",
+    "view_logs": "日志",
+    "view_terminal": "终端",
+    "terminal_placeholder": "输入命令...",
+    "terminal_reconnect": "重新连接",
+    "terminal_session_ended": "— 会话已结束 —"
   },
   "app": {
     "title": "应用",

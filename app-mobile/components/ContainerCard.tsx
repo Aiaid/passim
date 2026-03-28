@@ -10,6 +10,8 @@ export interface ContainerCardProps {
   onStart?: () => void;
   onStop?: () => void;
   onRestart?: () => void;
+  onViewLogs?: () => void;
+  onViewTerminal?: () => void;
 }
 
 function mapState(state: string): StatusDotProps['status'] {
@@ -63,6 +65,8 @@ export function ContainerCard({
   onStart,
   onStop,
   onRestart,
+  onViewLogs,
+  onViewTerminal,
 }: ContainerCardProps) {
   const name = containerName(container.Names);
   const isRunning = container.State === 'running';
@@ -85,13 +89,19 @@ export function ContainerCard({
       </Text>
       <Text className="text-gray-500 text-xs mb-3">{container.Status}</Text>
 
-      <View className="flex-row gap-2">
+      <View className="flex-row gap-2 flex-wrap">
         {!isRunning ? (
           <ActionButton icon="play" label="Start" color="#30d158" onPress={onStart} />
         ) : (
           <ActionButton icon="stop" label="Stop" color="#ff453a" onPress={onStop} />
         )}
         <ActionButton icon="refresh" label="Restart" color="#ffd60a" onPress={onRestart} />
+        {onViewLogs && (
+          <ActionButton icon="document-text" label="Logs" color="#0a84ff" onPress={onViewLogs} />
+        )}
+        {onViewTerminal && isRunning && (
+          <ActionButton icon="terminal" label="Terminal" color="#bf5af2" onPress={onViewTerminal} />
+        )}
       </View>
     </Pressable>
   );

@@ -178,6 +178,41 @@ export default function AppDetailScreen() {
             <ClientConfig nodeId={nodeId} appId={id} templateName={app.template} />
           </View>
 
+          {/* Container Tools */}
+          {containerId ? (
+            <>
+              <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                {t('app.container')}
+              </Text>
+              <View className="flex-row gap-3 mb-4">
+                <ActionButton
+                  testID="btn-app-logs"
+                  icon="document-text"
+                  label={t('container.view_logs')}
+                  color="#0a84ff"
+                  onPress={() => {
+                    router.push({
+                      pathname: '/containers/[id]/logs',
+                      params: { id: containerId, name: app!.template },
+                    });
+                  }}
+                />
+                <ActionButton
+                  testID="btn-app-terminal"
+                  icon="terminal"
+                  label={t('container.view_terminal')}
+                  color="#bf5af2"
+                  onPress={() => {
+                    router.push({
+                      pathname: '/containers/[id]/terminal',
+                      params: { id: containerId, name: app!.template },
+                    });
+                  }}
+                />
+              </View>
+            </>
+          ) : null}
+
           {/* Actions */}
           <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
             {t('common.actions')}
