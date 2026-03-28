@@ -369,5 +369,17 @@
     "remove_node_confirm": "确定要移除 \"{{name}}\" 吗？此操作不可撤销。",
     "passkey_register_web": "Passkey 注册仅支持 Web 端。请在桌面浏览器中打开 Passim 来注册新的 Passkey。",
     "register_passkey": "注册新 Passkey"
+  },
+  "share": {
+    "your_connection": "你的连接",
+    "unavailable": "链接不可用",
+    "unavailable_desc": "此分享链接已过期或已撤销。请联系发送者获取新链接。",
+    "missing_host": "无效的分享链接",
+    "missing_host_desc": "此分享链接缺少服务器地址。请打开完整的分享链接。",
+    "limitations": "已知限制",
+    "how_to_connect": "如何连接",
+    "download_all_zip": "下载全部 (ZIP)",
+    "download_failed": "文件下载失败",
+    "qr_failed": "加载二维码内容失败"
   }
 }
