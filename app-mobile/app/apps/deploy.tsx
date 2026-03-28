@@ -26,12 +26,17 @@ import { localized } from '@/lib/utils';
 import { StatusDot } from '@/components/StatusDot';
 import { useTranslation } from '@/lib/i18n';
 
+const CATEGORIES = ['all', 'vpn', 'storage', 'proxy', 'remote', 'tools'] as const;
+type Category = (typeof CATEGORIES)[number];
+
 const CATEGORY_COLORS: Record<string, string> = {
   vpn: '#30d158',
   media: '#5e5ce6',
   storage: '#0a84ff',
+  proxy: '#ff9f0a',
   network: '#ff9f0a',
   remote: '#bf5af2',
+  tools: '#ff453a',
 };
 
 // --- Reusable sub-components ---
@@ -315,6 +320,9 @@ export default function DeployScreen() {
   const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<Category>('all');
+  const searchInputRef = useRef<TextInput>(null);
 
   const activeNodeId = useNodeStore((s) => s.activeNodeId) ?? '';
   const allNodes = useNodeStore((s) => s.nodes);
@@ -338,6 +346,18 @@ export default function DeployScreen() {
 
   // Total steps: 2 if single node, 3 if we have remote nodes
   const totalSteps = hasRemoteNodes ? 3 : 2;
+
+  const filteredTemplates = useMemo(() => {
+    if (!templates) return [];
+    return templates.filter((tpl: TemplateSummary) => {
+      const matchCategory = category === 'all' || tpl.category === category;
+      const matchSearch =
+        !search || tpl.name.toLowerCase().includes(search.toLowerCase());
+      return matchCategory && matchSearch;
+    });
+  }, [templates, category, search]);
+
+  const hasFilter = category !== 'all' || search.length > 0;
 
   // Initialize settings from template defaults when moving to step 2
   const initSettings = useCallback(
@@ -634,23 +654,92 @@ export default function DeployScreen() {
       {/* Step 1: Template Selection */}
       {step === 1 ? (
         <>
+          {/* Search Bar */}
+          <View className="px-4 mt-1 mb-2">
+            <View className="flex-row items-center bg-gray-900 rounded-xl px-3">
+              <Ionicons name="search" size={18} color="#666" />
+              <TextInput
+                ref={searchInputRef}
+                testID="search-input"
+                className="flex-1 text-white text-base py-3 px-2"
+                placeholder={t('marketplace.search')}
+                placeholderTextColor="#555"
+                value={search}
+                onChangeText={setSearch}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+              />
+              {search.length > 0 ? (
+                <Pressable
+                  onPress={() => {
+                    setSearch('');
+                    searchInputRef.current?.blur();
+                  }}
+                  hitSlop={8}
+                >
+                  <Ionicons name="close-circle" size={18} color="#666" />
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+
+          {/* Category Filter Pills */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+            className="mb-2"
+            style={{ flexGrow: 0 }}
+          >
+            {CATEGORIES.map((cat) => {
+              const isActive = category === cat;
+              const pillColor = cat === 'all' ? '#30d158' : (CATEGORY_COLORS[cat] ?? '#666');
+              return (
+                <Pressable
+                  key={cat}
+                  testID={`category-${cat}`}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setCategory(cat);
+                  }}
+                  className="rounded-full px-4 py-2"
+                  style={{
+                    backgroundColor: isActive ? pillColor : 'transparent',
+                    borderWidth: 1,
+                    borderColor: isActive ? pillColor : '#333',
+                  }}
+                >
+                  <Text
+                    className="text-sm font-medium"
+                    style={{ color: isActive ? (cat === 'tools' ? '#fff' : '#000') : '#aaa' }}
+                  >
+                    {t(`marketplace.${cat}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
           <ScrollView testID="template-list" className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 100 }}>
             {templatesLoading ? (
               <ActivityIndicator size="large" color="#30d158" className="mt-12" />
-            ) : templates?.length ? (
+            ) : filteredTemplates.length > 0 ? (
               <View className="gap-3 mt-2">
-                {templates.map((tmpl: TemplateSummary) => (
+                {filteredTemplates.map((tpl: TemplateSummary) => (
                   <TemplateCard
-                    key={tmpl.name}
-                    template={tmpl}
-                    selected={selectedTemplate === tmpl.name}
-                    onPress={() => handleSelectTemplate(tmpl.name)}
+                    key={tpl.name}
+                    template={tpl}
+                    selected={selectedTemplate === tpl.name}
+                    onPress={() => handleSelectTemplate(tpl.name)}
                   />
                 ))}
               </View>
             ) : (
               <View className="items-center mt-12">
-                <Text className="text-gray-500">{t('mobile.no_templates')}</Text>
+                <Text className="text-gray-500">
+                  {hasFilter ? t('marketplace.no_match') : t('mobile.no_templates')}
+                </Text>
               </View>
             )}
           </ScrollView>
