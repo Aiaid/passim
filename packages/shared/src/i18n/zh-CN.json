@@ -368,6 +368,26 @@
     "unable_fetch_status": "无法获取节点状态",
     "remove_node_confirm": "确定要移除 \"{{name}}\" 吗？此操作不可撤销。",
     "passkey_register_web": "Passkey 注册仅支持 Web 端。请在桌面浏览器中打开 Passim 来注册新的 Passkey。",
-    "register_passkey": "注册新 Passkey"
+    "register_passkey": "注册新 Passkey",
+    "select_targets": "选择目标",
+    "deploy_targets": "部署目标",
+    "deploy_to_nodes": "部署到所选节点",
+    "local_server": "本机（本地）",
+    "select_all": "全选",
+    "deselect_all": "取消全选",
+    "no_targets_selected": "至少选择一个目标节点",
+    "deploying_to_nodes": "正在部署到 {{count}} 个节点...",
+    "deploy_progress": "部署进度",
+    "deploy_pending": "等待中",
+    "deploy_in_progress": "部署中",
+    "deploy_succeeded": "已部署",
+    "deploy_node_failed": "失败",
+    "overall_progress": "{{done}}/{{total}} 已完成",
+    "retry_failed": "重试失败项",
+    "all_succeeded": "所有部署均已成功",
+    "some_failed": "{{failed}}/{{total}} 个部署失败",
+    "done": "完成",
+    "view_apps": "查看应用",
+    "node_offline": "离线"
   }
 }

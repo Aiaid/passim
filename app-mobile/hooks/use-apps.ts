@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
 import { getNodeApi } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 
@@ -82,5 +82,48 @@ export function useRevokeShare(nodeId: string) {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: qk.appClientConfig(nodeId, variables.id) });
     },
+  });
+}
+
+/**
+ * Poll a task's status until it completes or fails.
+ */
+export function useTaskStatus(nodeId: string, taskId: string | undefined) {
+  return useQuery({
+    queryKey: ['task', nodeId, taskId],
+    queryFn: () => getNodeApi(nodeId).getTask(taskId!),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === 'completed' || status === 'failed') return false;
+      return 2000;
+    },
+    enabled: !!nodeId && !!taskId,
+  });
+}
+
+/**
+ * Deploy an app to a specific remote node via the Hub.
+ */
+export function useDeployNodeApp(hubNodeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { nodeId: string; template: string; settings: Record<string, unknown> }) =>
+      getNodeApi(hubNodeId).deployNodeApp(data.nodeId, {
+        template: data.template,
+        settings: data.settings,
+      }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: qk.apps(variables.nodeId) });
+    },
+  });
+}
+
+/**
+ * Batch deploy an app to multiple targets via the Hub.
+ */
+export function useBatchDeploy(hubNodeId: string) {
+  return useMutation({
+    mutationFn: (data: { template: string; settings: Record<string, unknown>; targets: string[] }) =>
+      getNodeApi(hubNodeId).batchDeploy(data),
   });
 }
