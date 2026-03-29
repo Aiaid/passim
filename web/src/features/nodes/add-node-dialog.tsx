@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -21,6 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { ApiError } from '@/lib/api-client';
 import { useAddNode } from './queries';
 
 const addNodeSchema = z.object({
@@ -39,6 +41,8 @@ interface AddNodeDialogProps {
 export function AddNodeDialog({ open, onOpenChange }: AddNodeDialogProps) {
   const { t } = useTranslation();
   const addNodeMutation = useAddNode();
+  const [tlsConfirm, setTlsConfirm] = useState(false);
+  const [pendingValues, setPendingValues] = useState<AddNodeFormValues | null>(null);
 
   const form = useForm<AddNodeFormValues>({
     resolver: zodResolver(addNodeSchema),
@@ -49,24 +53,88 @@ export function AddNodeDialog({ open, onOpenChange }: AddNodeDialogProps) {
     },
   });
 
-  function handleSubmit(values: AddNodeFormValues) {
+  function submitNode(values: AddNodeFormValues, skipTLSVerify = false) {
     addNodeMutation.mutate(
       {
         address: values.address,
         api_key: values.api_key,
         name: values.name || undefined,
+        skip_tls_verify: skipTLSVerify,
       },
       {
         onSuccess: () => {
           form.reset();
+          setTlsConfirm(false);
+          setPendingValues(null);
           onOpenChange(false);
+        },
+        onError: (error) => {
+          if (error instanceof ApiError && error.tlsError) {
+            setPendingValues(values);
+            setTlsConfirm(true);
+          }
         },
       },
     );
   }
 
+  function handleSubmit(values: AddNodeFormValues) {
+    submitNode(values, false);
+  }
+
+  function handleTlsSkip() {
+    if (pendingValues) {
+      submitNode(pendingValues, true);
+    }
+  }
+
+  function handleClose(v: boolean) {
+    if (!v) {
+      setTlsConfirm(false);
+      setPendingValues(null);
+    }
+    onOpenChange(v);
+  }
+
+  if (tlsConfirm) {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="size-5 text-amber-500" />
+              {t('mobile.tls_error_title')}
+            </DialogTitle>
+            <DialogDescription className="whitespace-pre-line">
+              {t('mobile.tls_error_message')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setTlsConfirm(false); setPendingValues(null); }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleTlsSkip}
+              disabled={addNodeMutation.isPending}
+            >
+              {addNodeMutation.isPending && (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              )}
+              {t('mobile.tls_skip_connect')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t('node.add')}</DialogTitle>
@@ -129,7 +197,7 @@ export function AddNodeDialog({ open, onOpenChange }: AddNodeDialogProps) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={() => handleClose(false)}
               >
                 {t('common.cancel')}
               </Button>

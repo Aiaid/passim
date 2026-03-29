@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
-import { api } from '@/lib/api-client';
+import { api, ApiError } from '@/lib/api-client';
 
 export function useNodes() {
   return useQuery({
@@ -15,13 +15,15 @@ export function useAddNode() {
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: (data: { address: string; api_key: string; name?: string }) =>
+    mutationFn: (data: { address: string; api_key: string; name?: string; skip_tls_verify?: boolean }) =>
       api.addNode(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nodes'] });
       toast.success(t('node.added'));
     },
     onError: (error) => {
+      // TLS errors are handled in the dialog, don't show generic toast
+      if (error instanceof ApiError && error.tlsError) return;
       toast.error(error.message);
     },
   });

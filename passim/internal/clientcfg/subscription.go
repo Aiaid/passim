@@ -48,21 +48,21 @@ func GenerateClashYAML(configs []ResolvedConfig) ([]byte, error) {
 	sb.WriteString("proxies:\n")
 	for _, p := range proxies {
 		sb.WriteString(fmt.Sprintf("  - name: %q\n", p.Name))
-		sb.WriteString(fmt.Sprintf("    type: %s\n", p.Type))
-		sb.WriteString(fmt.Sprintf("    server: %s\n", p.Server))
+		sb.WriteString(fmt.Sprintf("    type: %q\n", p.Type))
+		sb.WriteString(fmt.Sprintf("    server: %q\n", p.Server))
 		sb.WriteString(fmt.Sprintf("    port: %d\n", p.Port))
 		if p.Password != "" {
 			sb.WriteString(fmt.Sprintf("    password: %q\n", p.Password))
 		}
 		if p.UUID != "" {
-			sb.WriteString(fmt.Sprintf("    uuid: %s\n", p.UUID))
+			sb.WriteString(fmt.Sprintf("    uuid: %q\n", p.UUID))
 			sb.WriteString(fmt.Sprintf("    alterId: %d\n", p.AlterID))
 		}
 		if p.Insecure {
 			sb.WriteString("    skip-cert-verify: true\n")
 		}
 		if p.SNI != "" {
-			sb.WriteString(fmt.Sprintf("    sni: %s\n", p.SNI))
+			sb.WriteString(fmt.Sprintf("    sni: %q\n", p.SNI))
 		}
 		sb.WriteString("\n")
 	}

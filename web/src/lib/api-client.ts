@@ -4,6 +4,7 @@ const BASE = '/api';
 
 export class ApiError extends Error {
   status: number;
+  tlsError?: boolean;
   constructor(status: number, message: string) {
     super(message);
     this.name = 'ApiError';
@@ -38,7 +39,9 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-    throw new ApiError(res.status, err.error || 'Unknown error');
+    const apiErr = new ApiError(res.status, err.error || 'Unknown error');
+    if (err.tls_error) apiErr.tlsError = true;
+    throw apiErr;
   }
 
   // Handle 204 No Content
@@ -174,7 +177,7 @@ export const api = {
 
   // Nodes
   getNodes: () => request<RemoteNode[]>('/nodes'),
-  addNode: (data: { address: string; api_key: string; name?: string }) =>
+  addNode: (data: { address: string; api_key: string; name?: string; skip_tls_verify?: boolean }) =>
     request<RemoteNode>('/nodes', { method: 'POST', body: JSON.stringify(data) }),
   removeNode: (id: string) => request<void>(`/nodes/${id}`, { method: 'DELETE' }),
   updateNode: (id: string, data: { name: string }) =>
@@ -410,6 +413,7 @@ export interface RemoteNode {
   longitude?: number;
   last_seen?: string;
   created_at: string;
+  skip_tls_verify?: boolean;
   metrics?: {
     cpu_percent: number;
     memory_percent: number;

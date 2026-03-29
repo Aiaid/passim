@@ -157,7 +157,7 @@ export function createApi(request: <T>(path: string, options?: RequestInit) => P
 
     // Nodes
     getNodes: () => request<RemoteNode[]>('/nodes'),
-    addNode: (data: { address: string; api_key: string; name?: string }) =>
+    addNode: (data: { address: string; api_key: string; name?: string; skip_tls_verify?: boolean }) =>
       request<RemoteNode>('/nodes', { method: 'POST', body: JSON.stringify(data) }),
     removeNode: (id: string) => request<void>(`/nodes/${id}`, { method: 'DELETE' }),
     updateNode: (id: string, data: { name: string }) =>

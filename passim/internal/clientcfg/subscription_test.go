@@ -39,13 +39,13 @@ func TestGenerateClashYAML(t *testing.T) {
 	if !strings.Contains(s, "singapore-1") {
 		t.Error("missing singapore-1 proxy")
 	}
-	if !strings.Contains(s, "type: hysteria2") {
+	if !strings.Contains(s, `type: "hysteria2"`) {
 		t.Error("missing hysteria2 type")
 	}
-	if !strings.Contains(s, "server: 1.2.3.4") {
+	if !strings.Contains(s, `server: "1.2.3.4"`) {
 		t.Error("missing tokyo server")
 	}
-	if !strings.Contains(s, "server: 5.6.7.8") {
+	if !strings.Contains(s, `server: "5.6.7.8"`) {
 		t.Error("missing singapore server")
 	}
 	if !strings.Contains(s, "proxy-groups:") {

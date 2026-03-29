@@ -34,7 +34,7 @@ func newMockNodeHub() *mockNodeHub {
 	}
 }
 
-func (m *mockNodeHub) AddNode(_ context.Context, address, apiKey, name string) (*node.NodeInfo, error) {
+func (m *mockNodeHub) AddNode(_ context.Context, address, apiKey, name string, _ bool) (*node.NodeInfo, error) {
 	if m.addErr != nil {
 		return nil, m.addErr
 	}

@@ -2,10 +2,14 @@ package api
 
 import (
 	"net/http"
+	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/update"
 )
+
+// versionPattern validates semantic version strings to prevent image tag injection.
+var versionPattern = regexp.MustCompile(`^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$`)
 
 func versionCheckHandler(checker *update.Checker) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -49,6 +53,11 @@ func updateHandler(updater *update.Updater) gin.HandlerFunc {
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "version is required"})
+			return
+		}
+
+		if !versionPattern.MatchString(req.Version) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid version format"})
 			return
 		}
 

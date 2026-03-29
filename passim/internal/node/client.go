@@ -17,27 +17,39 @@ import (
 	"github.com/passim/passim/internal/sse"
 )
 
-// defaultTransport returns an http.Transport that skips TLS verification
-// (remote Passim nodes use self-signed certificates by default).
-func defaultTransport() *http.Transport {
+// nodeTransport returns an http.Transport with TLS verification controlled
+// by skipTLSVerify. When false (default), standard certificate verification
+// is used — works with valid certs (e.g. Let's Encrypt via DNS reflector).
+// When true, TLS verification is skipped for nodes with self-signed certs.
+func nodeTransport(skipTLSVerify bool) *http.Transport {
 	return &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: skipTLSVerify,
+		},
 	}
 }
 
-// defaultHTTPClient returns an http.Client for normal API calls (30s timeout).
+// defaultHTTPClient returns an http.Client that verifies TLS (30s timeout).
 func defaultHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout:   30 * time.Second,
-		Transport: defaultTransport(),
+		Transport: nodeTransport(false),
 	}
 }
 
-// sseHTTPClient returns an http.Client for long-lived SSE streams (no timeout).
-// Cancellation is handled via context instead.
-func sseHTTPClient() *http.Client {
+// nodeHTTPClient returns an http.Client with per-node TLS settings (30s timeout).
+func nodeHTTPClient(skipTLSVerify bool) *http.Client {
 	return &http.Client{
-		Transport: defaultTransport(),
+		Timeout:   30 * time.Second,
+		Transport: nodeTransport(skipTLSVerify),
+	}
+}
+
+// nodeSSEClient returns an http.Client for long-lived SSE streams (no timeout)
+// with per-node TLS settings. Cancellation is handled via context instead.
+func nodeSSEClient(skipTLSVerify bool) *http.Client {
+	return &http.Client{
+		Transport: nodeTransport(skipTLSVerify),
 	}
 }
 
@@ -150,6 +162,7 @@ func (h *Hub) subscribeSSE(ctx context.Context, rc *RemoteConn) error {
 	token := rc.token
 	rcScheme := rc.scheme
 	nodeID := rc.info.ID
+	skipTLS := rc.info.SkipTLSVerify
 	rc.mu.RUnlock()
 
 	scheme := rcScheme
@@ -172,7 +185,7 @@ func (h *Hub) subscribeSSE(ctx context.Context, rc *RemoteConn) error {
 
 	// Use a dedicated SSE client without Timeout — the normal client's
 	// 30s Timeout kills the long-lived SSE stream.
-	sseClient := sseHTTPClient()
+	sseClient := nodeSSEClient(skipTLS)
 	resp, err := sseClient.Do(req)
 	if err != nil {
 		sseCancel()

@@ -8,22 +8,23 @@ import (
 
 // RemoteNode represents a remote Passim instance managed by this hub.
 type RemoteNode struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Address   string `json:"address"`
-	APIKey    string `json:"api_key"`
-	Status    string `json:"status"`
-	Country   string `json:"country,omitempty"`
-	LastSeen  string `json:"last_seen,omitempty"`
-	CreatedAt string `json:"created_at"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Address         string `json:"address"`
+	APIKey          string `json:"api_key"`
+	Status          string `json:"status"`
+	Country         string `json:"country,omitempty"`
+	LastSeen        string `json:"last_seen,omitempty"`
+	CreatedAt       string `json:"created_at"`
+	SkipTLSVerify   bool   `json:"skip_tls_verify"`
 }
 
 // CreateRemoteNode inserts a new remote node.
 func CreateRemoteNode(database *sql.DB, node *RemoteNode) error {
 	_, err := database.Exec(
-		`INSERT INTO remote_nodes (id, name, address, api_key, status, country, last_seen, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		node.ID, node.Name, node.Address, node.APIKey, node.Status, node.Country, node.LastSeen, node.CreatedAt,
+		`INSERT INTO remote_nodes (id, name, address, api_key, status, country, last_seen, created_at, skip_tls_verify)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		node.ID, node.Name, node.Address, node.APIKey, node.Status, node.Country, node.LastSeen, node.CreatedAt, node.SkipTLSVerify,
 	)
 	if err != nil {
 		return fmt.Errorf("create remote node: %w", err)
@@ -35,9 +36,9 @@ func CreateRemoteNode(database *sql.DB, node *RemoteNode) error {
 func GetRemoteNode(database *sql.DB, id string) (*RemoteNode, error) {
 	var n RemoteNode
 	err := database.QueryRow(
-		`SELECT id, COALESCE(name,''), address, api_key, COALESCE(status,'disconnected'), COALESCE(country,''), COALESCE(last_seen,''), COALESCE(created_at,'')
+		`SELECT id, COALESCE(name,''), address, api_key, COALESCE(status,'disconnected'), COALESCE(country,''), COALESCE(last_seen,''), COALESCE(created_at,''), COALESCE(skip_tls_verify,0)
 		 FROM remote_nodes WHERE id = ?`, id,
-	).Scan(&n.ID, &n.Name, &n.Address, &n.APIKey, &n.Status, &n.Country, &n.LastSeen, &n.CreatedAt)
+	).Scan(&n.ID, &n.Name, &n.Address, &n.APIKey, &n.Status, &n.Country, &n.LastSeen, &n.CreatedAt, &n.SkipTLSVerify)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -50,7 +51,7 @@ func GetRemoteNode(database *sql.DB, id string) (*RemoteNode, error) {
 // ListRemoteNodes returns all remote nodes ordered by creation time descending.
 func ListRemoteNodes(database *sql.DB) ([]RemoteNode, error) {
 	rows, err := database.Query(
-		`SELECT id, COALESCE(name,''), address, api_key, COALESCE(status,'disconnected'), COALESCE(country,''), COALESCE(last_seen,''), COALESCE(created_at,'')
+		`SELECT id, COALESCE(name,''), address, api_key, COALESCE(status,'disconnected'), COALESCE(country,''), COALESCE(last_seen,''), COALESCE(created_at,''), COALESCE(skip_tls_verify,0)
 		 FROM remote_nodes ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -61,7 +62,7 @@ func ListRemoteNodes(database *sql.DB) ([]RemoteNode, error) {
 	var nodes []RemoteNode
 	for rows.Next() {
 		var n RemoteNode
-		if err := rows.Scan(&n.ID, &n.Name, &n.Address, &n.APIKey, &n.Status, &n.Country, &n.LastSeen, &n.CreatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.Name, &n.Address, &n.APIKey, &n.Status, &n.Country, &n.LastSeen, &n.CreatedAt, &n.SkipTLSVerify); err != nil {
 			return nil, fmt.Errorf("scan remote node: %w", err)
 		}
 		nodes = append(nodes, n)

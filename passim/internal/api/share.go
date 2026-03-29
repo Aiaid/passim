@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -279,7 +280,7 @@ func shareFileHandler(deps Deps) gin.HandlerFunc {
 				return
 			}
 			name := fmt.Sprintf("peer%d.conf", index)
-			c.Header("Content-Disposition", "attachment; filename=\""+name+"\"")
+			c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
 			c.Data(http.StatusOK, "application/octet-stream", content)
 			return
 		}
@@ -297,7 +298,7 @@ func shareFileHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		c.Header("Content-Disposition", "attachment; filename=\""+name+"\"")
+		c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
 		c.Data(http.StatusOK, "application/octet-stream", []byte(content))
 	}
 }
@@ -352,7 +353,7 @@ func shareZIPHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		c.Header("Content-Disposition", "attachment; filename=\""+app.Template+"-configs.zip\"")
+		c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": app.Template + "-configs.zip"}))
 		c.Data(http.StatusOK, "application/zip", zipData)
 	}
 }

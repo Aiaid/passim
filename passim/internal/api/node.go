@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"io"
 	"math"
 	"net/http"
@@ -17,7 +18,7 @@ import (
 // NodeHub is the interface the API layer uses to interact with remote nodes.
 // Implemented by *node.Hub.
 type NodeHub interface {
-	AddNode(ctx context.Context, address, apiKey, name string) (*node.NodeInfo, error)
+	AddNode(ctx context.Context, address, apiKey, name string, skipTLSVerify bool) (*node.NodeInfo, error)
 	RemoveNode(id string) error
 	UpdateNode(id, name string) error
 	ListNodes() []node.NodeInfo
@@ -26,9 +27,10 @@ type NodeHub interface {
 }
 
 type addNodeRequest struct {
-	Address string `json:"address" binding:"required"`
-	APIKey  string `json:"api_key" binding:"required"`
-	Name    string `json:"name"`
+	Address       string `json:"address" binding:"required"`
+	APIKey        string `json:"api_key" binding:"required"`
+	Name          string `json:"name"`
+	SkipTLSVerify bool   `json:"skip_tls_verify"`
 }
 
 type updateNodeRequest struct {
@@ -48,8 +50,16 @@ func addNodeHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		info, err := deps.NodeHub.AddNode(c.Request.Context(), req.Address, req.APIKey, req.Name)
+		info, err := deps.NodeHub.AddNode(c.Request.Context(), req.Address, req.APIKey, req.Name, req.SkipTLSVerify)
 		if err != nil {
+			var tlsErr *node.TLSError
+			if errors.As(err, &tlsErr) {
+				c.JSON(http.StatusBadGateway, gin.H{
+					"error":     "TLS certificate verification failed",
+					"tls_error": true,
+				})
+				return
+			}
 			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 			return
 		}

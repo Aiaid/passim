@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -115,7 +116,7 @@ func appClientConfigFileHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		c.Header("Content-Disposition", "attachment; filename=\""+name+"\"")
+		c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
 		c.Data(http.StatusOK, "application/octet-stream", []byte(content))
 	}
 }
@@ -174,7 +175,7 @@ func appClientConfigZIPHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		c.Header("Content-Disposition", "attachment; filename=\""+app.Template+"-configs.zip\"")
+		c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": app.Template + "-configs.zip"}))
 		c.Data(http.StatusOK, "application/zip", zipData)
 	}
 }

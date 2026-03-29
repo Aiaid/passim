@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,21 +18,45 @@ import (
 	"github.com/passim/passim/internal/sse"
 )
 
+// validateNodeAddress checks that the address does not resolve to a
+// private, loopback, or link-local IP, preventing SSRF attacks.
+func validateNodeAddress(address string) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		host = address // no port
+	}
+	ips, err := net.LookupHost(host)
+	if err != nil {
+		return fmt.Errorf("cannot resolve host: %w", err)
+	}
+	for _, ipStr := range ips {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			continue
+		}
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return fmt.Errorf("address resolves to private/reserved IP: %s", ipStr)
+		}
+	}
+	return nil
+}
+
 // NodeInfo is the external representation of a remote node with live data.
 type NodeInfo struct {
-	ID         string          `json:"id"`
-	Name       string          `json:"name"`
-	Address    string          `json:"address"`
-	APIKey     string          `json:"api_key,omitempty"`
-	Status     string          `json:"status"`
-	Version    string          `json:"version,omitempty"`
-	Country    string          `json:"country,omitempty"`
-	Latitude   float64         `json:"latitude"`
-	Longitude  float64         `json:"longitude"`
-	LastSeen   string          `json:"last_seen,omitempty"`
-	CreatedAt  string          `json:"created_at"`
-	Metrics    *NodeMetrics    `json:"metrics,omitempty"`
-	Containers []NodeContainer `json:"containers,omitempty"`
+	ID            string          `json:"id"`
+	Name          string          `json:"name"`
+	Address       string          `json:"address"`
+	APIKey        string          `json:"api_key,omitempty"`
+	Status        string          `json:"status"`
+	Version       string          `json:"version,omitempty"`
+	Country       string          `json:"country,omitempty"`
+	Latitude      float64         `json:"latitude"`
+	Longitude     float64         `json:"longitude"`
+	LastSeen      string          `json:"last_seen,omitempty"`
+	CreatedAt     string          `json:"created_at"`
+	SkipTLSVerify bool            `json:"skip_tls_verify"`
+	Metrics       *NodeMetrics    `json:"metrics,omitempty"`
+	Containers    []NodeContainer `json:"containers,omitempty"`
 }
 
 // NodeMetrics holds lightweight metrics from a remote node.
@@ -70,6 +96,10 @@ type Hub struct {
 	// newHTTPClient is a factory for creating HTTP clients.
 	// Override in tests to inject custom transports.
 	newHTTPClient func() *http.Client
+
+	// validateAddress checks a node address before connecting.
+	// Override in tests to allow loopback addresses.
+	validateAddress func(string) error
 }
 
 // RemoteConn holds the live connection state for a single remote node.
@@ -103,10 +133,11 @@ func (rc *RemoteConn) baseURL() string {
 // NewHub creates a new Hub.
 func NewHub(database *sql.DB, broker *sse.Broker) *Hub {
 	return &Hub{
-		nodes:         make(map[string]*RemoteConn),
-		db:            database,
-		broker:        broker,
-		newHTTPClient: defaultHTTPClient,
+		nodes:           make(map[string]*RemoteConn),
+		db:              database,
+		broker:          broker,
+		newHTTPClient:   defaultHTTPClient,
+		validateAddress: validateNodeAddress,
 	}
 }
 
@@ -124,7 +155,7 @@ func (h *Hub) Start(ctx context.Context) {
 		rc := &RemoteConn{
 			info:       n,
 			status:     "connecting",
-			httpClient: h.newHTTPClient(),
+			httpClient: nodeHTTPClient(n.SkipTLSVerify),
 		}
 		h.mu.Lock()
 		h.nodes[n.ID] = rc
@@ -151,14 +182,40 @@ func (h *Hub) Stop() {
 	h.mu.Unlock()
 }
 
+// TLSError indicates a TLS certificate verification failure when connecting
+// to a remote node. The API layer uses this to suggest skip_tls_verify.
+type TLSError struct {
+	Err error
+}
+
+func (e *TLSError) Error() string { return e.Err.Error() }
+func (e *TLSError) Unwrap() error { return e.Err }
+
+// isTLSError checks whether an error is caused by TLS certificate verification.
+func isTLSError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "certificate") || strings.Contains(s, "x509") || strings.Contains(s, "tls:")
+}
+
 // AddNode registers a new remote node and starts connecting to it.
-func (h *Hub) AddNode(ctx context.Context, address, apiKey, name string) (*NodeInfo, error) {
+func (h *Hub) AddNode(ctx context.Context, address, apiKey, name string, skipTLSVerify bool) (*NodeInfo, error) {
+	// Reject addresses that resolve to private/internal IPs (SSRF protection)
+	if err := h.validateAddress(address); err != nil {
+		return nil, fmt.Errorf("invalid node address: %w", err)
+	}
+
 	// Validate by calling GET /api/status on the remote
-	client := h.newHTTPClient()
+	client := nodeHTTPClient(skipTLSVerify)
 
 	// First, authenticate to get a token (auto-detects HTTPS vs HTTP)
 	loginRes, err := loginRemote(ctx, client, address, apiKey)
 	if err != nil {
+		if !skipTLSVerify && isTLSError(err) {
+			return nil, &TLSError{Err: err}
+		}
 		return nil, fmt.Errorf("login to remote: %w", err)
 	}
 
@@ -198,13 +255,14 @@ func (h *Hub) AddNode(ctx context.Context, address, apiKey, name string) (*NodeI
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	node := &db.RemoteNode{
-		ID:        id,
-		Name:      name,
-		Address:   address,
-		APIKey:    apiKey,
-		Status:    "connecting",
-		Country:   statusResp.Node.Country,
-		CreatedAt: now,
+		ID:            id,
+		Name:          name,
+		Address:       address,
+		APIKey:        apiKey,
+		Status:        "connecting",
+		Country:       statusResp.Node.Country,
+		CreatedAt:     now,
+		SkipTLSVerify: skipTLSVerify,
 	}
 
 	if err := db.CreateRemoteNode(h.db, node); err != nil {
@@ -381,16 +439,17 @@ func (h *Hub) buildNodeInfo(rc *RemoteConn) *NodeInfo {
 	defer rc.mu.RUnlock()
 
 	info := &NodeInfo{
-		ID:        rc.info.ID,
-		Name:      rc.info.Name,
-		Address:   rc.info.Address,
-		APIKey:    rc.info.APIKey,
-		Status:    rc.status,
-		Version:   rc.version,
-		Country:   rc.info.Country,
-		Latitude:  rc.latitude,
-		Longitude: rc.longitude,
-		CreatedAt: rc.info.CreatedAt,
+		ID:            rc.info.ID,
+		Name:          rc.info.Name,
+		Address:       rc.info.Address,
+		APIKey:        rc.info.APIKey,
+		Status:        rc.status,
+		Version:       rc.version,
+		Country:       rc.info.Country,
+		Latitude:      rc.latitude,
+		Longitude:     rc.longitude,
+		CreatedAt:     rc.info.CreatedAt,
+		SkipTLSVerify: rc.info.SkipTLSVerify,
 	}
 
 	if !rc.lastSeen.IsZero() {

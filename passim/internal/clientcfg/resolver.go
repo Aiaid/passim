@@ -257,7 +257,7 @@ func renderString(tmplStr string, data map[string]string) (string, error) {
 		s = strings.ReplaceAll(s, "{{"+bare+"}}", "{{."+bare+"}}")
 	}
 
-	t, err := template.New("").Option("missingkey=zero").Parse(s)
+	t, err := template.New("").Option("missingkey=error").Parse(s)
 	if err != nil {
 		return "", err
 	}

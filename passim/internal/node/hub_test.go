@@ -103,6 +103,9 @@ func testHTTPClientFactory(server *httptest.Server) func() *http.Client {
 	}
 }
 
+// noopAddressValidator skips SSRF checks in tests (test servers use loopback).
+func noopAddressValidator(_ string) error { return nil }
+
 func TestAddNode(t *testing.T) {
 	database := setupTestDB(t)
 	broker := sse.NewBroker()
@@ -111,6 +114,7 @@ func TestAddNode(t *testing.T) {
 
 	hub := NewHub(database, broker)
 	hub.newHTTPClient = testHTTPClientFactory(server)
+	hub.validateAddress = noopAddressValidator
 
 	// Don't start background reconnect loops; we just test AddNode
 	hub.ctx, hub.cancel = context.WithCancel(context.Background())
@@ -119,7 +123,7 @@ func TestAddNode(t *testing.T) {
 	// Extract host:port from the test server URL (strip "https://")
 	address := strings.TrimPrefix(server.URL, "https://")
 
-	info, err := hub.AddNode(context.Background(), address, "psk_test123", "Test Node")
+	info, err := hub.AddNode(context.Background(), address, "psk_test123", "Test Node", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,12 +162,13 @@ func TestAddNode_InvalidAPIKey(t *testing.T) {
 
 	hub := NewHub(database, broker)
 	hub.newHTTPClient = testHTTPClientFactory(server)
+	hub.validateAddress = noopAddressValidator
 	hub.ctx, hub.cancel = context.WithCancel(context.Background())
 	defer hub.Stop()
 
 	address := strings.TrimPrefix(server.URL, "https://")
 
-	_, err := hub.AddNode(context.Background(), address, "wrong-key", "Bad Node")
+	_, err := hub.AddNode(context.Background(), address, "wrong-key", "Bad Node", true)
 	if err == nil {
 		t.Fatal("expected error for invalid API key")
 	}
@@ -177,12 +182,13 @@ func TestRemoveNode(t *testing.T) {
 
 	hub := NewHub(database, broker)
 	hub.newHTTPClient = testHTTPClientFactory(server)
+	hub.validateAddress = noopAddressValidator
 	hub.ctx, hub.cancel = context.WithCancel(context.Background())
 	defer hub.Stop()
 
 	address := strings.TrimPrefix(server.URL, "https://")
 
-	info, err := hub.AddNode(context.Background(), address, "psk_test123", "ToDelete")
+	info, err := hub.AddNode(context.Background(), address, "psk_test123", "ToDelete", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,6 +236,7 @@ func TestListNodes(t *testing.T) {
 
 	hub := NewHub(database, broker)
 	hub.newHTTPClient = testHTTPClientFactory(server)
+	hub.validateAddress = noopAddressValidator
 	hub.ctx, hub.cancel = context.WithCancel(context.Background())
 	defer hub.Stop()
 
@@ -242,11 +249,11 @@ func TestListNodes(t *testing.T) {
 	address := strings.TrimPrefix(server.URL, "https://")
 
 	// Add two nodes
-	_, err := hub.AddNode(context.Background(), address, "psk_test123", "Node A")
+	_, err := hub.AddNode(context.Background(), address, "psk_test123", "Node A", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = hub.AddNode(context.Background(), address, "psk_test123", "Node B")
+	_, err = hub.AddNode(context.Background(), address, "psk_test123", "Node B", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,12 +272,13 @@ func TestUpdateNode(t *testing.T) {
 
 	hub := NewHub(database, broker)
 	hub.newHTTPClient = testHTTPClientFactory(server)
+	hub.validateAddress = noopAddressValidator
 	hub.ctx, hub.cancel = context.WithCancel(context.Background())
 	defer hub.Stop()
 
 	address := strings.TrimPrefix(server.URL, "https://")
 
-	info, err := hub.AddNode(context.Background(), address, "psk_test123", "Original")
+	info, err := hub.AddNode(context.Background(), address, "psk_test123", "Original", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,12 +327,13 @@ func TestProxyRequest(t *testing.T) {
 
 	hub := NewHub(database, broker)
 	hub.newHTTPClient = testHTTPClientFactory(server)
+	hub.validateAddress = noopAddressValidator
 	hub.ctx, hub.cancel = context.WithCancel(context.Background())
 	defer hub.Stop()
 
 	address := strings.TrimPrefix(server.URL, "https://")
 
-	info, err := hub.AddNode(context.Background(), address, "psk_test123", "Proxy Node")
+	info, err := hub.AddNode(context.Background(), address, "psk_test123", "Proxy Node", true)
 	if err != nil {
 		t.Fatal(err)
 	}

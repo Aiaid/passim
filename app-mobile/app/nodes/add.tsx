@@ -31,7 +31,7 @@ export default function AddNodeScreen() {
 
   const canSubmit = host.trim().length > 0 && apiKey.trim().length > 0;
 
-  const handleSubmit = async () => {
+  const connectToNode = async (skipTLSVerify = false) => {
     if (!canSubmit || loading) return;
     setError(null);
     setLoading(true);
@@ -76,9 +76,36 @@ export default function AddNodeScreen() {
               address: trimmedHost,
               api_key: apiKey.trim(),
               name,
+              skip_tls_verify: skipTLSVerify,
             });
             await useNodeStore.getState().updateNodeHubRemoteId(newNodeId, result.id);
-          } catch {
+          } catch (hubErr: unknown) {
+            // Check if Hub returned a TLS error
+            const errBody = hubErr instanceof Error ? hubErr.message : '';
+            if (errBody.includes('tls_error') || errBody.includes('TLS certificate')) {
+              Alert.alert(
+                t('mobile.tls_error_title'),
+                t('mobile.tls_error_message'),
+                [
+                  { text: t('actions.cancel'), style: 'cancel' },
+                  {
+                    text: t('mobile.tls_skip_connect'),
+                    style: 'destructive',
+                    onPress: () => {
+                      // Retry Hub registration with TLS skip
+                      getNodeApi(hubNode.id).addNode({
+                        address: trimmedHost,
+                        api_key: apiKey.trim(),
+                        name,
+                        skip_tls_verify: true,
+                      }).then((result) => {
+                        useNodeStore.getState().updateNodeHubRemoteId(newNodeId, result.id);
+                      }).catch(() => {});
+                    },
+                  },
+                ],
+              );
+            }
             // Hub unreachable — will sync later
           }
         }
@@ -94,6 +121,8 @@ export default function AddNodeScreen() {
       setLoading(false);
     }
   };
+
+  const handleSubmit = () => connectToNode(false);
 
   return (
     <SafeAreaView className="flex-1 bg-black">

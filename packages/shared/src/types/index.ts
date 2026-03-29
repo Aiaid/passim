@@ -201,6 +201,7 @@ export interface RemoteNode {
   longitude?: number;
   last_seen?: string;
   created_at: string;
+  skip_tls_verify?: boolean;
   metrics?: {
     cpu_percent: number;
     memory_percent: number;

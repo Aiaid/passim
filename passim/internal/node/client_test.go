@@ -145,12 +145,13 @@ func TestSSEEventParsing(t *testing.T) {
 	// Create node in DB
 	now := time.Now().UTC().Format(time.RFC3339)
 	node := &db.RemoteNode{
-		ID:        "node-sse-test",
-		Name:      "SSE Test",
-		Address:   address,
-		APIKey:    "psk_test",
-		Status:    "connecting",
-		CreatedAt: now,
+		ID:            "node-sse-test",
+		Name:          "SSE Test",
+		Address:       address,
+		APIKey:        "psk_test",
+		Status:        "connecting",
+		CreatedAt:     now,
+		SkipTLSVerify: true,
 	}
 	if err := db.CreateRemoteNode(database, node); err != nil {
 		t.Fatal(err)

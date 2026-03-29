@@ -168,10 +168,7 @@
     "auto_scroll": "自动滚动",
     "no_logs": "暂无日志",
     "view_logs": "日志",
-    "view_terminal": "终端",
-    "terminal_placeholder": "输入命令...",
-    "terminal_reconnect": "重新连接",
-    "terminal_session_ended": "— 会话已结束 —"
+    "view_terminal": "终端"
   },
   "app": {
     "title": "应用",
@@ -372,6 +369,9 @@
     "node_name_title": "节点名称",
     "node_name_prompt": "输入此节点的名称。",
     "connection_failed": "连接失败",
+    "tls_error_title": "证书不受信任",
+    "tls_error_message": "该节点使用了自签名或不受信任的 TLS 证书。跳过证书验证不够安全，可能遭受中间人攻击。\n\n是否跳过证书验证？",
+    "tls_skip_connect": "仍然连接",
     "unable_fetch_status": "无法获取节点状态",
     "remove_node_confirm": "确定要移除 \"{{name}}\" 吗？此操作不可撤销。",
     "passkey_register_web": "Passkey 注册仅支持 Web 端。请在桌面浏览器中打开 Passim 来注册新的 Passkey。",
@@ -395,7 +395,9 @@
     "some_failed": "{{failed}}/{{total}} 个部署失败",
     "done": "完成",
     "view_apps": "查看应用",
-    "node_offline": "离线"
+    "node_offline": "离线",
+    "not_deployed": "未部署",
+    "remove_container_desc": "移除容器 \"{{name}}\"？此操作不可撤销。"
   },
   "share": {
     "your_connection": "你的连接",

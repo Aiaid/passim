@@ -94,6 +94,7 @@ var alterColumns = []string{
 	`ALTER TABLE passkeys ADD COLUMN backup_eligible INTEGER DEFAULT 0`,
 	`ALTER TABLE passkeys ADD COLUMN backup_state INTEGER DEFAULT 0`,
 	`ALTER TABLE apps ADD COLUMN generated TEXT DEFAULT '{}'`,
+	`ALTER TABLE remote_nodes ADD COLUMN skip_tls_verify INTEGER DEFAULT 0`,
 }
 
 func Migrate(database *sql.DB) error {

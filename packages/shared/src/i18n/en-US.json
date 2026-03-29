@@ -168,10 +168,7 @@
     "auto_scroll": "Auto-scroll",
     "no_logs": "No logs available",
     "view_logs": "Logs",
-    "view_terminal": "Terminal",
-    "terminal_placeholder": "Type a command...",
-    "terminal_reconnect": "Reconnect",
-    "terminal_session_ended": "— session ended —"
+    "view_terminal": "Terminal"
   },
   "app": {
     "title": "Apps",
@@ -372,6 +369,9 @@
     "node_name_title": "Node Name",
     "node_name_prompt": "Enter a name for this node.",
     "connection_failed": "Connection Failed",
+    "tls_error_title": "Certificate Not Trusted",
+    "tls_error_message": "This node uses a self-signed or untrusted TLS certificate. Connecting without verification is less secure and vulnerable to man-in-the-middle attacks.\n\nSkip certificate verification?",
+    "tls_skip_connect": "Connect Anyway",
     "unable_fetch_status": "Unable to fetch node status",
     "remove_node_confirm": "Are you sure you want to remove \"{{name}}\"? This cannot be undone.",
     "passkey_register_web": "Passkey registration is only available from the web interface. Open Passim in a desktop browser to register a new passkey.",
@@ -395,7 +395,9 @@
     "some_failed": "{{failed}} of {{total}} deployments failed",
     "done": "Done",
     "view_apps": "View Apps",
-    "node_offline": "Offline"
+    "node_offline": "Offline",
+    "not_deployed": "Not deployed",
+    "remove_container_desc": "Remove container \"{{name}}\"? This cannot be undone."
   },
   "share": {
     "your_connection": "Your Connection",
