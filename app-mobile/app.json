@@ -5,6 +5,8 @@
     "version": "0.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "iconDark": "./assets/icon-dark.png",
+    "iconTinted": "./assets/icon-tinted.png",
     "scheme": "passim",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
