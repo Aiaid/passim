@@ -15,7 +15,13 @@ import * as Haptics from 'expo-haptics';
 import type { Container, AppResponse } from '@passim/shared/types';
 import { useMultiNodeSSE } from '@/hooks/use-sse';
 import { useStatus } from '@/hooks/use-node';
-import { useContainers } from '@/hooks/use-containers';
+import {
+  useContainers,
+  useStartContainer,
+  useStopContainer,
+  useRestartContainer,
+  useRemoveContainer,
+} from '@/hooks/use-containers';
 import { useApps } from '@/hooks/use-apps';
 import { useSpeedTest } from '@/hooks/use-speedtest';
 import { useNodeStore } from '@/stores/node-store';
@@ -49,6 +55,10 @@ export default function NodeDetailScreen() {
   const { data: status, isLoading } = useStatus(id);
   const { data: containers } = useContainers(id);
   const { data: apps } = useApps(id);
+  const startContainer = useStartContainer(id);
+  const stopContainer = useStopContainer(id);
+  const restartContainer = useRestartContainer(id);
+  const removeContainer = useRemoveContainer(id);
   const speedTest = useSpeedTest(id);
   const sseMetrics = sse.metrics;
   const netSent = sseMetrics?.net_bytes_sent ?? 0;
@@ -199,15 +209,26 @@ export default function NodeDetailScreen() {
                     <ContainerCard
                       key={container.Id}
                       container={container}
+                      onStart={() => startContainer.mutate(container.Id)}
+                      onStop={() => stopContainer.mutate(container.Id)}
+                      onRestart={() => restartContainer.mutate(container.Id)}
+                      onRemove={() => {
+                        Alert.alert(
+                          t('common.delete'),
+                          t('mobile.remove_container_desc', { name: cName }),
+                          [
+                            { text: t('common.cancel'), style: 'cancel' },
+                            {
+                              text: t('common.delete'),
+                              style: 'destructive',
+                              onPress: () => removeContainer.mutate(container.Id),
+                            },
+                          ],
+                        );
+                      }}
                       onViewLogs={() => {
                         router.push({
                           pathname: '/containers/[id]/logs',
-                          params: { id: container.Id, name: cName },
-                        });
-                      }}
-                      onViewTerminal={() => {
-                        router.push({
-                          pathname: '/containers/[id]/terminal',
                           params: { id: container.Id, name: cName },
                         });
                       }}

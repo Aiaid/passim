@@ -11,7 +11,7 @@ export interface ContainerCardProps {
   onStop?: () => void;
   onRestart?: () => void;
   onViewLogs?: () => void;
-  onViewTerminal?: () => void;
+  onRemove?: () => void;
 }
 
 function mapState(state: string): StatusDotProps['status'] {
@@ -66,7 +66,7 @@ export function ContainerCard({
   onStop,
   onRestart,
   onViewLogs,
-  onViewTerminal,
+  onRemove,
 }: ContainerCardProps) {
   const name = containerName(container.Names);
   const isRunning = container.State === 'running';
@@ -99,8 +99,8 @@ export function ContainerCard({
         {onViewLogs && (
           <ActionButton icon="document-text" label="Logs" color="#0a84ff" onPress={onViewLogs} />
         )}
-        {onViewTerminal && isRunning && (
-          <ActionButton icon="terminal" label="Terminal" color="#bf5af2" onPress={onViewTerminal} />
+        {onRemove && !isRunning && (
+          <ActionButton icon="trash" label="Remove" color="#ff6961" onPress={onRemove} />
         )}
       </View>
     </Pressable>

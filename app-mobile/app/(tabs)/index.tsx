@@ -8,11 +8,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useQueries } from '@tanstack/react-query';
 import { useMultiNodeSSE } from '@/hooks/use-sse';
 import { useStatus } from '@/hooks/use-node';
 import { useApps } from '@/hooks/use-apps';
 import { useSpeedTest } from '@/hooks/use-speedtest';
 import { useNodeStore } from '@/stores/node-store';
+import { getNodeApi } from '@/lib/api';
+import { qk } from '@/lib/query-keys';
 import { MetricRing } from '@/components/MetricRing';
 import { StatusDot } from '@/components/StatusDot';
 import { GlobeView } from '@/components/globe/GlobeView';
@@ -30,18 +33,31 @@ export default function DashboardScreen() {
 
   const status = sse.status ?? statusQuery.data;
 
-  // Collect all node statuses for the globe
+  // Prefetch status for all nodes via REST so globe shows billboards immediately
+  const allNodeStatusQueries = useQueries({
+    queries: nodes.map((n) => ({
+      queryKey: qk.status(n.id),
+      queryFn: () => getNodeApi(n.id).getStatus(),
+      enabled: !!n.id,
+      staleTime: 60_000,
+    })),
+  });
+
+  // Stable trigger: re-derive when REST data arrives or SSE updates
+  const restDataKey = allNodeStatusQueries.map((q) => q.dataUpdatedAt).join(',');
+
+  // Collect all node statuses for the globe — SSE first, REST fallback
   const globeNodeStatuses = useMemo(() =>
-    nodes.map((n) => {
+    nodes.map((n, i) => {
       const nodeSSE = getNodeSSE(n.id);
       return {
         nodeId: n.id,
-        status: nodeSSE.status!,
-        isConnected: nodeSSE.isConnected,
+        status: (nodeSSE.status ?? allNodeStatusQueries[i]?.data)!,
+        isConnected: nodeSSE.isConnected || !!allNodeStatusQueries[i]?.data,
       };
     }).filter((n) => n.status != null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [nodes, status], // re-derive when any SSE status updates
+    [nodes, status, restDataKey], // re-derive when any SSE or REST status updates
   );
   const metrics = sse.metrics;
   const isConnected = sse.isConnected;

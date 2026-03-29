@@ -1,26 +1,3 @@
-// Shared mocks for all container screen tests
-
-const mockWsSend = jest.fn();
-const mockWsClose = jest.fn();
-
-beforeAll(() => {
-  // @ts-expect-error - mock WebSocket globally
-  global.WebSocket = class MockWebSocket {
-    static OPEN = 1;
-    readyState = 1;
-    onopen: (() => void) | null = null;
-    onmessage: ((ev: { data: string }) => void) | null = null;
-    onclose: (() => void) | null = null;
-    onerror: (() => void) | null = null;
-    binaryType = 'arraybuffer';
-    send = mockWsSend;
-    close = mockWsClose;
-    constructor() {
-      setTimeout(() => this.onopen?.(), 0);
-    }
-  };
-});
-
 // Mock expo-router
 const mockBack = jest.fn();
 const mockPush = jest.fn();
@@ -78,7 +55,6 @@ jest.mock('@expo/vector-icons', () => {
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import ContainerLogsScreen from '../app/containers/[id]/logs';
-import ContainerTerminalScreen from '../app/containers/[id]/terminal';
 
 describe('ContainerLogsScreen', () => {
   beforeEach(() => {
@@ -108,23 +84,3 @@ describe('ContainerLogsScreen', () => {
   });
 });
 
-describe('ContainerTerminalScreen', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('renders the terminal screen with header', () => {
-    render(<ContainerTerminalScreen />);
-    expect(screen.getByText('container.terminal')).toBeTruthy();
-  });
-
-  it('renders container name in chrome bar', () => {
-    render(<ContainerTerminalScreen />);
-    expect(screen.getByText('test-container')).toBeTruthy();
-  });
-
-  it('shows connection status', () => {
-    render(<ContainerTerminalScreen />);
-    expect(screen.getByText('container.terminal_connecting')).toBeTruthy();
-  });
-});
