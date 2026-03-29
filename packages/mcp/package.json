@@ -1,0 +1,22 @@
+{
+  "name": "@passim/mcp",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "passim-mcp": "./dist/bin/passim-mcp.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@passim/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2"
+  }
+}

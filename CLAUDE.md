@@ -17,6 +17,7 @@ Full rewrite in progress: legacy multi-component architecture → single Go bina
 | `site/` | Next.js 15 + next-intl marketing landing page | Active |
 | `app-mobile/` | Expo 52 + React Native mobile app (primary UI) | Active — Phase 5 |
 | `packages/shared/` | Shared types, API client, i18n, globe scene | Active |
+| `packages/mcp/` | MCP Server — lets LLM agents control Passim | Active |
 | `.github/` | GitHub Actions CI/CD workflows | Active |
 | `DNS/` | Python nserver DNS server (kept as-is) | Maintained |
 | `Doc/` | Design docs, specs, user stories | Active |
@@ -87,6 +88,14 @@ pnpm start                       # Expo dev server
 pnpm ios                         # Run on iOS simulator
 pnpm android                     # Run on Android emulator
 pnpm typecheck                   # TypeScript check
+```
+
+### MCP Server (`packages/mcp/`)
+```bash
+cd packages/mcp
+pnpm build                       # Build with tsup
+pnpm typecheck                   # TypeScript check
+node dist/bin/passim-mcp.js      # Run (needs PASSIM_URL + PASSIM_API_KEY)
 ```
 
 ### DNS Server

@@ -125,6 +125,31 @@ Apps are defined as YAML templates. Deploy from the Web UI with a guided wizard 
 | Samba | Storage | Windows-compatible file sharing |
 | RDesktop | Remote | Remote desktop access |
 
+## MCP Server (AI Agent Integration)
+
+Passim includes an MCP (Model Context Protocol) server that lets any MCP-compatible LLM agent (Claude Code, Cursor, custom agents) manage your Passim instances via natural language.
+
+**21 tools** covering: system status, container management, app deployment, task tracking, multi-node operations, and system administration.
+
+### Setup
+
+```json
+{
+  "mcpServers": {
+    "passim": {
+      "command": "node",
+      "args": ["packages/mcp/dist/bin/passim-mcp.js"],
+      "env": {
+        "PASSIM_URL": "https://your-server:8443",
+        "PASSIM_API_KEY": "psk_xxx"
+      }
+    }
+  }
+}
+```
+
+Multi-instance support via `PASSIM_INSTANCES` env var (JSON array). See `Doc/spec-mcp-server.md` for full documentation.
+
 ## Architecture
 
 Single Go binary with embedded Web UI, packaged in one Docker container.
