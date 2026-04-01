@@ -143,5 +143,7 @@ jobs:
           tags: |
             ghcr.io/aiaid/quote0-passim:latest
             anend/quote0-passim:latest
+          provenance: true
+          sbom: true
           cache-from: type=gha,scope=quote0
           cache-to: type=gha,scope=quote0,mode=max

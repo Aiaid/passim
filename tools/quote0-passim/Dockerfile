@@ -10,6 +10,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py .
 
+RUN useradd -r -s /usr/sbin/nologin appuser
+USER appuser
+
 ENV PASSIM_URL="" \
     PASSIM_API_KEY="" \
     QUOTE0_API_KEY="" \
