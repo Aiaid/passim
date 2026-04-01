@@ -26,14 +26,29 @@ QUOTE0_BASE = "https://dot.mindreset.tech/api/authV2/open/device"
 
 # ── Fonts ──────────────────────────────────────────────────
 
+def _find_font(name: str):
+    for d in [
+        "/usr/share/fonts/truetype/dejavu",   # Linux (Docker)
+        os.path.expanduser("~/Library/Fonts"), # macOS user
+        "/Library/Fonts",                      # macOS system
+    ]:
+        p = os.path.join(d, name)
+        if os.path.exists(p):
+            return p
+    return None
+
+
 def load_fonts():
-    try:
-        bold  = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 13)
-        norm  = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 11)
-        small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-    except OSError:
-        bold = norm = small = ImageFont.load_default()
-    return bold, norm, small
+    bold_path = _find_font("DejaVuSans-Bold.ttf")
+    norm_path = _find_font("DejaVuSans.ttf")
+    if bold_path and norm_path:
+        return (
+            ImageFont.truetype(bold_path, 13),
+            ImageFont.truetype(norm_path, 11),
+            ImageFont.truetype(norm_path, 10),
+        )
+    f = ImageFont.load_default()
+    return f, f, f
 
 
 BOLD, NORM, SMALL = load_fonts()
@@ -175,26 +190,28 @@ def render_single(status: dict) -> Image.Image:
     d.line([(4, y), (W - 4, y)], fill="black")
     y += 4
 
+    BAR_X, BAR_W = 80, 140
+
     # CPU
     cpu = sy["cpu"]
     d.text((4, y), f"CPU  {cpu['usage_percent']:4.0f}%", font=NORM, fill="black")
-    draw_bar(d, 80, y + 1, W - 88, 10, cpu["usage_percent"])
+    draw_bar(d, BAR_X, y + 1, BAR_W, 10, cpu["usage_percent"])
     y += 16
 
     # MEM
     mem = sy["memory"]
+    mem_detail = f"{fmt_bytes(mem['used_bytes'])}/{fmt_bytes(mem['total_bytes'])}"
     d.text((4, y), f"MEM  {mem['usage_percent']:4.0f}%", font=NORM, fill="black")
-    draw_bar(d, 80, y + 1, W - 88, 10, mem["usage_percent"])
-    detail = f"{fmt_bytes(mem['used_bytes'])}/{fmt_bytes(mem['total_bytes'])}"
-    right_text(d, y + 12, detail, SMALL)
+    draw_bar(d, BAR_X, y + 1, BAR_W, 10, mem["usage_percent"])
+    right_text(d, y + 1, mem_detail, SMALL)
     y += 16
 
     # DISK
     disk = sy["disk"]
+    disk_detail = f"{fmt_bytes(disk['used_bytes'])}/{fmt_bytes(disk['total_bytes'])}"
     d.text((4, y), f"DISK {disk['usage_percent']:4.0f}%", font=NORM, fill="black")
-    draw_bar(d, 80, y + 1, W - 88, 10, disk["usage_percent"])
-    detail = f"{fmt_bytes(disk['used_bytes'])}/{fmt_bytes(disk['total_bytes'])}"
-    right_text(d, y + 12, detail, SMALL)
+    draw_bar(d, BAR_X, y + 1, BAR_W, 10, disk["usage_percent"])
+    right_text(d, y + 1, disk_detail, SMALL)
     y += 16
 
     # Network
@@ -210,15 +227,161 @@ def render_single(status: dict) -> Image.Image:
     return img
 
 
-# ── Multi-node cluster view ───────────────────────────────
+# ── Multi-node cluster view (adaptive density) ───────────
+
+def _collect_nodes(status: dict, nodes: list) -> list:
+    """Normalise local + remote nodes into a uniform list of dicts."""
+    local = status["node"]
+    sy = status["system"]
+    ct = status["containers"]
+
+    all_nodes = [{
+        "name": local.get("name", "local"),
+        "online": True,
+        "cpu": sy["cpu"]["usage_percent"],
+        "mem": sy["memory"]["usage_percent"],
+        "disk": sy["disk"]["usage_percent"],
+        "mem_detail": f"{fmt_bytes(sy['memory']['used_bytes'])}/{fmt_bytes(sy['memory']['total_bytes'])}",
+        "running": ct["running"],
+        "total": ct["total"],
+        "country": local.get("country", ""),
+        "uptime": local.get("uptime", 0),
+        "net_rx": sy["network"]["rx_rate"],
+        "net_tx": sy["network"]["tx_rate"],
+        "is_local": True,
+    }]
+
+    for n in nodes:
+        st = n.get("status", "unknown")
+        name = n.get("name") or n.get("id", "?")
+        if st == "connected" and n.get("metrics"):
+            m = n["metrics"]
+            c = m.get("containers", {})
+            all_nodes.append({
+                "name": name, "online": True,
+                "cpu": m.get("cpu_percent", 0),
+                "mem": m.get("memory_percent", 0),
+                "disk": m.get("disk_percent", 0),
+                "running": c.get("running", 0), "total": c.get("total", 0),
+                "country": n.get("country", ""),
+                "is_local": False,
+            })
+        else:
+            all_nodes.append({"name": name, "online": False, "is_local": False})
+
+    return all_nodes
+
+
+def _draw_expanded(d: ImageDraw.ImageDraw, y: int, nodes: list) -> int:
+    """2 nodes — full bars + detail per node."""
+    BAR_W = W - 88
+    for i, n in enumerate(nodes):
+        if y > H - 18:
+            break
+        if i > 0:
+            d.line([(20, y), (W - 20, y)], fill="black")
+            y += 3
+
+        tag = "\u25cf" if n["online"] else "\u25cb"
+        d.text((4, y), f"{tag} {n['name'][:12]}", font=NORM, fill="black")
+        if n["online"]:
+            parts = []
+            if n.get("country"):
+                parts.append(n["country"])
+            if n.get("uptime"):
+                parts.append(f"up {fmt_uptime(n['uptime'])}")
+            parts.append(f"{n['running']}/{n['total']}")
+            right_text(d, y, "  ".join(parts), SMALL)
+        else:
+            d.text((88, y), "offline", font=SMALL, fill="black")
+        y += 15
+
+        if not n["online"]:
+            continue
+
+        # CPU bar
+        d.text((4, y), f"CPU {n['cpu']:3.0f}%", font=SMALL, fill="black")
+        draw_bar(d, 56, y + 1, 110, 8, n["cpu"])
+        # MEM bar
+        d.text((174, y), f"MEM {n['mem']:3.0f}%", font=SMALL, fill="black")
+        draw_bar(d, 226, y + 1, 62, 8, n["mem"])
+        y += 14
+
+        # Extra detail for local node
+        if n.get("is_local") and n.get("net_rx") is not None:
+            detail = f"DISK {n['disk']:.0f}%  {n.get('mem_detail', '')}"
+            net = f"\u2193{fmt_rate(n['net_rx'])} \u2191{fmt_rate(n['net_tx'])}"
+            d.text((4, y), detail, font=SMALL, fill="black")
+            right_text(d, y, net, SMALL)
+            y += 13
+
+    return y
+
+
+def _draw_medium(d: ImageDraw.ImageDraw, y: int, nodes: list) -> int:
+    """3-4 nodes — name line + dual bar line per node."""
+    for i, n in enumerate(nodes):
+        if y > H - 18:
+            break
+        if i > 0:
+            y += 1
+
+        tag = "\u25cf" if n["online"] else "\u25cb"
+        d.text((4, y), f"{tag} {n['name'][:10]}", font=NORM, fill="black")
+        if n["online"]:
+            ct = f"{n['running']}/{n['total']}"
+            cc = n.get("country", "")
+            right_text(d, y, f"{ct}  {cc}".strip(), SMALL)
+        else:
+            d.text((88, y), "offline", font=SMALL, fill="black")
+        y += 14
+
+        if not n["online"]:
+            continue
+
+        # CPU + MEM bars on one line
+        d.text((8, y), "C", font=SMALL, fill="black")
+        draw_bar(d, 18, y + 1, 100, 8, n["cpu"])
+        d.text((124, y), f"{n['cpu']:.0f}%", font=SMALL, fill="black")
+        d.text((154, y), "M", font=SMALL, fill="black")
+        draw_bar(d, 164, y + 1, 100, 8, n["mem"])
+        d.text((270, y), f"{n['mem']:.0f}%", font=SMALL, fill="black")
+        y += 14
+
+    return y
+
+
+def _draw_compact(d: ImageDraw.ImageDraw, y: int, nodes: list) -> int:
+    """5+ nodes — single line per node."""
+    for n in nodes:
+        if y > H - 18:
+            break
+        tag = "\u25cf" if n["online"] else "\u25cb"
+        d.text((4, y), f"{tag} {n['name'][:10]}", font=NORM, fill="black")
+
+        if n["online"]:
+            d.text((88, y), "C", font=SMALL, fill="black")
+            draw_bar(d, 98, y + 2, 46, 8, n["cpu"])
+            d.text((150, y), "M", font=SMALL, fill="black")
+            draw_bar(d, 162, y + 2, 46, 8, n["mem"])
+            d.text((214, y), f"{n['running']}/{n['total']}", font=SMALL, fill="black")
+            if n.get("country"):
+                right_text(d, y, n["country"], SMALL)
+        else:
+            d.text((88, y), "offline", font=SMALL, fill="black")
+
+        y += 15
+
+    return y
+
 
 def render_cluster(status: dict, nodes: list) -> Image.Image:
     img = Image.new("1", (W, H), 1)
     d = ImageDraw.Draw(img)
 
     local = status["node"]
-    sy = status["system"]
-    ct = status["containers"]
+    all_nodes = _collect_nodes(status, nodes)
+    count = len(all_nodes)
 
     y = 2
     d.text((4, y), "Passim Cluster", font=BOLD, fill="black")
@@ -227,57 +390,12 @@ def render_cluster(status: dict, nodes: list) -> Image.Image:
     d.line([(4, y), (W - 4, y)], fill="black")
     y += 3
 
-    # Helper: draw one compact node row
-    def node_row(name: str, cpu: float, mem: float, running: int, total: int,
-                 country: str = "", online: bool = True):
-        nonlocal y
-        if y > H - 18:
-            return
-        tag = "\u25cf" if online else "\u25cb"
-        label = f"{tag} {name[:10]}"
-        d.text((4, y), label, font=NORM, fill="black")
-
-        if online:
-            # CPU mini bar
-            d.text((88, y), "C", font=SMALL, fill="black")
-            draw_bar(d, 98, y + 2, 46, 8, cpu)
-            # MEM mini bar
-            d.text((150, y), "M", font=SMALL, fill="black")
-            draw_bar(d, 162, y + 2, 46, 8, mem)
-            # Container count
-            d.text((214, y), f"{running}/{total}", font=SMALL, fill="black")
-            if country:
-                right_text(d, y, country, SMALL)
-        else:
-            d.text((88, y), "offline", font=SMALL, fill="black")
-
-        y += 15
-
-    # Local node
-    node_row(
-        local.get("name", "local"),
-        sy["cpu"]["usage_percent"],
-        sy["memory"]["usage_percent"],
-        ct["running"], ct["total"],
-        local.get("country", ""),
-    )
-
-    # Remote nodes
-    for n in nodes:
-        st = n.get("status", "unknown")
-        name = n.get("name") or n.get("id", "?")
-        if st == "online" and n.get("metrics"):
-            m = n["metrics"]
-            c = m.get("containers", {})
-            node_row(
-                name,
-                m.get("cpu_percent", 0),
-                m.get("memory_percent", 0),
-                c.get("running", 0), c.get("total", 0),
-                n.get("country", ""),
-            )
-        else:
-            node_row(name, 0, 0, 0, 0, online=False)
+    if count <= 2:
+        _draw_expanded(d, y, all_nodes)
+    elif count <= 4:
+        _draw_medium(d, y, all_nodes)
+    else:
+        _draw_compact(d, y, all_nodes)
 
     stamp(d)
     return img
