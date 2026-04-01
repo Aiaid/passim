@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Fetch Passim cluster status and push to Quote/0 e-ink display."""
-import base64, io, json, logging, os, time
+import base64, io, json, logging, os, time, zoneinfo
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -17,6 +17,7 @@ QUOTE0_DEVICE_ID = os.environ.get("QUOTE0_DEVICE_ID", "")    # device serial
 INTERVAL         = int(os.environ.get("INTERVAL", "60"))      # seconds
 PROXY            = os.environ.get("PROXY", "")                # socks5h://...
 VERIFY_SSL       = os.environ.get("VERIFY_SSL", "0") == "1"
+TZ_NAME          = os.environ.get("TZ", "Asia/Shanghai")
 # =======================================
 
 W, H = 296, 152  # Quote/0 screen resolution
@@ -160,7 +161,8 @@ def right_text(draw: ImageDraw.ImageDraw, y: int, text: str, font, margin: int =
 
 
 def stamp(draw: ImageDraw.ImageDraw):
-    right_text(draw, H - 13, datetime.now().strftime("%m-%d %H:%M"), SMALL)
+    now = datetime.now(zoneinfo.ZoneInfo(TZ_NAME))
+    right_text(draw, H - 13, now.strftime("%m-%d %H:%M"), SMALL)
 
 
 # ── Single-node detailed view ─────────────────────────────

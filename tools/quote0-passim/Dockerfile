@@ -16,6 +16,7 @@ ENV PASSIM_URL="" \
     QUOTE0_DEVICE_ID="" \
     INTERVAL="60" \
     PROXY="" \
-    VERIFY_SSL="0"
+    VERIFY_SSL="0" \
+    TZ="Asia/Shanghai"
 
 CMD ["python", "-u", "main.py"]
