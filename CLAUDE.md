@@ -18,6 +18,7 @@ Full rewrite in progress: legacy multi-component architecture → single Go bina
 | `app-mobile/` | Expo 52 + React Native mobile app (primary UI) | Active — Phase 5 |
 | `packages/shared/` | Shared types, API client, i18n, globe scene | Active |
 | `packages/mcp/` | MCP Server — lets LLM agents control Passim | Active |
+| `tools/quote0-passim/` | Quote/0 e-ink display — pushes Passim cluster status | Active |
 | `.github/` | GitHub Actions CI/CD workflows | Active |
 | `DNS/` | Python nserver DNS server (kept as-is) | Maintained |
 | `Doc/` | Design docs, specs, user stories | Active |
@@ -175,6 +176,7 @@ Triggers on push to `main` and all PRs. Uses `dorny/paths-filter` for monorepo p
 2. **go-test** — Runs only when `passim/**` changes. `go test -race -cover ./...` + integration tests
 3. **web-test** — Runs only when `web/**` changes. `pnpm lint` + `pnpm tsc -b` + `pnpm vitest run`
 4. **docker-build** — Runs when backend or frontend changes, after tests pass. Builds + pushes dev image on main push
+5. **quote0-build** — Runs only when `tools/quote0-passim/**` changes. Builds + pushes `ghcr.io/aiaid/quote0-passim:latest`
 
 ### Release Pipeline (`.github/workflows/release.yml`)
 

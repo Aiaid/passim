@@ -1,0 +1,13 @@
+services:
+  quote0-passim:
+    build: .
+    container_name: quote0-passim
+    restart: unless-stopped
+    environment:
+      - PASSIM_URL=https://192.168.1.100:8443
+      - PASSIM_API_KEY=your-api-key
+      - QUOTE0_API_KEY=dot_app_xxx
+      - QUOTE0_DEVICE_ID=your-device-serial
+      - INTERVAL=60
+      # - PROXY=socks5h://192.168.1.x:1080
+      # - VERIFY_SSL=0
