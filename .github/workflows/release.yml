@@ -80,6 +80,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
@@ -98,12 +104,20 @@ jobs:
             type=semver,pattern={{major}}
             type=sha,prefix=
 
-      - name: Create manifest and push
+      - name: Create GHCR manifest and push
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Copy to Docker Hub
+        run: |
+          GHCR="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}"
+          docker buildx imagetools create \
+            -t anend/passim:${{ github.ref_name }} \
+            -t anend/passim:latest \
+            "$GHCR"
 
       - name: Generate changelog
         id: changelog
