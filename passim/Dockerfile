@@ -21,9 +21,11 @@ COPY passim/ ./passim/
 COPY --from=frontend /web/dist ./passim/cmd/passim/dist/
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
+    SHORT_COMMIT=$(echo "${COMMIT}" | cut -c1-7) && \
+    SHORT_VERSION=$(echo "${VERSION}" | sed "s/dev-.\{40\}/dev-${SHORT_COMMIT}/") && \
     cd passim && CGO_ENABLED=1 go build \
-      -ldflags "-X github.com/passim/passim/internal/version.Version=${VERSION} \
-                -X github.com/passim/passim/internal/version.Commit=${COMMIT} \
+      -ldflags "-X github.com/passim/passim/internal/version.Version=${SHORT_VERSION} \
+                -X github.com/passim/passim/internal/version.Commit=${SHORT_COMMIT} \
                 -X github.com/passim/passim/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       -o /passim ./cmd/passim/
 
