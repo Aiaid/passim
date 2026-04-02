@@ -53,15 +53,19 @@ function MetricGauge({ label, percent, icon: Icon }: { label: string; percent: n
   );
 }
 
+function isDevVersion(v?: string): boolean {
+  return !v || v === 'dev' || v === 'unknown' || v.startsWith('dev-');
+}
+
 function NodeUpdateCard({ nodeId, currentVersion }: { nodeId: string; currentVersion?: string }) {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checking, setChecking] = useState(false);
   const nodeUpdate = useNodeUpdate();
+  const { status } = useEventStream();
 
-  const isDev = !currentVersion
-    || currentVersion === 'dev'
-    || currentVersion === 'unknown'
-    || currentVersion.startsWith('dev-');
+  // Show dev update button if either the remote node OR the local hub is running dev
+  const localVersion = status?.node?.version;
+  const isDev = isDevVersion(currentVersion) || isDevVersion(localVersion);
 
   const handleCheck = async () => {
     setChecking(true);
