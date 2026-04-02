@@ -75,13 +75,14 @@ export const useNodeStore = create<NodeState>((set, get) => ({
       }
     }
 
-    let nodes = get().nodes.filter((n) => n.id !== id);
-
-    // If deleting the Hub (nodes[0]), clear all hubRemoteIds
+    // If deleting the Hub (nodes[0]), clear ALL nodes — remote nodes can't work without hub
     if (hubNode && id === hubNode.id) {
-      nodes = nodes.map((n) => ({ ...n, hubRemoteId: undefined }));
+      await persistNodes([]);
+      set({ nodes: [], activeNodeId: null, activeNode: null, hubNode: null });
+      return;
     }
 
+    const nodes = get().nodes.filter((n) => n.id !== id);
     await persistNodes(nodes);
     const activeNodeId = get().activeNodeId === id ? (nodes[0]?.id ?? null) : get().activeNodeId;
     set({
