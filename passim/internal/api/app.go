@@ -115,12 +115,17 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 		if deps.SSL != nil {
 			sslDomain = deps.SSL.GetDomain()
 		}
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8443"
+		}
 		nodeInfo := tmpl.NodeInfo{
 			PublicIP:  appPublicIP,
 			Timezone:  tz,
 			Hostname:  hostname,
 			DataDir:   dataDir,
 			Domain:    sslDomain,
+			Port:      port,
 		}
 		// Resolve {{node.*}} placeholder defaults in settings (e.g. "{{node.Domain}}")
 		tmpl.ResolveNodeDefaults(merged, nodeInfo)
@@ -130,7 +135,7 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			Settings:  merged,
 			Node:      nodeInfo,
 			Generated: generated,
-			App:       tmpl.AppInfo{Dir: appDir},
+			App:       tmpl.AppInfo{Dir: appDir, ID: appID},
 		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "render failed: " + err.Error()})
@@ -376,6 +381,10 @@ func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[stri
 	if deps.SSL != nil {
 		redeployDomain = deps.SSL.GetDomain()
 	}
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8443"
+	}
 	appDir := filepath.Join(dataDir, "apps", t.Name+"-"+appID[:8])
 	rendered, err := tmpl.Render(t, tmpl.RenderData{
 		Settings: settings,
@@ -385,9 +394,10 @@ func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[stri
 			Hostname:  hostname,
 			DataDir:   dataDir,
 			Domain:    redeployDomain,
+			Port:      port,
 		},
 		Generated: generated,
-		App:       tmpl.AppInfo{Dir: appDir},
+		App:       tmpl.AppInfo{Dir: appDir, ID: appID},
 	})
 	if err != nil {
 		return nil, err
