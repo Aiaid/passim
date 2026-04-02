@@ -264,11 +264,19 @@ export interface AppUsersResponse {
   users: AppUser[];
 }
 
+export interface TrafficNodeDetail {
+  node: string;
+  tx_bytes: number;
+  rx_bytes: number;
+  online_connections: number;
+}
+
 export interface TrafficUserSummary {
   username: string;
   tx_bytes: number;
   rx_bytes: number;
   online_connections: number;
+  nodes?: TrafficNodeDetail[];
 }
 
 export interface TrafficResponse {

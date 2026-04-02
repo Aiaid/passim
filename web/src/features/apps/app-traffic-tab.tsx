@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowUpFromLine, ArrowDownToLine, Activity } from 'lucide-react';
+import { ArrowUpFromLine, ArrowDownToLine, Activity, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -15,11 +15,56 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { formatBytes } from '@/lib/utils';
 import { useAppTraffic } from './queries';
+import type { TrafficUserSummary } from '@/lib/api-client';
 
 const PERIODS = ['1h', '24h', '7d', '30d'] as const;
 
 interface AppTrafficTabProps {
   appId: string;
+}
+
+function UserRow({ user }: { user: TrafficUserSummary }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasNodes = (user.nodes?.length ?? 0) > 1;
+
+  return (
+    <>
+      <TableRow
+        className={hasNodes ? 'cursor-pointer hover:bg-muted/50' : undefined}
+        onClick={hasNodes ? () => setExpanded(!expanded) : undefined}
+      >
+        <TableCell className="font-medium">
+          <div className="flex items-center gap-1.5">
+            {hasNodes && (expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />)}
+            {user.username}
+          </div>
+        </TableCell>
+        <TableCell>{formatBytes(user.tx_bytes)}</TableCell>
+        <TableCell>{formatBytes(user.rx_bytes)}</TableCell>
+        <TableCell>{formatBytes(user.tx_bytes + user.rx_bytes)}</TableCell>
+        <TableCell>
+          {user.online_connections > 0 ? (
+            <Badge variant="outline" className="text-green-600">
+              {user.online_connections}
+            </Badge>
+          ) : (
+            <span className="text-xs text-muted-foreground">0</span>
+          )}
+        </TableCell>
+      </TableRow>
+      {expanded && user.nodes?.map((nd) => (
+        <TableRow key={nd.node} className="bg-muted/30">
+          <TableCell className="pl-10 text-xs text-muted-foreground">{nd.node}</TableCell>
+          <TableCell className="text-xs text-muted-foreground">{formatBytes(nd.tx_bytes)}</TableCell>
+          <TableCell className="text-xs text-muted-foreground">{formatBytes(nd.rx_bytes)}</TableCell>
+          <TableCell className="text-xs text-muted-foreground">{formatBytes(nd.tx_bytes + nd.rx_bytes)}</TableCell>
+          <TableCell className="text-xs text-muted-foreground">
+            {nd.online_connections > 0 ? nd.online_connections : '-'}
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
 }
 
 export function AppTrafficTab({ appId }: AppTrafficTabProps) {
@@ -90,21 +135,7 @@ export function AppTrafficTab({ appId }: AppTrafficTabProps) {
             </TableHeader>
             <TableBody>
               {users.map((user) => (
-                <TableRow key={user.username}>
-                  <TableCell className="font-medium">{user.username}</TableCell>
-                  <TableCell>{formatBytes(user.tx_bytes)}</TableCell>
-                  <TableCell>{formatBytes(user.rx_bytes)}</TableCell>
-                  <TableCell>{formatBytes(user.tx_bytes + user.rx_bytes)}</TableCell>
-                  <TableCell>
-                    {user.online_connections > 0 ? (
-                      <Badge variant="outline" className="text-green-600">
-                        {user.online_connections}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">0</span>
-                    )}
-                  </TableCell>
-                </TableRow>
+                <UserRow key={user.username} user={user} />
               ))}
             </TableBody>
           </Table>

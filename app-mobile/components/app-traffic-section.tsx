@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from '@/lib/i18n';
 import { useAppTraffic } from '@/hooks/use-app-traffic';
+import type { TrafficUserSummary } from '@passim/shared/types';
 
 interface Props {
   nodeId: string;
@@ -22,6 +24,61 @@ function formatBytes(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   const value = bytes / Math.pow(1024, i);
   return `${value.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+}
+
+function UserTrafficCard({ user }: { user: TrafficUserSummary }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const hasNodes = (user.nodes?.length ?? 0) > 1;
+
+  return (
+    <Pressable
+      className="bg-gray-900 rounded-xl px-4 py-3"
+      onPress={hasNodes ? () => setExpanded(!expanded) : undefined}
+    >
+      <View className="flex-row items-center justify-between">
+        <View className="flex-1 min-w-0">
+          <View className="flex-row items-center gap-1.5">
+            {hasNodes && (
+              <Ionicons
+                name={expanded ? 'chevron-down' : 'chevron-forward'}
+                size={12}
+                color="#9ca3af"
+              />
+            )}
+            <Text className="text-white text-sm font-medium" numberOfLines={1}>
+              {user.username}
+            </Text>
+          </View>
+          {user.online_connections > 0 && (
+            <Text className="text-green-500 text-xs mt-0.5">
+              {t('app.connections', { count: String(user.online_connections) })}
+            </Text>
+          )}
+        </View>
+        <View className="items-end">
+          <Text className="text-gray-300 text-xs">
+            {'\u2191'} {formatBytes(user.tx_bytes)}
+          </Text>
+          <Text className="text-gray-300 text-xs">
+            {'\u2193'} {formatBytes(user.rx_bytes)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Node breakdown */}
+      {expanded && user.nodes?.map((nd) => (
+        <View key={nd.node} className="flex-row items-center justify-between mt-2 pt-2 border-t border-gray-800">
+          <Text className="text-gray-500 text-xs flex-1">{nd.node}</Text>
+          <View className="items-end">
+            <Text className="text-gray-500 text-xs">
+              {'\u2191'}{formatBytes(nd.tx_bytes)}  {'\u2193'}{formatBytes(nd.rx_bytes)}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </Pressable>
+  );
 }
 
 export function AppTrafficSection({ nodeId, appId }: Props) {
@@ -92,28 +149,7 @@ export function AppTrafficSection({ nodeId, appId }: Props) {
           {data.users.length > 0 && (
             <View className="gap-2">
               {data.users.map((user) => (
-                <View key={user.username} className="bg-gray-900 rounded-xl px-4 py-3">
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-1 min-w-0">
-                      <Text className="text-white text-sm font-medium" numberOfLines={1}>
-                        {user.username}
-                      </Text>
-                      {user.online_connections > 0 && (
-                        <Text className="text-green-500 text-xs mt-0.5">
-                          {t('app.connections', { count: String(user.online_connections) })}
-                        </Text>
-                      )}
-                    </View>
-                    <View className="items-end">
-                      <Text className="text-gray-300 text-xs">
-                        {'\u2191'} {formatBytes(user.tx_bytes)}
-                      </Text>
-                      <Text className="text-gray-300 text-xs">
-                        {'\u2193'} {formatBytes(user.rx_bytes)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
+                <UserTrafficCard key={user.username} user={user} />
               ))}
             </View>
           )}
