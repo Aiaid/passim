@@ -124,6 +124,16 @@ func (m *MockClient) ResizeExec(ctx context.Context, execID string, height, widt
 	return m.ResizeExecErr
 }
 
+func (m *MockClient) EnsureNetwork(ctx context.Context, name string) error {
+	m.record("EnsureNetwork", name)
+	return nil
+}
+
+func (m *MockClient) ConnectNetwork(ctx context.Context, networkName, containerID string, aliases []string) error {
+	m.record("ConnectNetwork", networkName, containerID, aliases)
+	return nil
+}
+
 func (m *MockClient) Ping(ctx context.Context) error {
 	m.record("Ping")
 	return m.PingErr

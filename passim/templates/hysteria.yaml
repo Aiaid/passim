@@ -63,8 +63,6 @@ container:
     - "server"
     - "-c"
     - "/etc/hysteria/config.yaml"
-  extra_hosts:
-    - "host.docker.internal:host-gateway"
 clients:
   type: url
   urls:
@@ -113,7 +111,7 @@ config:
         auth:
           type: http
           http:
-            url: http://host.docker.internal:{{node.port}}/internal/app-auth/{{app.id}}
+            url: http://passim:{{node.port}}/internal/app-auth/{{app.id}}
             insecure: true
         trafficStats:
           listen: :9999

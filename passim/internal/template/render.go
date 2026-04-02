@@ -9,12 +9,13 @@ import (
 
 // NodeInfo describes the host node for template rendering.
 type NodeInfo struct {
-	PublicIP string
-	Timezone string
-	Hostname string
-	DataDir  string
-	Domain   string // SSL domain (e.g., "vruwbka8.dns.passim.io" or user's own domain)
-	Port     string // Passim listen port (e.g., "8443")
+	PublicIP    string
+	Timezone    string
+	Hostname    string
+	DataDir     string
+	Domain      string // SSL domain (e.g., "vruwbka8.dns.passim.io" or user's own domain)
+	Port        string // Passim listen port (e.g., "8443")
+	InternalIP  string // Passim container IP on Docker network (for container→container auth callbacks)
 }
 
 // AppInfo describes the deployed app instance for template rendering.
@@ -64,6 +65,7 @@ func buildFlatMap(data RenderData) map[string]interface{} {
 	m["node_data_dir"] = data.Node.DataDir
 	m["node_Domain"] = data.Node.Domain
 	m["node_port"] = data.Node.Port
+	m["node_internal_ip"] = data.Node.InternalIP
 	for k, v := range data.Generated {
 		m["generated_"+k] = v
 	}

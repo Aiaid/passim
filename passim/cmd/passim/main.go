@@ -202,6 +202,25 @@ func main() {
 		}
 	}
 
+	// Set up "passim" Docker network for container-to-container communication.
+	// Passim joins with alias "passim" so deployed apps can reach it via DNS.
+	if dockerClient != nil {
+		ctx := context.Background()
+		if err := dockerClient.EnsureNetwork(ctx, "passim"); err != nil {
+			log.Printf("warning: failed to ensure passim network: %v", err)
+		} else {
+			hostname, _ := os.Hostname()
+			if err := dockerClient.ConnectNetwork(ctx, "passim", hostname, []string{"passim"}); err != nil {
+				// Ignore "already connected" errors
+				if !strings.Contains(err.Error(), "already exists") {
+					log.Printf("warning: failed to join passim network: %v", err)
+				}
+			} else {
+				log.Printf("joined passim Docker network (alias: passim)")
+			}
+		}
+	}
+
 	// Initialize Node Hub for remote node management
 	nodeHub := node.NewHub(database, sseBroker)
 	nodeHub.Start(context.Background())

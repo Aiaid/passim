@@ -21,8 +21,9 @@ type DeployRequest struct {
 	CapAdd      []string
 	Sysctls     map[string]string
 	Args        []string
-	ExtraHosts  []string
-	ConfigFiles []DeployConfigFile
+	ExtraHosts   []string
+	NetworkName  string // Docker network to join (e.g. "passim")
+	ConfigFiles  []DeployConfigFile
 	DataDir      string // base data directory (e.g. /data)
 	DataVolume   string // Docker named volume for DataDir (e.g. "passim_passim-data")
 	DataHostPath string // host bind-mount source for DataDir (e.g. "/opt/passim/data")
@@ -97,6 +98,7 @@ func CreateAndRun(ctx context.Context, client DockerClient, req *DeployRequest) 
 		Sysctls:       req.Sysctls,
 		Cmd:           req.Args,
 		ExtraHosts:    req.ExtraHosts,
+		NetworkName:   req.NetworkName,
 		RestartPolicy: "unless-stopped",
 		DataDir:       req.DataDir,
 		DataVolume:    req.DataVolume,

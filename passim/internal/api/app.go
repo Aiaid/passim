@@ -120,12 +120,12 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			port = "8443"
 		}
 		nodeInfo := tmpl.NodeInfo{
-			PublicIP:  appPublicIP,
-			Timezone:  tz,
-			Hostname:  hostname,
-			DataDir:   dataDir,
-			Domain:    sslDomain,
-			Port:      port,
+			PublicIP:    appPublicIP,
+			Timezone:    tz,
+			Hostname:    hostname,
+			DataDir:     dataDir,
+			Domain:      sslDomain,
+			Port:        port,
 		}
 		// Resolve {{node.*}} placeholder defaults in settings (e.g. "{{node.Domain}}")
 		tmpl.ResolveNodeDefaults(merged, nodeInfo)
@@ -389,12 +389,12 @@ func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[stri
 	rendered, err := tmpl.Render(t, tmpl.RenderData{
 		Settings: settings,
 		Node: tmpl.NodeInfo{
-			PublicIP:  redeployIP,
-			Timezone:  tz,
-			Hostname:  hostname,
-			DataDir:   dataDir,
-			Domain:    redeployDomain,
-			Port:      port,
+			PublicIP:    redeployIP,
+			Timezone:    tz,
+			Hostname:    hostname,
+			DataDir:     dataDir,
+			Domain:      redeployDomain,
+			Port:        port,
 		},
 		Generated: generated,
 		App:       tmpl.AppInfo{Dir: appDir, ID: appID},
@@ -427,6 +427,7 @@ func buildDeployReq(deps Deps, t *tmpl.Template, appID string, settings map[stri
 		DataDir:      dataDir,
 		DataVolume:   deps.DataVolume,
 		DataHostPath: deps.DataHostPath,
+		NetworkName:  "passim",
 	}, nil
 }
 

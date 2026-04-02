@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
@@ -36,6 +37,8 @@ type DockerClient interface {
 	ExecContainer(ctx context.Context, id string, cmd []string) (string, error)
 	ExecInteractive(ctx context.Context, id string, cmd []string) (*ExecSession, error)
 	ResizeExec(ctx context.Context, execID string, height, width uint) error
+	EnsureNetwork(ctx context.Context, name string) error
+	ConnectNetwork(ctx context.Context, networkName, containerID string, aliases []string) error
 	Ping(ctx context.Context) error
 	Close() error
 }
@@ -52,6 +55,7 @@ type ContainerConfig struct {
 	Sysctls       map[string]string
 	Cmd           []string
 	ExtraHosts    []string
+	NetworkName   string // Docker network to connect the container to (e.g. "passim")
 	RestartPolicy string
 	AutoRemove    bool
 	// DataDir is the data directory path inside the Passim container (e.g. "/data").
@@ -158,6 +162,11 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, cfg *ContainerConf
 	if err != nil {
 		return "", fmt.Errorf("create container: %w", err)
 	}
+	// Connect to named network before starting (for Docker DNS resolution)
+	if cfg.NetworkName != "" {
+		_ = c.cli.NetworkConnect(ctx, cfg.NetworkName, resp.ID, nil)
+	}
+
 	if err := c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		// Clean up the created container so it doesn't become an orphan
 		_ = c.cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
@@ -276,6 +285,32 @@ func (c *Client) ResizeExec(ctx context.Context, execID string, height, width ui
 	return c.cli.ContainerExecResize(ctx, execID, container.ResizeOptions{
 		Height: height,
 		Width:  width,
+	})
+}
+
+func (c *Client) EnsureNetwork(ctx context.Context, name string) error {
+	// Check if network already exists
+	networks, err := c.cli.NetworkList(ctx, network.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("list networks: %w", err)
+	}
+	for _, n := range networks {
+		if n.Name == name {
+			return nil // already exists
+		}
+	}
+	_, err = c.cli.NetworkCreate(ctx, name, network.CreateOptions{
+		Driver: "bridge",
+	})
+	if err != nil {
+		return fmt.Errorf("create network %s: %w", name, err)
+	}
+	return nil
+}
+
+func (c *Client) ConnectNetwork(ctx context.Context, networkName, containerID string, aliases []string) error {
+	return c.cli.NetworkConnect(ctx, networkName, containerID, &network.EndpointSettings{
+		Aliases: aliases,
 	})
 }
 
