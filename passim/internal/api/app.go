@@ -164,6 +164,7 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 			Sysctls:     rendered.Sysctls,
 			Args:        rendered.Args,
 			ExtraHosts:  rendered.ExtraHosts,
+			NetworkName: "passim",
 			ConfigFiles:  configFiles,
 			DataDir:      dataDir,
 			DataVolume:   deps.DataVolume,
