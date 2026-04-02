@@ -472,10 +472,11 @@ export interface AppUser {
   username: string;
   enabled: boolean;
   quota_bytes: number;
+  connection_uri?: string;
+  share_url?: string;
   used_bytes?: number;
   online_connections?: number;
   created_at: string;
-  share_url?: string;
 }
 
 export interface AppUsersResponse {

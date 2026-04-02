@@ -236,6 +236,8 @@
     "online": "Online",
     "offline": "Offline",
     "connections": "{{count}} connections",
+    "copy_uri": "Copy URI",
+    "share": "Share",
     "enabled": "Enabled",
     "disabled": "Disabled",
     "total_upload": "Upload",

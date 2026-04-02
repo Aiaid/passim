@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Trash2, Zap, Users } from 'lucide-react';
+import { Plus, Trash2, Zap, Users, Copy, QrCode, ExternalLink } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,6 +45,7 @@ export function AppUsersTab({ appId, templateDetail }: AppUsersTabProps) {
   const { t } = useTranslation();
   const [showAdd, setShowAdd] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [qrURI, setQrURI] = useState<string | null>(null);
 
   const { data } = useAppUsers(appId, true);
   const createUser = useCreateAppUser();
@@ -143,6 +146,42 @@ export function AppUsersTab({ appId, templateDetail }: AppUsersTabProps) {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {user.connection_uri && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title={t('users.copy_uri')}
+                              onClick={() => {
+                                navigator.clipboard.writeText(user.connection_uri!);
+                                toast.success(t('users.uri_copied'));
+                              }}
+                            >
+                              <Copy className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title={t('users.show_qr')}
+                              onClick={() => setQrURI(user.connection_uri!)}
+                            >
+                              <QrCode className="size-4" />
+                            </Button>
+                          </>
+                        )}
+                        {user.share_url && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title={t('users.share_link')}
+                            onClick={() => {
+                              navigator.clipboard.writeText(user.share_url!);
+                              toast.success(t('users.share_copied'));
+                            }}
+                          >
+                            <ExternalLink className="size-4" />
+                          </Button>
+                        )}
                         {kickSupported && (user.online_connections ?? 0) > 0 && (
                           <Button
                             variant="ghost"
@@ -191,6 +230,19 @@ export function AppUsersTab({ appId, templateDetail }: AppUsersTabProps) {
         }}
         destructive
       />
+
+      {/* QR Code Dialog */}
+      <Dialog open={!!qrURI} onOpenChange={(open) => !open && setQrURI(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('users.connection_qr')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 p-4">
+            {qrURI && <QRCodeSVG value={qrURI} size={256} />}
+            <code className="text-xs text-muted-foreground break-all max-w-full">{qrURI}</code>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

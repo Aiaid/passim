@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   Switch,
   TextInput,
+  Share,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import type { TemplateDetail } from '@passim/shared/types';
@@ -173,6 +175,34 @@ export function AppUsersSection({ nodeId, appId, templateDetail }: Props) {
                     />
                   </View>
                 </View>
+                {/* Per-user URI actions */}
+                {(user.connection_uri || user.share_url) && (
+                  <View className="flex-row gap-2 mt-2 pt-2 border-t border-gray-800">
+                    {user.connection_uri && (
+                      <Pressable
+                        className="flex-1 flex-row items-center justify-center gap-1 py-1.5 rounded-lg bg-gray-800 active:opacity-70"
+                        onPress={() => {
+                          Clipboard.setStringAsync(user.connection_uri!);
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        }}
+                      >
+                        <Ionicons name="copy-outline" size={14} color="#9ca3af" />
+                        <Text className="text-gray-400 text-xs">{t('app.copy_uri')}</Text>
+                      </Pressable>
+                    )}
+                    {user.share_url && (
+                      <Pressable
+                        className="flex-1 flex-row items-center justify-center gap-1 py-1.5 rounded-lg bg-gray-800 active:opacity-70"
+                        onPress={() => {
+                          Share.share({ url: user.share_url!, message: user.share_url! });
+                        }}
+                      >
+                        <Ionicons name="share-outline" size={14} color="#9ca3af" />
+                        <Text className="text-gray-400 text-xs">{t('app.share')}</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                )}
               </Pressable>
             );
           })}

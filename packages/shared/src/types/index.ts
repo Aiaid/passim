@@ -256,8 +256,9 @@ export interface AppUser {
   quota_bytes: number;
   used_bytes?: number;
   online_connections?: number;
-  created_at: string;
+  connection_uri?: string;
   share_url?: string;
+  created_at: string;
 }
 
 export interface AppUsersResponse {

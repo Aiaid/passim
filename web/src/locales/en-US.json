@@ -245,7 +245,13 @@
     "kicked": "User kicked",
     "no_users": "No users",
     "no_users_desc": "Add a user to get started",
-    "unlimited": "Unlimited"
+    "unlimited": "Unlimited",
+    "copy_uri": "Copy connection URI",
+    "uri_copied": "Connection URI copied",
+    "show_qr": "Show QR code",
+    "share_link": "Copy share link",
+    "share_copied": "Share link copied",
+    "connection_qr": "Connection QR Code"
   },
   "traffic": {
     "total_upload": "Total Upload",

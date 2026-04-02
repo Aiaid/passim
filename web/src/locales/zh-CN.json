@@ -245,7 +245,13 @@
     "kicked": "用户已踢下线",
     "no_users": "暂无用户",
     "no_users_desc": "添加用户以开始使用",
-    "unlimited": "无限制"
+    "unlimited": "无限制",
+    "copy_uri": "复制连接地址",
+    "uri_copied": "连接地址已复制",
+    "show_qr": "显示二维码",
+    "share_link": "复制分享链接",
+    "share_copied": "分享链接已复制",
+    "connection_qr": "连接二维码"
   },
   "traffic": {
     "total_upload": "总上传",
