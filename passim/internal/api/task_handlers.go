@@ -59,12 +59,37 @@ func makeDeployHandler(deps Deps) task.TaskHandler {
 			log.Printf("task %s: failed to update app %s: %v", t.ID, appID, err)
 		}
 
-		// Start metrics polling if template has metrics config
-		if deps.MetricsCollector != nil && deps.Templates != nil {
+		// Auto-create default user for apps using http_auth
+		if deps.Templates != nil {
 			app, _ := db.GetApp(deps.DB, appID)
 			if app != nil {
-				if tmpl, ok := deps.Templates.Get(app.Template); ok && tmpl.Metrics != nil {
-					deps.MetricsCollector.StartPolling(app, tmpl)
+				if tmpl, ok := deps.Templates.Get(app.Template); ok {
+					if tmpl.Users != nil && tmpl.Users.Add != nil && tmpl.Users.Add.Method == "http_auth" {
+						count, _ := db.CountAppUsers(deps.DB, appID)
+						if count == 0 {
+							// Extract password from app settings
+							var settings map[string]interface{}
+							json.Unmarshal([]byte(app.Settings), &settings)
+							pw, _ := settings["password"].(string)
+							if pw != "" {
+								defaultUser := &db.AppUser{
+									ID:       "default-" + appID[:8],
+									AppID:    appID,
+									Username: "admin",
+									Password: pw,
+									Enabled:  true,
+								}
+								if err := db.CreateAppUser(deps.DB, defaultUser); err != nil {
+									log.Printf("task %s: failed to create default user for %s: %v", t.ID, appID, err)
+								}
+							}
+						}
+					}
+
+					// Start metrics polling if template has metrics config
+					if deps.MetricsCollector != nil && tmpl.Metrics != nil {
+						deps.MetricsCollector.StartPolling(app, tmpl)
+					}
 				}
 			}
 		}
