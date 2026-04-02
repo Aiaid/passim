@@ -312,12 +312,10 @@ function AppNodesTab({ app }: { app: AppResponse }) {
 
   const undeployMutation = useMutation({
     mutationFn: async ({ nodeId, appId }: { nodeId: string; appId: string }) => {
-      // For now, only local undeploy is supported via deleteApp
       if (nodeId === 'local') {
         return api.deleteApp(appId);
       }
-      // Remote undeploy would need a proxy endpoint — placeholder
-      return api.deleteApp(appId);
+      return api.deleteNodeApp(nodeId, appId);
     },
     onSuccess: (_data, { nodeId }) => {
       if (nodeId === 'local') {
