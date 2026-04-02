@@ -164,7 +164,9 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, cfg *ContainerConf
 	}
 	// Connect to named network before starting (for Docker DNS resolution)
 	if cfg.NetworkName != "" {
-		_ = c.cli.NetworkConnect(ctx, cfg.NetworkName, resp.ID, nil)
+		if err := c.cli.NetworkConnect(ctx, cfg.NetworkName, resp.ID, nil); err != nil {
+			fmt.Printf("warning: failed to connect container %s to network %s: %v\n", cfg.Name, cfg.NetworkName, err)
+		}
 	}
 
 	if err := c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
