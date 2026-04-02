@@ -210,6 +210,24 @@ export const api = {
       body: JSON.stringify({ version }),
     }),
 
+  // App Users
+  getAppUsers: (appId: string) =>
+    request<AppUsersResponse>(`/apps/${appId}/users`),
+  createAppUser: (appId: string, data: { username: string; password?: string; quota_bytes?: number }) =>
+    request<AppUser>(`/apps/${appId}/users`, { method: 'POST', body: JSON.stringify(data) }),
+  updateAppUser: (appId: string, uid: string, data: { enabled?: boolean; quota_bytes?: number; password?: string }) =>
+    request<AppUser>(`/apps/${appId}/users/${uid}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteAppUser: (appId: string, uid: string) =>
+    request<void>(`/apps/${appId}/users/${uid}`, { method: 'DELETE' }),
+  kickAppUser: (appId: string, uid: string) =>
+    request<void>(`/apps/${appId}/users/${uid}/kick`, { method: 'POST' }),
+
+  // App Traffic
+  getAppTraffic: (appId: string, period: string) =>
+    request<TrafficResponse>(`/apps/${appId}/traffic?period=${period}`),
+  getAppUserTrafficHistory: (appId: string, username: string, period: string) =>
+    request<TrafficHistoryResponse>(`/apps/${appId}/traffic/${username}/history?period=${period}`),
+
   // Connections
   getConnections: () => request<ConnectionInfo[]>('/connections'),
   disconnect: (id: string) => request<void>(`/connections/${id}`, { method: 'DELETE' }),
@@ -290,6 +308,18 @@ export interface TemplateShare {
   share_content?: string[];
 }
 
+export interface UsersCapability {
+  supported: boolean;
+  kick_supported: boolean;
+  fields?: { key: string; type: string; label: Record<string, string>; required?: boolean; default?: unknown }[];
+}
+
+export interface MetricsCapability {
+  supported: boolean;
+  per_user: boolean;
+  interval: string;
+}
+
 export interface TemplateDetail extends TemplateSummary {
   version: string;
   guide?: TemplateGuide;
@@ -297,6 +327,8 @@ export interface TemplateDetail extends TemplateSummary {
   share?: TemplateShare;
   source?: { url?: string; license?: string };
   limitations?: string[];
+  users?: UsersCapability;
+  metrics?: MetricsCapability;
 }
 
 export interface ClientConfigResponse {
@@ -429,6 +461,39 @@ export interface ConnectionInfo {
   id: string;
   remote_ip: string;
   connected_at: string;
+}
+
+export interface AppUser {
+  id: string;
+  username: string;
+  enabled: boolean;
+  quota_bytes: number;
+  used_bytes?: number;
+  online_connections?: number;
+  created_at: string;
+  share_url?: string;
+}
+
+export interface AppUsersResponse {
+  users: AppUser[];
+}
+
+export interface TrafficUserSummary {
+  username: string;
+  tx_bytes: number;
+  rx_bytes: number;
+  online_connections: number;
+}
+
+export interface TrafficResponse {
+  users: TrafficUserSummary[];
+  total: { tx_bytes: number; rx_bytes: number };
+  period: string;
+}
+
+export interface TrafficHistoryResponse {
+  points: { time: string; tx: number; rx: number }[];
+  granularity: string;
 }
 
 export interface PublicKeyCredentialCreationOptionsJSON {

@@ -585,8 +585,14 @@ func TestHysteriaConfigTemplate(t *testing.T) {
 	}
 
 	cf := hy.Config.Files[0]
-	if !strings.Contains(cf.Template, "password") {
-		t.Error("hysteria config template does not contain password reference")
+	if !strings.Contains(cf.Template, "auth") {
+		t.Error("hysteria config template does not contain auth section")
+	}
+	if !strings.Contains(cf.Template, "http") {
+		t.Error("hysteria config template does not contain http auth type")
+	}
+	if !strings.Contains(cf.Template, "trafficStats") {
+		t.Error("hysteria config template does not contain trafficStats section")
 	}
 	if cf.Path != "config.yaml" {
 		t.Errorf("hysteria config path = %q, want config.yaml", cf.Path)

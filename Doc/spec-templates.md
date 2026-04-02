@@ -36,8 +36,10 @@
 | `clients` (三种类型: file_per_user/credentials/url) | ✅ 解析 + 渲染 + API + 前端 |
 | `share` (分享配置) | ✅ 解析 + API + 前端 (token 创建/撤销/公开访问) |
 | `guide.platforms` (结构化平台指引) | ✅ 解析 + 前端展示 |
-| `users` (增删管理) | ⬜ Phase 2 |
-| `metrics.per_user` | ⬜ Phase 2 |
+| `users` (增删管理) | ✅ 已实现 (http_auth 方法 — Passim 做 auth backend，DB 存储用户) |
+| `users.kick` | ✅ 已实现 (api 方法 — 调用容器 HTTP API 踢用户) |
+| `metrics.per_user` | ✅ 已实现 (api 方法 — 轮询容器 trafficStats + online 端点) |
+| `container.extra_hosts` | ✅ 已实现 (传入 Docker HostConfig.ExtraHosts) |
 
 > **端口映射修复**: 端口映射已修复，ExposedPorts + PortBindings 正确传递到 Docker API。
 

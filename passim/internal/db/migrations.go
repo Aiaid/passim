@@ -86,6 +86,33 @@ var migrations = []string{
 		created_at TEXT DEFAULT (datetime('now')),
 		revoked    INTEGER DEFAULT 0
 	)`,
+
+	`CREATE TABLE IF NOT EXISTS app_users (
+		id          TEXT PRIMARY KEY,
+		app_id      TEXT NOT NULL,
+		username    TEXT NOT NULL,
+		password    TEXT NOT NULL,
+		enabled     INTEGER DEFAULT 1,
+		quota_bytes INTEGER DEFAULT 0,
+		created_at  TEXT DEFAULT (datetime('now')),
+		updated_at  TEXT DEFAULT (datetime('now')),
+		UNIQUE(app_id, username)
+	)`,
+
+	`CREATE TABLE IF NOT EXISTS app_traffic_logs (
+		id          INTEGER PRIMARY KEY AUTOINCREMENT,
+		app_id      TEXT NOT NULL,
+		user_id     TEXT NOT NULL,
+		tx_bytes    INTEGER NOT NULL,
+		rx_bytes    INTEGER NOT NULL,
+		recorded_at TEXT DEFAULT (datetime('now'))
+	)`,
+
+	`CREATE INDEX IF NOT EXISTS idx_traffic_app_user_time
+		ON app_traffic_logs(app_id, user_id, recorded_at)`,
+
+	`CREATE INDEX IF NOT EXISTS idx_app_users_app
+		ON app_users(app_id)`,
 }
 
 // alterColumns are idempotent column additions for existing tables.

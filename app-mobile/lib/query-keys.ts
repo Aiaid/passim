@@ -15,4 +15,6 @@ export const qk = {
   hubNodes: (hubNodeId: string) => ['hub-nodes', hubNodeId] as const,
   hubNodeApps: (hubNodeId: string, remoteNodeId: string) => ['hub-nodes', hubNodeId, remoteNodeId, 'apps'] as const,
   shareConfig: (host: string, token: string) => ['share', host, token] as const,
+  appUsers: (nodeId: string, appId: string) => ['app-users', nodeId, appId] as const,
+  appTraffic: (nodeId: string, appId: string, period: string) => ['app-traffic', nodeId, appId, period] as const,
 };

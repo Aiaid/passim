@@ -14,11 +14,13 @@ type NodeInfo struct {
 	Hostname string
 	DataDir  string
 	Domain   string // SSL domain (e.g., "vruwbka8.dns.passim.io" or user's own domain)
+	Port     string // Passim listen port (e.g., "8443")
 }
 
 // AppInfo describes the deployed app instance for template rendering.
 type AppInfo struct {
 	Dir string // per-app directory, e.g. /data/apps/wireguard-abc12345
+	ID  string // app instance ID, e.g. "abc12345"
 }
 
 // RenderData carries all data available during template rendering.
@@ -40,6 +42,7 @@ type RenderedTemplate struct {
 	Sysctls     map[string]string
 	Args        []string
 	ConfigFiles []RenderedConfigFile
+	ExtraHosts  []string
 }
 
 // RenderedConfigFile is a config file with its content rendered.
@@ -60,10 +63,12 @@ func buildFlatMap(data RenderData) map[string]interface{} {
 	m["node_Hostname"] = data.Node.Hostname
 	m["node_data_dir"] = data.Node.DataDir
 	m["node_Domain"] = data.Node.Domain
+	m["node_port"] = data.Node.Port
 	for k, v := range data.Generated {
 		m["generated_"+k] = v
 	}
 	m["app_dir"] = data.App.Dir
+	m["app_id"] = data.App.ID
 	return m
 }
 
@@ -194,6 +199,11 @@ func Render(tmpl *Template, data RenderData) (*RenderedTemplate, error) {
 	capAdd := make([]string, len(tmpl.Container.CapAdd))
 	copy(capAdd, tmpl.Container.CapAdd)
 
+	extraHosts, err := renderStringSlice(tmpl.Container.ExtraHosts, flatMap)
+	if err != nil {
+		return nil, fmt.Errorf("render extra_hosts: %w", err)
+	}
+
 	return &RenderedTemplate{
 		Image:       image,
 		Ports:       ports,
@@ -204,5 +214,6 @@ func Render(tmpl *Template, data RenderData) (*RenderedTemplate, error) {
 		Sysctls:     sysctls,
 		Args:        args,
 		ConfigFiles: configFiles,
+		ExtraHosts:  extraHosts,
 	}, nil
 }

@@ -188,6 +188,118 @@ func TestRenderNoPlaceholders(t *testing.T) {
 	}
 }
 
+func TestRenderAppID(t *testing.T) {
+	tmpl := &Template{
+		Name: "test",
+		Container: ContainerSpec{
+			Image: "alpine",
+			Environment: map[string]string{
+				"APP_ID": "{{app.id}}",
+			},
+		},
+	}
+
+	data := RenderData{
+		Settings: map[string]interface{}{},
+		App: AppInfo{
+			Dir: "/data/apps/hysteria-abc123",
+			ID:  "abc123",
+		},
+	}
+
+	result, err := Render(tmpl, data)
+	if err != nil {
+		t.Fatalf("Render() error: %v", err)
+	}
+
+	if result.Environment["APP_ID"] != "abc123" {
+		t.Errorf("Environment[APP_ID] = %q, want %q", result.Environment["APP_ID"], "abc123")
+	}
+}
+
+func TestRenderNodePort(t *testing.T) {
+	tmpl := &Template{
+		Name: "test",
+		Container: ContainerSpec{
+			Image: "alpine",
+			Environment: map[string]string{
+				"CALLBACK": "http://host.docker.internal:{{node.port}}/internal/auth",
+			},
+		},
+	}
+
+	data := RenderData{
+		Settings: map[string]interface{}{},
+		Node: NodeInfo{
+			Port: "8443",
+		},
+	}
+
+	result, err := Render(tmpl, data)
+	if err != nil {
+		t.Fatalf("Render() error: %v", err)
+	}
+
+	expected := "http://host.docker.internal:8443/internal/auth"
+	if result.Environment["CALLBACK"] != expected {
+		t.Errorf("Environment[CALLBACK] = %q, want %q", result.Environment["CALLBACK"], expected)
+	}
+}
+
+func TestRenderExtraHosts(t *testing.T) {
+	tmpl := &Template{
+		Name: "test",
+		Container: ContainerSpec{
+			Image:      "alpine",
+			ExtraHosts: []string{"host.docker.internal:host-gateway", "custom:{{node.PublicIP}}"},
+		},
+	}
+
+	data := RenderData{
+		Settings: map[string]interface{}{},
+		Node: NodeInfo{
+			PublicIP: "10.0.0.1",
+		},
+	}
+
+	result, err := Render(tmpl, data)
+	if err != nil {
+		t.Fatalf("Render() error: %v", err)
+	}
+
+	if len(result.ExtraHosts) != 2 {
+		t.Fatalf("len(ExtraHosts) = %d, want 2", len(result.ExtraHosts))
+	}
+	if result.ExtraHosts[0] != "host.docker.internal:host-gateway" {
+		t.Errorf("ExtraHosts[0] = %q", result.ExtraHosts[0])
+	}
+	if result.ExtraHosts[1] != "custom:10.0.0.1" {
+		t.Errorf("ExtraHosts[1] = %q, want %q", result.ExtraHosts[1], "custom:10.0.0.1")
+	}
+}
+
+func TestRenderExtraHostsNil(t *testing.T) {
+	tmpl := &Template{
+		Name: "test",
+		Container: ContainerSpec{
+			Image: "alpine",
+		},
+	}
+
+	data := RenderData{
+		Settings: map[string]interface{}{},
+	}
+
+	result, err := Render(tmpl, data)
+	if err != nil {
+		t.Fatalf("Render() error: %v", err)
+	}
+
+	if result.ExtraHosts != nil {
+		t.Errorf("ExtraHosts should be nil, got %v", result.ExtraHosts)
+	}
+}
+
 func TestRenderNodeVariables(t *testing.T) {
 	tmpl := &Template{
 		Name: "test",

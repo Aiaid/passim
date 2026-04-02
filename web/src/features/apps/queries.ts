@@ -100,3 +100,71 @@ export function useTemplateDetail(templateName: string | undefined) {
     staleTime: Infinity,
   });
 }
+
+export function useAppUsers(appId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['app-users', appId],
+    queryFn: () => api.getAppUsers(appId),
+    enabled: !!appId && enabled,
+    refetchInterval: 10_000,
+  });
+}
+
+export function useAppTraffic(appId: string, period: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['app-traffic', appId, period],
+    queryFn: () => api.getAppTraffic(appId, period),
+    enabled: !!appId && enabled,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useCreateAppUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ appId, data }: { appId: string; data: { username: string; password?: string; quota_bytes?: number } }) =>
+      api.createAppUser(appId, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['app-users', variables.appId] });
+    },
+  });
+}
+
+export function useUpdateAppUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ appId, uid, data }: { appId: string; uid: string; data: { enabled?: boolean; quota_bytes?: number; password?: string } }) =>
+      api.updateAppUser(appId, uid, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['app-users', variables.appId] });
+    },
+  });
+}
+
+export function useDeleteAppUser() {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  return useMutation({
+    mutationFn: ({ appId, uid }: { appId: string; uid: string }) =>
+      api.deleteAppUser(appId, uid),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['app-users', variables.appId] });
+      toast.success(t('users.deleted'));
+    },
+  });
+}
+
+export function useKickAppUser() {
+  const { t } = useTranslation();
+
+  return useMutation({
+    mutationFn: ({ appId, uid }: { appId: string; uid: string }) =>
+      api.kickAppUser(appId, uid),
+    onSuccess: () => {
+      toast.success(t('users.kicked'));
+    },
+  });
+}

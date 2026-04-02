@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/api"
+	"github.com/passim/passim/internal/appmetrics"
 	"github.com/passim/passim/internal/auth"
 	"github.com/passim/passim/internal/db"
 	"github.com/passim/passim/internal/docker"
@@ -217,27 +218,47 @@ func main() {
 
 	pairingStore := auth.NewPairingStore()
 
+	// Metrics collector — polls app containers for traffic/online stats
+	var metricsCollector *appmetrics.Collector
+	if dockerClient != nil && registry != nil {
+		metricsCollector = appmetrics.NewCollector(database, dockerClient, registry)
+	}
+
 	deps := api.Deps{
-		DB:         database,
-		JWT:        jwtMgr,
-		WebAuthn:   webauthnMgr,
-		Pairing:    pairingStore,
-		Docker:     dockerClient,
-		Templates:  registry,
-		SSL:        sslMgr,
-		Iperf:      iperfSrv,
-		Tasks:      taskQueue,
-		SSE:        sseBroker,
-		NodeHub:    nodeHub,
-		DataDir:      dataDir,
-		DataVolume:   dataVolume,
-		DataHostPath: dataHostPath,
-		Checker:    checker,
-		Updater:    updater,
+		DB:               database,
+		JWT:              jwtMgr,
+		WebAuthn:         webauthnMgr,
+		Pairing:          pairingStore,
+		Docker:           dockerClient,
+		Templates:        registry,
+		SSL:              sslMgr,
+		Iperf:            iperfSrv,
+		Tasks:            taskQueue,
+		SSE:              sseBroker,
+		NodeHub:          nodeHub,
+		DataDir:          dataDir,
+		DataVolume:       dataVolume,
+		DataHostPath:     dataHostPath,
+		Checker:          checker,
+		Updater:          updater,
+		MetricsCollector: metricsCollector,
 	}
 
 	// Register task handlers (deploy/undeploy) — after deps assembled
 	api.RegisterTaskHandlers(taskQueue, deps)
+
+	// Start metrics polling for running apps with metrics config
+	if metricsCollector != nil {
+		apps, _ := db.ListApps(database)
+		for _, app := range apps {
+			if app.Status != "running" {
+				continue
+			}
+			if tmpl, ok := registry.Get(app.Template); ok && tmpl.Metrics != nil {
+				metricsCollector.StartPolling(&app, tmpl)
+			}
+		}
+	}
 
 	router := api.NewRouter(deps)
 
@@ -308,6 +329,11 @@ func main() {
 	updateCtx, updateCancel := context.WithCancel(context.Background())
 	defer updateCancel()
 	checker.StartBackground(updateCtx, 24*time.Hour)
+
+	// Stop all metrics pollers on shutdown
+	if metricsCollector != nil {
+		defer metricsCollector.StopAll()
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

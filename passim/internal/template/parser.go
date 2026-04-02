@@ -23,6 +23,8 @@ type Template struct {
 	Clients     *ClientConfig    `yaml:"clients,omitempty"`
 	Share       *ShareConfig     `yaml:"share,omitempty"`
 	Generated   []GeneratedSpec  `yaml:"generated,omitempty"`
+	Users       *UsersConfig     `yaml:"users,omitempty"`
+	Metrics     *MetricsConfig   `yaml:"metrics,omitempty"`
 }
 
 type Source struct {
@@ -71,6 +73,7 @@ type ContainerSpec struct {
 	CapAdd      []string          `yaml:"cap_add,omitempty"`
 	Sysctls     map[string]string `yaml:"sysctls,omitempty"`
 	Args        []string          `yaml:"args,omitempty"`
+	ExtraHosts  []string          `yaml:"extra_hosts,omitempty"`
 }
 
 type ConfigMapping struct {
@@ -137,6 +140,54 @@ type GeneratedSpec struct {
 	Key    string `yaml:"key"`
 	Type   string `yaml:"type"`
 	Length int    `yaml:"length,omitempty"`
+}
+
+type UsersConfig struct {
+	Add    *UserAction `yaml:"add,omitempty"`
+	Remove *UserAction `yaml:"remove,omitempty"`
+	List   *UserAction `yaml:"list,omitempty"`
+	Kick   *KickConfig `yaml:"kick,omitempty"`
+	Fields []UserField `yaml:"fields,omitempty"`
+}
+
+type UserAction struct {
+	Method    string `yaml:"method"`              // "http_auth" | "config_edit" | "exec" | "env_restart"
+	File      string `yaml:"file,omitempty"`
+	Format    string `yaml:"format,omitempty"`
+	Operation string `yaml:"operation,omitempty"`
+	Path      string `yaml:"path,omitempty"`
+	Value     string `yaml:"value,omitempty"`
+	EnvKey    string `yaml:"env_key,omitempty"`
+	Command   string `yaml:"command,omitempty"`
+	Post      string `yaml:"post,omitempty"`       // restart | none
+}
+
+type KickConfig struct {
+	Method string `yaml:"method"` // "api"
+	URL    string `yaml:"url"`
+	Secret string `yaml:"secret,omitempty"`
+}
+
+type UserField struct {
+	Key      string            `yaml:"key"`
+	Type     string            `yaml:"type"`
+	Label    map[string]string `yaml:"label"`
+	Required bool              `yaml:"required,omitempty"`
+	Default  interface{}       `yaml:"default,omitempty"`
+}
+
+type MetricsConfig struct {
+	PerUser  *PerUserMetrics `yaml:"per_user,omitempty"`
+	Interval string          `yaml:"interval,omitempty"` // default "60s"
+}
+
+type PerUserMetrics struct {
+	Method    string `yaml:"method"`               // "api" | "exec" | "file" | "log"
+	URL       string `yaml:"url,omitempty"`
+	Secret    string `yaml:"secret,omitempty"`
+	OnlineURL string `yaml:"online_url,omitempty"`
+	Command   string `yaml:"command,omitempty"`
+	Path      string `yaml:"path,omitempty"`
 }
 
 func ParseFile(path string) (*Template, error) {

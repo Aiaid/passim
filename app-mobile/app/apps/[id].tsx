@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AppResponse } from '@passim/shared/types';
-import { useApp, useDeleteApp } from '@/hooks/use-apps';
+import { useApp, useDeleteApp, useTemplate } from '@/hooks/use-apps';
 import {
   useStartContainer,
   useStopContainer,
@@ -24,6 +24,8 @@ import { useNodeStore } from '@/stores/node-store';
 import { getNodeApi } from '@/lib/api';
 import { StatusDot } from '@/components/StatusDot';
 import { ClientConfig } from '@/components/client-config';
+import { AppUsersSection } from '@/components/app-users-section';
+import { AppTrafficSection } from '@/components/app-traffic-section';
 import { useTranslation } from '@/lib/i18n';
 
 function mapStatus(status: string): 'running' | 'stopped' | 'deploying' | 'error' {
@@ -190,6 +192,7 @@ export default function AppDetailScreen() {
   const hubNode = useNodeStore((s) => s.hubNode);
   const hubNodeId = hubNode?.id ?? '';
   const { data: app, isLoading: appLoading } = useApp(nodeId, id);
+  const { data: templateDetail } = useTemplate(nodeId, app?.template ?? '');
   const deleteApp = useDeleteApp(nodeId);
   const startContainer = useStartContainer(nodeId);
   const stopContainer = useStopContainer(nodeId);
@@ -325,6 +328,26 @@ export default function AppDetailScreen() {
               </View>
             </>
           ) : null}
+
+          {/* Users */}
+          {templateDetail?.users?.supported && (
+            <>
+              <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                {t('app.users')}
+              </Text>
+              <AppUsersSection nodeId={nodeId} appId={id} templateDetail={templateDetail} />
+            </>
+          )}
+
+          {/* Traffic */}
+          {templateDetail?.metrics?.supported && (
+            <>
+              <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                {t('app.traffic')}
+              </Text>
+              <AppTrafficSection nodeId={nodeId} appId={id} />
+            </>
+          )}
 
           {/* Client Config */}
           <View testID="client-config" className="mb-4">

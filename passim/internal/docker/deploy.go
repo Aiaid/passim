@@ -21,6 +21,7 @@ type DeployRequest struct {
 	CapAdd      []string
 	Sysctls     map[string]string
 	Args        []string
+	ExtraHosts  []string
 	ConfigFiles []DeployConfigFile
 	DataDir      string // base data directory (e.g. /data)
 	DataVolume   string // Docker named volume for DataDir (e.g. "passim_passim-data")
@@ -95,6 +96,7 @@ func CreateAndRun(ctx context.Context, client DockerClient, req *DeployRequest) 
 		CapAdd:        req.CapAdd,
 		Sysctls:       req.Sysctls,
 		Cmd:           req.Args,
+		ExtraHosts:    req.ExtraHosts,
 		RestartPolicy: "unless-stopped",
 		DataDir:       req.DataDir,
 		DataVolume:    req.DataVolume,

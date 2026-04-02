@@ -15,6 +15,10 @@ import type {
   ConnectionInfo,
   PublicKeyCredentialRequestOptionsJSON,
   PublicKeyCredentialCreationOptionsJSON,
+  AppUser,
+  AppUsersResponse,
+  TrafficResponse,
+  TrafficHistoryResponse,
 } from '../types';
 
 export class ApiError extends Error {
@@ -118,6 +122,24 @@ export function createApi(request: <T>(path: string, options?: RequestInit) => P
         `/apps/${id}/share${userIndex != null ? `?user_index=${userIndex}` : ''}`,
         { method: 'DELETE' },
       ),
+
+    // App users
+    getAppUsers: (appId: string) =>
+      request<AppUsersResponse>(`/apps/${appId}/users`),
+    createAppUser: (appId: string, data: { username: string; password?: string; quota_bytes?: number }) =>
+      request<AppUser>(`/apps/${appId}/users`, { method: 'POST', body: JSON.stringify(data) }),
+    updateAppUser: (appId: string, uid: string, data: { enabled?: boolean; password?: string; quota_bytes?: number }) =>
+      request<AppUser>(`/apps/${appId}/users/${uid}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deleteAppUser: (appId: string, uid: string) =>
+      request<void>(`/apps/${appId}/users/${uid}`, { method: 'DELETE' }),
+    kickAppUser: (appId: string, uid: string) =>
+      request<void>(`/apps/${appId}/users/${uid}/kick`, { method: 'POST' }),
+
+    // App traffic
+    getAppTraffic: (appId: string, period?: string) =>
+      request<TrafficResponse>(`/apps/${appId}/traffic${period ? `?period=${period}` : ''}`),
+    getAppUserTrafficHistory: (appId: string, username: string, period?: string) =>
+      request<TrafficHistoryResponse>(`/apps/${appId}/traffic/${username}/history${period ? `?period=${period}` : ''}`),
 
     // Public share (no auth)
     getShareConfig: (token: string) => request<ShareConfigResponse>(`/s/${token}`),

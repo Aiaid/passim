@@ -51,6 +51,7 @@ type ContainerConfig struct {
 	CapAdd        []string
 	Sysctls       map[string]string
 	Cmd           []string
+	ExtraHosts    []string
 	RestartPolicy string
 	AutoRemove    bool
 	// DataDir is the data directory path inside the Passim container (e.g. "/data").
@@ -143,6 +144,7 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, cfg *ContainerConf
 		CapAdd:       cfg.CapAdd,
 		PortBindings: portBindings,
 		Sysctls:      cfg.Sysctls,
+		ExtraHosts:   cfg.ExtraHosts,
 	}
 
 	if cfg.RestartPolicy != "" {

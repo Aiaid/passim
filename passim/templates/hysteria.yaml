@@ -31,8 +31,21 @@ settings:
     description:
       en-US: "Authentication password for clients"
       zh-CN: "客户端认证密码"
+  - key: masquerade_url
+    type: string
+    default: "https://news.ycombinator.com/"
+    advanced: true
+    label:
+      en-US: "Masquerade URL"
+      zh-CN: "伪装网址"
+    description:
+      en-US: "URL to proxy when masquerading as a normal website"
+      zh-CN: "伪装为正常网站时代理的 URL"
 generated:
   - key: password
+    type: random_string
+    length: 32
+  - key: stats_secret
     type: random_string
     length: 32
 container:
@@ -50,17 +63,20 @@ container:
     - "server"
     - "-c"
     - "/etc/hysteria/config.yaml"
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
 clients:
   type: url
   urls:
     - name: "Hysteria 2"
-      scheme: "hysteria2://{{settings.password}}@{{node.public_ip}}:{{settings.port}}/?insecure=1&sni={{node.domain}}#{{node.hostname}}"
+      scheme: "hysteria2://{{user.username}}:{{user.password}}@{{node.public_ip}}:{{settings.port}}/?insecure=1&sni={{node.domain}}#{{node.hostname}}"
       qr: true
   import_urls:
     stash: "stash://install-config?url={{subscribe_url}}"
     shadowrocket: "sub://{{base64_subscribe_url}}"
 share:
   supports: true
+  per_user: true
   share_content: [client_config, guide]
 guide:
   setup:
@@ -95,10 +111,46 @@ config:
           cert: /etc/passim-ssl/cert.pem
           key: /etc/passim-ssl/key.pem
         auth:
-          type: password
-          password: {{settings.password}}
+          type: http
+          http:
+            url: http://host.docker.internal:{{node.port}}/internal/app-auth/{{app.id}}
+            insecure: true
+        trafficStats:
+          listen: :9999
+          secret: {{generated.stats_secret}}
         masquerade:
           type: proxy
           proxy:
-            url: https://news.ycombinator.com/
+            url: {{settings.masquerade_url}}
             rewriteHost: true
+users:
+  add:
+    method: http_auth
+  remove:
+    method: http_auth
+  list:
+    method: http_auth
+  kick:
+    method: api
+    url: "http://{{container_ip}}:9999/kick"
+    secret: "{{generated.stats_secret}}"
+  fields:
+    - key: username
+      type: string
+      label:
+        en-US: "Username"
+        zh-CN: "用户名"
+      required: true
+    - key: password
+      type: string
+      label:
+        en-US: "Password"
+        zh-CN: "密码"
+      required: true
+metrics:
+  per_user:
+    method: api
+    url: "http://{{container_ip}}:9999/traffic"
+    secret: "{{generated.stats_secret}}"
+    online_url: "http://{{container_ip}}:9999/online"
+  interval: "60s"

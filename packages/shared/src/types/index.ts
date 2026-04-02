@@ -79,6 +79,8 @@ export interface TemplateDetail extends TemplateSummary {
   share?: TemplateShare;
   source?: { url?: string; license?: string };
   limitations?: string[];
+  users?: UsersCapability;
+  metrics?: MetricsCapability;
 }
 
 export interface ClientConfigResponse {
@@ -244,6 +246,53 @@ export interface MetricsData {
   disk_total: number;
   net_bytes_sent: number;
   net_bytes_recv: number;
+}
+
+// App user management
+export interface AppUser {
+  id: string;
+  username: string;
+  enabled: boolean;
+  quota_bytes: number;
+  used_bytes?: number;
+  online_connections?: number;
+  created_at: string;
+  share_url?: string;
+}
+
+export interface AppUsersResponse {
+  users: AppUser[];
+}
+
+export interface TrafficUserSummary {
+  username: string;
+  tx_bytes: number;
+  rx_bytes: number;
+  online_connections: number;
+}
+
+export interface TrafficResponse {
+  users: TrafficUserSummary[];
+  total: { tx_bytes: number; rx_bytes: number };
+  period: string;
+}
+
+export interface TrafficHistoryResponse {
+  points: { time: string; tx: number; rx: number }[];
+  granularity: string;
+}
+
+// Template capability declarations (returned by GET /api/templates/:name)
+export interface UsersCapability {
+  supported: boolean;
+  kick_supported: boolean;
+  fields?: { key: string; type: string; label: Record<string, string>; required?: boolean; default?: unknown }[];
+}
+
+export interface MetricsCapability {
+  supported: boolean;
+  per_user: boolean;
+  interval: string;
 }
 
 // Common type aliases

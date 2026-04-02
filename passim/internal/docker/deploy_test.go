@@ -228,6 +228,49 @@ func TestDeploy_WithSysctls(t *testing.T) {
 	}
 }
 
+func TestDeploy_ExtraHosts(t *testing.T) {
+	mock := &MockClient{
+		PullReader: io.NopCloser(strings.NewReader("")),
+		CreateID:   "container-extrahosts-001",
+	}
+
+	req := &DeployRequest{
+		AppID:      "11111111-2222-3333-4444-555555555555",
+		AppName:    "testapp",
+		Image:      "test/image:latest",
+		ExtraHosts: []string{"host.docker.internal:host-gateway", "myhost:192.168.1.100"},
+		DataDir:    t.TempDir(),
+	}
+
+	result, err := Deploy(context.Background(), mock, req)
+	if err != nil {
+		t.Fatalf("Deploy() error: %v", err)
+	}
+	if result.ContainerID != "container-extrahosts-001" {
+		t.Errorf("ContainerID = %q", result.ContainerID)
+	}
+
+	found := false
+	for _, call := range mock.Calls {
+		if call.Method == "CreateAndStartContainer" {
+			found = true
+			cfg := call.Args[0].(*ContainerConfig)
+			if len(cfg.ExtraHosts) != 2 {
+				t.Fatalf("ExtraHosts length = %d, want 2", len(cfg.ExtraHosts))
+			}
+			if cfg.ExtraHosts[0] != "host.docker.internal:host-gateway" {
+				t.Errorf("ExtraHosts[0] = %q, want %q", cfg.ExtraHosts[0], "host.docker.internal:host-gateway")
+			}
+			if cfg.ExtraHosts[1] != "myhost:192.168.1.100" {
+				t.Errorf("ExtraHosts[1] = %q, want %q", cfg.ExtraHosts[1], "myhost:192.168.1.100")
+			}
+		}
+	}
+	if !found {
+		t.Error("CreateAndStartContainer not called")
+	}
+}
+
 func TestDeploy_RestartPolicyApplied(t *testing.T) {
 	mock := &MockClient{
 		PullReader: io.NopCloser(strings.NewReader("")),

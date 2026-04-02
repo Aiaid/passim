@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/auth"
+	"github.com/passim/passim/internal/db"
 	"github.com/passim/passim/internal/docker"
 	"github.com/passim/passim/internal/speedtest"
 	"github.com/passim/passim/internal/sse"
@@ -15,6 +16,15 @@ import (
 	"github.com/passim/passim/internal/update"
 	"github.com/passim/passim/internal/version"
 )
+
+// MetricsCollector is the interface for the app metrics polling engine.
+// Defined here to avoid import cycles between api and appmetrics packages.
+type MetricsCollector interface {
+	StartPolling(app *db.App, tmpl *template.Template)
+	StopPolling(appID string)
+	StopAll()
+	GetOnline(appID string) map[string]int
+}
 
 type Deps struct {
 	DB        *sql.DB
@@ -31,8 +41,9 @@ type Deps struct {
 	DataDir      string
 	DataVolume   string // Docker named volume for DataDir (auto-discovered)
 	DataHostPath string // Host bind-mount source for DataDir (auto-discovered)
-	Checker    *update.Checker
-	Updater    *update.Updater
+	Checker          *update.Checker
+	Updater          *update.Updater
+	MetricsCollector MetricsCollector
 }
 
 func NewRouter(deps Deps) http.Handler {
@@ -81,6 +92,12 @@ func NewRouter(deps Deps) http.Handler {
 		// Public speedtest routes (no auth)
 		registerSpeedtestPublicRoutes(api)
 
+		// Internal routes — no JWT auth (container-to-host callbacks)
+		internal := api.Group("/internal")
+		{
+			internal.POST("/app-auth/:appId", appAuthHandler(deps))
+		}
+
 		// Protected — JWT required
 		protected := api.Group("")
 		protected.Use(authMiddleware(deps.JWT, deps.DB))
@@ -128,6 +145,17 @@ func NewRouter(deps Deps) http.Handler {
 			protected.GET("/apps/:id/subscribe", appSubscribeHandler(deps))
 			protected.POST("/apps/:id/share", createShareHandler(deps))
 			protected.DELETE("/apps/:id/share", revokeShareHandler(deps))
+
+			// App user management routes
+			protected.GET("/apps/:id/users", listAppUsersHandler(deps))
+			protected.POST("/apps/:id/users", createAppUserHandler(deps))
+			protected.PATCH("/apps/:id/users/:uid", updateAppUserHandler(deps))
+			protected.DELETE("/apps/:id/users/:uid", deleteAppUserHandler(deps))
+			protected.POST("/apps/:id/users/:uid/kick", kickAppUserHandler(deps))
+
+			// App traffic routes
+			protected.GET("/apps/:id/traffic", getTrafficHandler(deps))
+			protected.GET("/apps/:id/traffic/:username/history", getUserTrafficHistoryHandler(deps))
 
 			// Task routes
 			protected.GET("/tasks", listTasksHandler(deps))

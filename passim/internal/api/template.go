@@ -87,6 +87,28 @@ type shareInfo struct {
 	ShareContent []string `json:"share_content,omitempty"`
 }
 
+// usersCapability describes multi-user management support for a template.
+type usersCapability struct {
+	Supported     bool            `json:"supported"`
+	KickSupported bool            `json:"kick_supported"`
+	Fields        []userFieldInfo `json:"fields,omitempty"`
+}
+
+type userFieldInfo struct {
+	Key      string            `json:"key"`
+	Type     string            `json:"type"`
+	Label    map[string]string `json:"label"`
+	Required bool              `json:"required,omitempty"`
+	Default  interface{}       `json:"default,omitempty"`
+}
+
+// metricsCapability describes traffic metrics support for a template.
+type metricsCapability struct {
+	Supported bool   `json:"supported"`
+	PerUser   bool   `json:"per_user"`
+	Interval  string `json:"interval"`
+}
+
 // templateDetail is the JSON shape returned by GET /api/templates/:name.
 type templateDetail struct {
 	Name        string            `json:"name"`
@@ -100,6 +122,8 @@ type templateDetail struct {
 	Share       *shareInfo        `json:"share,omitempty"`
 	Source      *sourceInfo       `json:"source,omitempty"`
 	Limitations []string          `json:"limitations,omitempty"`
+	Users       *usersCapability  `json:"users,omitempty"`
+	Metrics     *metricsCapability `json:"metrics,omitempty"`
 }
 
 func convertSettings(src []tmpl.Setting) []settingInfo {
@@ -209,8 +233,45 @@ func getTemplateHandler(deps Deps) gin.HandlerFunc {
 
 		detail.Clients = convertClients(t.Clients)
 		detail.Share = convertShare(t.Share)
+		detail.Users = convertUsers(t.Users)
+		detail.Metrics = convertMetrics(t.Metrics)
 
 		c.JSON(http.StatusOK, detail)
+	}
+}
+
+func convertUsers(u *tmpl.UsersConfig) *usersCapability {
+	if u == nil {
+		return nil
+	}
+	cap := &usersCapability{
+		Supported:     true,
+		KickSupported: u.Kick != nil,
+	}
+	for _, f := range u.Fields {
+		cap.Fields = append(cap.Fields, userFieldInfo{
+			Key:      f.Key,
+			Type:     f.Type,
+			Label:    f.Label,
+			Required: f.Required,
+			Default:  f.Default,
+		})
+	}
+	return cap
+}
+
+func convertMetrics(m *tmpl.MetricsConfig) *metricsCapability {
+	if m == nil {
+		return nil
+	}
+	interval := m.Interval
+	if interval == "" {
+		interval = "60s"
+	}
+	return &metricsCapability{
+		Supported: true,
+		PerUser:   m.PerUser != nil,
+		Interval:  interval,
 	}
 }
 

@@ -17,6 +17,8 @@ import { ClientConfig } from './client-config';
 import { AppEvents } from './app-events';
 import { AppSettingsForm } from './app-settings-form';
 import { ConnectionGuide } from './connection-guide';
+import { AppUsersTab } from './app-users-tab';
+import { AppTrafficTab } from './app-traffic-tab';
 import { UndeployDialog } from './undeploy-dialog';
 
 function isSensitiveSetting(key: string): boolean {
@@ -108,6 +110,8 @@ export function AppDetailPage() {
           <TabsTrigger value="settings">{t('app.settings_tab')}</TabsTrigger>
           <TabsTrigger value="client-config">{t('app.client_config', 'Client Config')}</TabsTrigger>
           <TabsTrigger value="events">{t('app.events')}</TabsTrigger>
+          {templateDetail?.users?.supported && <TabsTrigger value="users">{t('app.users')}</TabsTrigger>}
+          {templateDetail?.metrics?.supported && <TabsTrigger value="traffic">{t('app.traffic')}</TabsTrigger>}
         </TabsList>
 
         {/* Overview tab */}
@@ -195,6 +199,20 @@ export function AppDetailPage() {
         <TabsContent value="events" className="mt-6">
           <AppEvents appId={app.id} />
         </TabsContent>
+
+        {/* Users tab */}
+        {templateDetail?.users?.supported && (
+          <TabsContent value="users" className="mt-6">
+            <AppUsersTab appId={app.id} templateDetail={templateDetail} />
+          </TabsContent>
+        )}
+
+        {/* Traffic tab */}
+        {templateDetail?.metrics?.supported && (
+          <TabsContent value="traffic" className="mt-6">
+            <AppTrafficTab appId={app.id} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <UndeployDialog

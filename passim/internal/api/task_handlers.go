@@ -59,6 +59,16 @@ func makeDeployHandler(deps Deps) task.TaskHandler {
 			log.Printf("task %s: failed to update app %s: %v", t.ID, appID, err)
 		}
 
+		// Start metrics polling if template has metrics config
+		if deps.MetricsCollector != nil && deps.Templates != nil {
+			app, _ := db.GetApp(deps.DB, appID)
+			if app != nil {
+				if tmpl, ok := deps.Templates.Get(app.Template); ok && tmpl.Metrics != nil {
+					deps.MetricsCollector.StartPolling(app, tmpl)
+				}
+			}
+		}
+
 		publishEvent(deps.SSE, "task:"+t.ID, "status", `{"status":"completed"}`)
 		publishEvent(deps.SSE, "app:"+appID, "deploy", `{"status":"running"}`)
 		publishEvent(deps.SSE, "app:"+appID, "progress", `{"status":"running","progress":100}`)
@@ -73,6 +83,11 @@ func makeUndeployHandler(deps Deps) task.TaskHandler {
 		var payload undeployPayload
 		if err := json.Unmarshal([]byte(t.Payload), &payload); err != nil {
 			return fmt.Errorf("parse undeploy payload: %w", err)
+		}
+
+		// Stop metrics polling before removing the container
+		if deps.MetricsCollector != nil {
+			deps.MetricsCollector.StopPolling(payload.AppID)
 		}
 
 		publishEvent(deps.SSE, "task:"+t.ID, "status", `{"status":"running","message":"stopping container"}`)

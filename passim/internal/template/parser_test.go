@@ -292,6 +292,184 @@ container:
 	}
 }
 
+func TestParseUsersConfig(t *testing.T) {
+	yamlData := `
+name: test-users
+category: vpn
+version: 1.0.0
+icon: zap
+description:
+  en-US: "Test template with users"
+container:
+  image: alpine:latest
+users:
+  add:
+    method: http_auth
+  remove:
+    method: http_auth
+  list:
+    method: http_auth
+  kick:
+    method: api
+    url: "http://container:9999/kick"
+    secret: "mysecret"
+  fields:
+    - key: username
+      type: string
+      label:
+        en-US: "Username"
+        zh-CN: "用户名"
+      required: true
+    - key: password
+      type: string
+      label:
+        en-US: "Password"
+        zh-CN: "密码"
+      required: true
+`
+	tmpl, err := Parse([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	if tmpl.Users == nil {
+		t.Fatal("Users should not be nil")
+	}
+	if tmpl.Users.Add == nil || tmpl.Users.Add.Method != "http_auth" {
+		t.Errorf("Users.Add.Method = %v, want http_auth", tmpl.Users.Add)
+	}
+	if tmpl.Users.Remove == nil || tmpl.Users.Remove.Method != "http_auth" {
+		t.Errorf("Users.Remove.Method = %v, want http_auth", tmpl.Users.Remove)
+	}
+	if tmpl.Users.List == nil || tmpl.Users.List.Method != "http_auth" {
+		t.Errorf("Users.List.Method = %v, want http_auth", tmpl.Users.List)
+	}
+	if tmpl.Users.Kick == nil {
+		t.Fatal("Users.Kick should not be nil")
+	}
+	if tmpl.Users.Kick.Method != "api" {
+		t.Errorf("Users.Kick.Method = %q, want %q", tmpl.Users.Kick.Method, "api")
+	}
+	if tmpl.Users.Kick.URL != "http://container:9999/kick" {
+		t.Errorf("Users.Kick.URL = %q", tmpl.Users.Kick.URL)
+	}
+	if tmpl.Users.Kick.Secret != "mysecret" {
+		t.Errorf("Users.Kick.Secret = %q", tmpl.Users.Kick.Secret)
+	}
+	if len(tmpl.Users.Fields) != 2 {
+		t.Fatalf("len(Users.Fields) = %d, want 2", len(tmpl.Users.Fields))
+	}
+	if tmpl.Users.Fields[0].Key != "username" {
+		t.Errorf("Users.Fields[0].Key = %q", tmpl.Users.Fields[0].Key)
+	}
+	if !tmpl.Users.Fields[0].Required {
+		t.Error("Users.Fields[0].Required should be true")
+	}
+	if tmpl.Users.Fields[0].Label["zh-CN"] != "用户名" {
+		t.Errorf("Users.Fields[0].Label[zh-CN] = %q", tmpl.Users.Fields[0].Label["zh-CN"])
+	}
+}
+
+func TestParseMetricsConfig(t *testing.T) {
+	yamlData := `
+name: test-metrics
+category: vpn
+version: 1.0.0
+icon: zap
+description:
+  en-US: "Test template with metrics"
+container:
+  image: alpine:latest
+metrics:
+  per_user:
+    method: api
+    url: "http://container:9999/traffic"
+    secret: "statsecret"
+    online_url: "http://container:9999/online"
+  interval: "30s"
+`
+	tmpl, err := Parse([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	if tmpl.Metrics == nil {
+		t.Fatal("Metrics should not be nil")
+	}
+	if tmpl.Metrics.Interval != "30s" {
+		t.Errorf("Metrics.Interval = %q, want %q", tmpl.Metrics.Interval, "30s")
+	}
+	if tmpl.Metrics.PerUser == nil {
+		t.Fatal("Metrics.PerUser should not be nil")
+	}
+	if tmpl.Metrics.PerUser.Method != "api" {
+		t.Errorf("Metrics.PerUser.Method = %q, want %q", tmpl.Metrics.PerUser.Method, "api")
+	}
+	if tmpl.Metrics.PerUser.URL != "http://container:9999/traffic" {
+		t.Errorf("Metrics.PerUser.URL = %q", tmpl.Metrics.PerUser.URL)
+	}
+	if tmpl.Metrics.PerUser.Secret != "statsecret" {
+		t.Errorf("Metrics.PerUser.Secret = %q", tmpl.Metrics.PerUser.Secret)
+	}
+	if tmpl.Metrics.PerUser.OnlineURL != "http://container:9999/online" {
+		t.Errorf("Metrics.PerUser.OnlineURL = %q", tmpl.Metrics.PerUser.OnlineURL)
+	}
+}
+
+func TestParseTemplateWithoutUsers(t *testing.T) {
+	yamlData := `
+name: no-users
+category: vpn
+version: 1.0.0
+icon: box
+description:
+  en-US: "Template without users or metrics"
+container:
+  image: alpine:latest
+`
+	tmpl, err := Parse([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	if tmpl.Users != nil {
+		t.Error("Users should be nil for template without users section")
+	}
+	if tmpl.Metrics != nil {
+		t.Error("Metrics should be nil for template without metrics section")
+	}
+}
+
+func TestParseExtraHosts(t *testing.T) {
+	yamlData := `
+name: test-extra-hosts
+category: vpn
+version: 1.0.0
+icon: box
+description:
+  en-US: "Template with extra_hosts"
+container:
+  image: alpine:latest
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "myhost:192.168.1.1"
+`
+	tmpl, err := Parse([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	if len(tmpl.Container.ExtraHosts) != 2 {
+		t.Fatalf("len(ExtraHosts) = %d, want 2", len(tmpl.Container.ExtraHosts))
+	}
+	if tmpl.Container.ExtraHosts[0] != "host.docker.internal:host-gateway" {
+		t.Errorf("ExtraHosts[0] = %q", tmpl.Container.ExtraHosts[0])
+	}
+	if tmpl.Container.ExtraHosts[1] != "myhost:192.168.1.1" {
+		t.Errorf("ExtraHosts[1] = %q", tmpl.Container.ExtraHosts[1])
+	}
+}
+
 func TestParseInvalidYAML(t *testing.T) {
 	tests := []struct {
 		name  string
