@@ -49,6 +49,12 @@ export const useNodeStore = create<NodeState>((set, get) => ({
   hubNode: null,
 
   addNode: async (node) => {
+    // Dedup: if a node with the same host already exists, return its id
+    const existing = get().nodes.find((n) => n.host === node.host);
+    if (existing) {
+      return existing.id;
+    }
+
     const id = generateId();
     const newNode = { ...node, id };
     const nodes = [...get().nodes, newNode];

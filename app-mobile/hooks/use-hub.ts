@@ -100,6 +100,8 @@ export async function syncWithHub(): Promise<MigrateResult> {
   const localHosts = new Set(nodes.map((n) => n.host));
   for (const remote of hubRemotes) {
     if (localHosts.has(remote.address)) continue;
+    // Skip if this remote is the hub itself (address matches hub)
+    if (remote.address === hubNode.host) continue;
     if (!remote.api_key) continue;
 
     try {
