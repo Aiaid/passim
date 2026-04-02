@@ -11,6 +11,22 @@ export function useApps() {
   });
 }
 
+export function useAppConfigs(appId: string) {
+  return useQuery({
+    queryKey: ['app-configs', appId],
+    queryFn: () => api.getAppConfigs(appId),
+    enabled: !!appId,
+  });
+}
+
+export function useAppConfigFile(appId: string, filename: string | null) {
+  return useQuery({
+    queryKey: ['app-config-file', appId, filename],
+    queryFn: () => api.getAppConfigFile(appId, filename!),
+    enabled: !!appId && !!filename,
+  });
+}
+
 export function useApp(id: string) {
   return useQuery({
     queryKey: ['app', id],
