@@ -282,21 +282,21 @@ export default function SettingsScreen() {
 
   const handleRemoveNode = () => {
     if (!activeNode) return;
+    const isHub = activeNode.id === nodes[0]?.id;
     Alert.alert(
-      t('mobile.remove_node_title'),
-      t('mobile.remove_node_desc', { name: activeNode.name }),
+      isHub ? t('mobile.disconnect_hub_title') : t('mobile.remove_node_title'),
+      isHub
+        ? t('mobile.disconnect_hub_desc')
+        : t('mobile.remove_node_desc', { name: activeNode.name }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.delete'),
+          text: isHub ? t('mobile.disconnect') : t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             const id = activeNode.id;
             await removeNode(id);
-            const remaining = useNodeStore.getState().nodes;
-            if (remaining.length === 0) {
-              router.replace('/(auth)/welcome');
-            }
+            router.replace('/(auth)/welcome');
           },
         },
       ],
