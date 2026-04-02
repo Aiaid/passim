@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/passim/passim/internal/db"
 	"github.com/passim/passim/internal/template"
@@ -158,17 +159,31 @@ func TestAppAuthUnknownApp(t *testing.T) {
 	}
 }
 
-func TestAppAuthBlocksPublicIP(t *testing.T) {
+func TestAppAuthRateLimit(t *testing.T) {
 	router, _ := setupAuthTest(t)
 
-	body, _ := json.Marshal(map[string]string{"auth": "alice:secret123"})
-	req := httptest.NewRequest("POST", "/api/internal/app-auth/test-app-001", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.RemoteAddr = "8.8.8.8:12345" // public IP
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	// Reset rate limiter
+	authLimiter.mu.Lock()
+	authLimiter.failures = make(map[string][]time.Time)
+	authLimiter.mu.Unlock()
 
-	if w.Code != http.StatusForbidden {
-		t.Errorf("expected 403 for public IP, got %d", w.Code)
+	// Send 10 failed attempts (wrong password)
+	for i := 0; i < authRateMaxFails; i++ {
+		w := postAuth(router, "test-app-001", "alice:wrongpass")
+		if w.Code != http.StatusOK {
+			t.Fatalf("attempt %d: expected 200, got %d", i, w.Code)
+		}
+	}
+
+	// 11th attempt should be rate limited
+	w := postAuth(router, "test-app-001", "alice:wrongpass")
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected 429 after %d failures, got %d", authRateMaxFails, w.Code)
+	}
+
+	// Correct password should also be blocked (IP is rate limited)
+	w = postAuth(router, "test-app-001", "alice:secret123")
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected 429 even with correct password, got %d", w.Code)
 	}
 }

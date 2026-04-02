@@ -64,6 +64,7 @@ func buildFlatMap(data RenderData) map[string]interface{} {
 	m["node_Hostname"] = data.Node.Hostname
 	m["node_data_dir"] = data.Node.DataDir
 	m["node_Domain"] = data.Node.Domain
+	m["node_domain"] = data.Node.Domain
 	m["node_port"] = data.Node.Port
 	m["node_internal_ip"] = data.Node.InternalIP
 	for k, v := range data.Generated {

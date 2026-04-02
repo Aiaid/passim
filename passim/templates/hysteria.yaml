@@ -67,7 +67,7 @@ clients:
   type: url
   urls:
     - name: "Hysteria 2"
-      scheme: "hysteria2://admin%3A{{settings.password}}@{{node.public_ip}}:{{settings.port}}/?insecure=1&sni={{node.domain}}#{{node.hostname}}"
+      scheme: "hysteria2://admin%3A{{settings.password}}@{{node.public_ip}}:{{settings.port}}/?sni={{node.domain}}#{{node.hostname}}"
       qr: true
   import_urls:
     stash: "stash://install-config?url={{subscribe_url}}"
@@ -111,8 +111,8 @@ config:
         auth:
           type: http
           http:
-            url: https://passim:{{node.port}}/api/internal/app-auth/{{app.id}}
-            insecure: true
+            url: https://{{node.domain}}:{{node.port}}/api/internal/app-auth/{{app.id}}
+            insecure: false
         trafficStats:
           listen: :9999
           secret: {{generated.stats_secret}}

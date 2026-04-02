@@ -1,52 +1,65 @@
 package api
 
 import (
-	"net"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/passim/passim/internal/db"
 )
 
-// privateNetworks defines RFC 1918 + loopback ranges for internal-only access.
-var privateNetworks = []net.IPNet{
-	{IP: net.IPv4(10, 0, 0, 0), Mask: net.CIDRMask(8, 32)},
-	{IP: net.IPv4(172, 16, 0, 0), Mask: net.CIDRMask(12, 32)},
-	{IP: net.IPv4(192, 168, 0, 0), Mask: net.CIDRMask(16, 32)},
-	{IP: net.IPv4(127, 0, 0, 0), Mask: net.CIDRMask(8, 32)},
+// authRateLimiter tracks failed auth attempts per IP to prevent brute force.
+type authRateLimiter struct {
+	mu       sync.Mutex
+	failures map[string][]time.Time
 }
 
-// internalOnlyMiddleware rejects requests from non-private IPs.
-// Docker bridge networks use 172.x IPs, so container-to-container traffic passes.
-func internalOnlyMiddleware() gin.HandlerFunc {
+var authLimiter = &authRateLimiter{failures: make(map[string][]time.Time)}
+
+const (
+	authRateWindow   = 1 * time.Minute
+	authRateMaxFails = 10
+)
+
+// authRateLimitMiddleware rejects IPs with too many failed auth attempts.
+func authRateLimitMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
-		if err != nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-			c.Abort()
-			return
-		}
-		ip := net.ParseIP(host)
-		if ip == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-			c.Abort()
-			return
-		}
-		for _, n := range privateNetworks {
-			if n.Contains(ip) {
-				c.Next()
-				return
+		ip := c.ClientIP()
+		authLimiter.mu.Lock()
+		now := time.Now()
+		// Clean old entries
+		times := authLimiter.failures[ip]
+		cutoff := now.Add(-authRateWindow)
+		clean := times[:0]
+		for _, t := range times {
+			if t.After(cutoff) {
+				clean = append(clean, t)
 			}
 		}
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		c.Abort()
+		authLimiter.failures[ip] = clean
+		if len(clean) >= authRateMaxFails {
+			authLimiter.mu.Unlock()
+			c.JSON(http.StatusTooManyRequests, gin.H{"ok": false})
+			c.Abort()
+			return
+		}
+		authLimiter.mu.Unlock()
+		c.Next()
 	}
 }
 
+// recordAuthFailure records a failed auth attempt for rate limiting.
+func recordAuthFailure(ip string) {
+	authLimiter.mu.Lock()
+	authLimiter.failures[ip] = append(authLimiter.failures[ip], time.Now())
+	authLimiter.mu.Unlock()
+}
+
 // appAuthHandler handles POST /internal/app-auth/:appId
-// This endpoint is called by containers (e.g. Hysteria HTTP auth) to authenticate users.
-// No JWT auth required — only accessible from container network.
+// Called by app containers (e.g. Hysteria HTTP auth) to authenticate users.
+// Protected by rate limiting — no JWT required (containers can't obtain tokens).
 func appAuthHandler(deps Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		appID := c.Param("appId")
@@ -70,18 +83,21 @@ func appAuthHandler(deps Deps) gin.HandlerFunc {
 
 		user, err := db.GetAppUserByUsername(deps.DB, appID, username)
 		if err != nil || user == nil {
+			recordAuthFailure(c.ClientIP())
 			c.JSON(http.StatusOK, gin.H{"ok": false})
 			return
 		}
 
 		// Check enabled
 		if !user.Enabled {
+			recordAuthFailure(c.ClientIP())
 			c.JSON(http.StatusOK, gin.H{"ok": false})
 			return
 		}
 
 		// Check password (plaintext comparison — these are proxy passwords, not login credentials)
 		if user.Password != password {
+			recordAuthFailure(c.ClientIP())
 			c.JSON(http.StatusOK, gin.H{"ok": false})
 			return
 		}
