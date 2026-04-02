@@ -1,7 +1,10 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,11 +25,19 @@ func loadAppAndTemplateWithMetrics(deps Deps, c *gin.Context) (*db.App, *tmpl.Te
 	return app, t, true
 }
 
-type trafficUserSummary struct {
-	Username          string `json:"username"`
+type trafficNodeDetail struct {
+	Node              string `json:"node"`
 	TxBytes           int64  `json:"tx_bytes"`
 	RxBytes           int64  `json:"rx_bytes"`
 	OnlineConnections int    `json:"online_connections"`
+}
+
+type trafficUserSummary struct {
+	Username          string              `json:"username"`
+	TxBytes           int64               `json:"tx_bytes"`
+	RxBytes           int64               `json:"rx_bytes"`
+	OnlineConnections int                 `json:"online_connections"`
+	Nodes             []trafficNodeDetail `json:"nodes,omitempty"`
 }
 
 type trafficResponse struct {
@@ -88,8 +99,13 @@ func getTrafficHandler(deps Deps) gin.HandlerFunc {
 			onlineCounts = deps.MetricsCollector.GetOnline(app.ID)
 		}
 
+		// Local node name
+		localName := localNodeName(deps)
+
+		// Build per-user map with node details
+		userMap := make(map[string]*trafficUserSummary)
 		var totalTx, totalRx int64
-		var userSummaries []trafficUserSummary
+
 		for _, s := range summaries {
 			username := idToUser[s.UserID]
 			if username == "" {
@@ -99,14 +115,40 @@ func getTrafficHandler(deps Deps) gin.HandlerFunc {
 			if onlineCounts != nil {
 				online = onlineCounts[username]
 			}
-			userSummaries = append(userSummaries, trafficUserSummary{
-				Username:          username,
-				TxBytes:           s.TxBytes,
-				RxBytes:           s.RxBytes,
-				OnlineConnections: online,
+			u := getOrCreateUser(userMap, username)
+			u.TxBytes += s.TxBytes
+			u.RxBytes += s.RxBytes
+			u.OnlineConnections += online
+			u.Nodes = append(u.Nodes, trafficNodeDetail{
+				Node: localName, TxBytes: s.TxBytes, RxBytes: s.RxBytes, OnlineConnections: online,
 			})
 			totalTx += s.TxBytes
 			totalRx += s.RxBytes
+		}
+
+		// Aggregate traffic from remote nodes running the same template
+		remoteTraffic := fetchRemoteTraffic(c.Request.Context(), deps, app.Template, period)
+		for _, rt := range remoteTraffic {
+			u := getOrCreateUser(userMap, rt.Username)
+			u.TxBytes += rt.TxBytes
+			u.RxBytes += rt.RxBytes
+			u.OnlineConnections += rt.OnlineConnections
+			for _, nd := range rt.Nodes {
+				u.Nodes = append(u.Nodes, nd)
+			}
+			// If remote didn't include node details, add a generic one
+			if len(rt.Nodes) == 0 {
+				u.Nodes = append(u.Nodes, trafficNodeDetail{
+					Node: "remote", TxBytes: rt.TxBytes, RxBytes: rt.RxBytes, OnlineConnections: rt.OnlineConnections,
+				})
+			}
+			totalTx += rt.TxBytes
+			totalRx += rt.RxBytes
+		}
+
+		var userSummaries []trafficUserSummary
+		for _, u := range userMap {
+			userSummaries = append(userSummaries, *u)
 		}
 
 		if userSummaries == nil {
@@ -187,4 +229,47 @@ func getUserTrafficHistoryHandler(deps Deps) gin.HandlerFunc {
 			Granularity: granularity,
 		})
 	}
+}
+
+func getOrCreateUser(m map[string]*trafficUserSummary, username string) *trafficUserSummary {
+	if u, ok := m[username]; ok {
+		return u
+	}
+	u := &trafficUserSummary{Username: username}
+	m[username] = u
+	return u
+}
+
+// fetchRemoteTraffic queries all connected remote nodes for traffic data
+// of apps using the same template. Returns merged per-user summaries.
+func fetchRemoteTraffic(ctx context.Context, deps Deps, templateName, period string) []trafficUserSummary {
+	remoteApps := findRemoteApps(ctx, deps, templateName)
+	if len(remoteApps) == 0 {
+		return nil
+	}
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	var result []trafficUserSummary
+
+	for _, ra := range remoteApps {
+		wg.Add(1)
+		go func(ra remoteAppInfo) {
+			defer wg.Done()
+			path := "/api/apps/" + ra.AppID + "/traffic?period=" + period
+			status, body, err := deps.NodeHub.ProxyRequest(ctx, ra.NodeID, "GET", path, nil)
+			if err != nil || status != http.StatusOK {
+				return
+			}
+			var resp trafficResponse
+			if json.Unmarshal(body, &resp) != nil {
+				return
+			}
+			mu.Lock()
+			result = append(result, resp.Users...)
+			mu.Unlock()
+		}(ra)
+	}
+	wg.Wait()
+	return result
 }
