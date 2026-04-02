@@ -111,7 +111,7 @@ config:
         auth:
           type: http
           http:
-            url: http://passim:{{node.port}}/api/internal/app-auth/{{app.id}}
+            url: https://passim:{{node.port}}/api/internal/app-auth/{{app.id}}
             insecure: true
         trafficStats:
           listen: :9999
