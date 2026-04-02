@@ -1,11 +1,12 @@
-import { useNodeStore } from '@/stores/node-store';
 import { createApi, ApiError } from '@passim/shared/api';
 
 export { ApiError };
 
 export function getNodeApi(nodeId: string) {
+  // Lazy import to break require cycle: node-store → api → node-store
+  const { useNodeStore } = require('@/stores/node-store');
   const store = useNodeStore.getState();
-  const node = store.nodes.find((n) => n.id === nodeId);
+  const node = store.nodes.find((n: { id: string }) => n.id === nodeId);
 
   if (!node) throw new Error(`Node ${nodeId} not found`);
 
