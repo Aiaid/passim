@@ -219,9 +219,12 @@ func resolveSecret(secretTmpl string, generatedJSON string) string {
 	return secretTmpl
 }
 
-// resolveURL replaces {{container.ip}} with the actual container IP.
+// resolveURL replaces container IP placeholders with the actual container IP.
+// Supports both {{container.ip}} and {{container_ip}} formats.
 func resolveURL(urlTmpl string, containerIP string) string {
-	return strings.ReplaceAll(urlTmpl, "{{container.ip}}", containerIP)
+	s := strings.ReplaceAll(urlTmpl, "{{container.ip}}", containerIP)
+	s = strings.ReplaceAll(s, "{{container_ip}}", containerIP)
+	return s
 }
 
 // pollTraffic fetches traffic data from the container's traffic API endpoint.
