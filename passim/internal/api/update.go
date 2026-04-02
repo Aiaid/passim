@@ -8,8 +8,9 @@ import (
 	"github.com/passim/passim/internal/update"
 )
 
-// versionPattern validates semantic version strings to prevent image tag injection.
-var versionPattern = regexp.MustCompile(`^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$`)
+// versionPattern validates version strings to prevent image tag injection.
+// Allows: semver (v1.2.3, v1.2.3-rc.1), dev tags (dev, dev-<sha>), "latest".
+var versionPattern = regexp.MustCompile(`^(v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?|dev(-[a-fA-F0-9]+)?|latest)$`)
 
 func versionCheckHandler(checker *update.Checker) gin.HandlerFunc {
 	return func(c *gin.Context) {
