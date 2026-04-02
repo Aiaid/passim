@@ -94,13 +94,19 @@ func parseURIToClashProxy(uri, nodeName string) (ClashProxy, error) {
 }
 
 // parseHysteria2URI parses: hysteria2://password@host:port/?insecure=1#name
+// Also handles multi-user format: hysteria2://username:password@host:port/...
 func parseHysteria2URI(uri, fallbackName string) (ClashProxy, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
 		return ClashProxy{}, fmt.Errorf("parse hysteria2 URI: %w", err)
 	}
 
+	// For hy2 HTTP auth, the full userinfo (username:password) is the auth string.
+	// For single-password mode, it's just the password (no colon).
 	password := u.User.Username()
+	if p, ok := u.User.Password(); ok {
+		password = password + ":" + p
+	}
 	host := u.Hostname()
 	port := 443
 	if p := u.Port(); p != "" {

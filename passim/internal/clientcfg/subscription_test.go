@@ -133,6 +133,28 @@ func TestParseHysteria2URI_NoFallbackNoFragment(t *testing.T) {
 	}
 }
 
+func TestParseHysteria2URI_MultiUser(t *testing.T) {
+	// Multi-user format: hysteria2://username:password@host:port/...
+	proxy, err := parseHysteria2URI("hysteria2://admin:secretpass123@example.com:8443/?insecure=1&sni=example.com#node", "")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if proxy.Password != "admin:secretpass123" {
+		t.Errorf("Password = %q, want %q", proxy.Password, "admin:secretpass123")
+	}
+}
+
+func TestParseHysteria2URI_SinglePassword(t *testing.T) {
+	// Single-password mode: hysteria2://password@host:port/...
+	proxy, err := parseHysteria2URI("hysteria2://mypass@example.com:8443/?insecure=1", "")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if proxy.Password != "mypass" {
+		t.Errorf("Password = %q, want %q", proxy.Password, "mypass")
+	}
+}
+
 func TestParseVMessURI(t *testing.T) {
 	// fallbackName takes priority over URI fragment
 	proxy, err := parseVMessURI("vmess://550e8400-e29b-41d4-a716-446655440000@10.0.0.1:10086?alterId=0#v2ray-node", "fallback")
