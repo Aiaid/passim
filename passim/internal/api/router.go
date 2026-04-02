@@ -92,8 +92,8 @@ func NewRouter(deps Deps) http.Handler {
 		// Public speedtest routes (no auth)
 		registerSpeedtestPublicRoutes(api)
 
-		// Internal routes — no JWT auth (container-to-host callbacks)
-		internal := api.Group("/internal")
+		// Internal routes — no JWT auth, private network only (container callbacks)
+		internal := api.Group("/internal", internalOnlyMiddleware())
 		{
 			internal.POST("/app-auth/:appId", appAuthHandler(deps))
 		}

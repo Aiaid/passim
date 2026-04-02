@@ -52,6 +52,7 @@ func postAuth(router http.Handler, appID, auth string) *httptest.ResponseRecorde
 	body, _ := json.Marshal(map[string]string{"auth": auth})
 	req := httptest.NewRequest("POST", "/api/internal/app-auth/"+appID, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.RemoteAddr = "172.18.0.3:12345" // simulate Docker network source
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	return w
@@ -154,5 +155,20 @@ func TestAppAuthUnknownApp(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp["ok"] != false {
 		t.Errorf("expected ok=false for unknown app, got %v", resp["ok"])
+	}
+}
+
+func TestAppAuthBlocksPublicIP(t *testing.T) {
+	router, _ := setupAuthTest(t)
+
+	body, _ := json.Marshal(map[string]string{"auth": "alice:secret123"})
+	req := httptest.NewRequest("POST", "/api/internal/app-auth/test-app-001", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.RemoteAddr = "8.8.8.8:12345" // public IP
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for public IP, got %d", w.Code)
 	}
 }
