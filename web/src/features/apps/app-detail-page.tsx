@@ -247,7 +247,6 @@ export function AppDetailPage() {
 /* ── Logs Tab ──────────────────────────────────────────────── */
 
 function AppLogsTab({ app }: { app: AppResponse }) {
-  const { t } = useTranslation();
   const { nodes } = useEventStream();
   const connectedNodes = (nodes ?? []).filter(n => n.status === 'connected');
 
@@ -322,12 +321,13 @@ function LogTerminal({ containerId, nodeId, label }: { containerId: string | nul
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const logs = data?.logs;
   const lines = useMemo(() => {
-    if (!data?.logs) return [];
-    const raw = data.logs.split('\n');
+    if (!logs) return [];
+    const raw = logs.split('\n');
     while (raw.length > 0 && raw[raw.length - 1] === '') raw.pop();
     return raw;
-  }, [data?.logs]);
+  }, [logs]);
 
   useEffect(() => {
     if (lines.length > 0) {
