@@ -57,3 +57,11 @@ export function useContainerLogs(nodeId: string, id: string) {
     enabled: !!nodeId && !!id,
   });
 }
+
+export function useNodeContainerLogs(hubNodeId: string, remoteNodeId: string, containerId: string) {
+  return useQuery({
+    queryKey: ['node-container-logs', hubNodeId, remoteNodeId, containerId] as const,
+    queryFn: () => getNodeApi(hubNodeId).getNodeContainerLogs(remoteNodeId, containerId),
+    enabled: !!hubNodeId && !!remoteNodeId && !!containerId,
+  });
+}

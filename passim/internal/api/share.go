@@ -136,15 +136,20 @@ func shareConfigHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		// If per-user share, filter to specific user index
-		if st.UserIndex > 0 && clientsDef.Type == "file_per_user" {
-			var filtered []clientcfg.ResolvedFile
-			for _, f := range resolved.Files {
-				if f.Index == st.UserIndex {
-					filtered = append(filtered, f)
+		// If per-user share, filter/rewrite for the specific user
+		if st.UserIndex > 0 {
+			switch clientsDef.Type {
+			case "file_per_user":
+				var filtered []clientcfg.ResolvedFile
+				for _, f := range resolved.Files {
+					if f.Index == st.UserIndex {
+						filtered = append(filtered, f)
+					}
 				}
+				resolved.Files = filtered
+			case "url":
+				replaceURIsForUser(deps, resolved, app.ID, st.UserIndex)
 			}
-			resolved.Files = filtered
 		}
 
 		resp := buildShareResponse(resolved, t)
@@ -209,7 +214,7 @@ func shareConfigHandler(deps Deps) gin.HandlerFunc {
 func shareSubscribeHandler(deps Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
-		_, app, t, ok := loadShareContext(deps, c, token)
+		st, app, t, ok := loadShareContext(deps, c, token)
 		if !ok {
 			return
 		}
@@ -226,6 +231,11 @@ func shareSubscribeHandler(deps Deps) gin.HandlerFunc {
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "resolve: " + err.Error()})
 			return
+		}
+
+		// Replace admin credentials with user's for per-user shares
+		if st.UserIndex > 0 {
+			replaceURIsForUser(deps, resolved, app.ID, st.UserIndex)
 		}
 
 		resolved.NodeName = localNodeName(deps)
@@ -452,6 +462,19 @@ func buildShareResponse(resolved *clientcfg.ResolvedConfig, t *tmpl.Template) sh
 	}
 
 	return resp
+}
+
+// replaceURIsForUser replaces admin credentials in resolved URLs with the
+// specific user's username:password. userIndex is 1-based (matches share token).
+func replaceURIsForUser(deps Deps, resolved *clientcfg.ResolvedConfig, appID string, userIndex int) {
+	users, err := db.ListAppUsers(deps.DB, appID)
+	if err != nil || userIndex < 1 || userIndex > len(users) {
+		return
+	}
+	user := users[userIndex-1]
+	for i, u := range resolved.URLs {
+		resolved.URLs[i].URI = userConnectionURI(u.URI, user.Username, user.Password)
+	}
 }
 
 func parseIndex(s string) (int, error) {

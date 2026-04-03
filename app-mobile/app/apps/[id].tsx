@@ -354,17 +354,17 @@ export default function AppDetailScreen() {
             <ClientConfig nodeId={nodeId} appId={id} templateName={app.template} />
           </View>
 
-          {/* Container Tools */}
+          {/* Logs */}
           {containerId ? (
             <>
               <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                {t('app.container')}
+                {t('container.logs')}
               </Text>
-              <View className="flex-row gap-3 mb-4">
+              <View className="gap-2 mb-4">
                 <ActionButton
                   testID="btn-app-logs"
                   icon="document-text"
-                  label={t('container.view_logs')}
+                  label={hasRemoteNodes ? `${hubNode?.name ?? 'Local'} ${t('container.logs')}` : t('container.view_logs')}
                   color="#0a84ff"
                   onPress={() => {
                     router.push({
@@ -373,6 +373,31 @@ export default function AppDetailScreen() {
                     });
                   }}
                 />
+                {connectedRemotes.map((node, i) => {
+                  const remoteApps = remoteAppQueries[i]?.data;
+                  const remoteApp = remoteApps?.find(
+                    (a: AppResponse) => a.template === app!.template,
+                  );
+                  if (!remoteApp?.container_id) return null;
+                  return (
+                    <ActionButton
+                      key={node.id}
+                      icon="document-text"
+                      label={`${node.name || node.address} ${t('container.logs')}`}
+                      color="#5e5ce6"
+                      onPress={() => {
+                        router.push({
+                          pathname: '/containers/[id]/logs',
+                          params: {
+                            id: remoteApp.container_id!,
+                            name: `${node.name || node.address} / ${app!.template}`,
+                            remoteNodeId: node.id,
+                          },
+                        });
+                      }}
+                    />
+                  );
+                })}
               </View>
             </>
           ) : null}

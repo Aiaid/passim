@@ -22,7 +22,6 @@ import {
   useNodeUpdate,
 } from './queries';
 import type { RemoteNode, Container, AppResponse, UpdateInfo } from '@/lib/api-client';
-import { AppDetailPanel } from '@/features/apps/app-detail-panel';
 
 function countryFlag(code: string): string {
   return [...code.toUpperCase()]
@@ -283,7 +282,7 @@ function ContainersTab({ nodeId, containers, isLoading }: { nodeId: string; cont
 
 function AppsTab({ apps, isLoading }: { apps?: AppResponse[]; isLoading: boolean }) {
   const { t } = useTranslation();
-  const [selected, setSelected] = useState<AppResponse | null>(null);
+  const navigate = useNavigate();
 
   if (isLoading) return <PageSkeleton />;
 
@@ -297,35 +296,27 @@ function AppsTab({ apps, isLoading }: { apps?: AppResponse[]; isLoading: boolean
   }
 
   return (
-    <>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {apps.map((app) => (
-          <Card
-            key={app.id}
-            className="cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
-            onClick={() => setSelected(app)}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="text-sm font-medium capitalize truncate">{app.template}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {new Date(app.deployed_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <StatusBadge status={app.status} />
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {apps.map((app) => (
+        <Card
+          key={app.id}
+          className="cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
+          onClick={() => navigate(`/apps/${app.id}`)}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-sm font-medium capitalize truncate">{app.template}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {new Date(app.deployed_at).toLocaleDateString()}
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <AppDetailPanel
-        app={selected}
-        open={!!selected}
-        onOpenChange={(open) => { if (!open) setSelected(null); }}
-      />
-    </>
+              <StatusBadge status={app.status} />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }
 

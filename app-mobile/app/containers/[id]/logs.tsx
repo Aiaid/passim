@@ -9,15 +9,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useContainerLogs } from '@/hooks/use-containers';
+import { useContainerLogs, useNodeContainerLogs } from '@/hooks/use-containers';
 import { useNodeStore } from '@/stores/node-store';
 import { useTranslation } from '@/lib/i18n';
 
 export default function ContainerLogsScreen() {
   const { t } = useTranslation();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, remoteNodeId } = useLocalSearchParams<{ id: string; remoteNodeId?: string }>();
   const nodeId = useNodeStore((s) => s.activeNodeId) ?? '';
-  const { data, isLoading, refetch, isRefetching } = useContainerLogs(nodeId, id);
+  const localLogs = useContainerLogs(nodeId, remoteNodeId ? '' : id);
+  const remoteLogs = useNodeContainerLogs(nodeId, remoteNodeId ?? '', remoteNodeId ? id : '');
+  const { data, isLoading, refetch, isRefetching } = remoteNodeId ? remoteLogs : localLogs;
 
   const scrollRef = useRef<ScrollView>(null);
   const [autoScroll, setAutoScroll] = useState(true);

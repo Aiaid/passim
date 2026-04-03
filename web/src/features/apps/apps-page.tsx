@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { AppWindow, Plus, Server } from 'lucide-react';
@@ -16,7 +15,6 @@ import type { AppResponse } from '@/lib/api-client';
 import { useEventStream } from '@/hooks/use-event-stream';
 import { cn, localized } from '@/lib/utils';
 import { AppCard } from './app-card';
-import { AppDetailPanel } from './app-detail-panel';
 
 export function AppsPage() {
   const { nodes } = useEventStream();
@@ -39,7 +37,6 @@ function SingleNodeAppsPage() {
     queryKey: ['templates'],
     queryFn: () => api.getTemplates(),
   });
-  const [selected, setSelected] = useState<AppResponse | null>(null);
 
   const runningCount = apps?.filter(a => a.status === 'running').length ?? 0;
 
@@ -72,18 +69,11 @@ function SingleNodeAppsPage() {
               key={app.id}
               app={app}
               template={templates?.find((tpl) => tpl.name === app.template)}
-              onClick={() => setSelected(app)}
+              onClick={() => navigate(`/apps/${app.id}`)}
             />
           ))}
         </div>
       )}
-
-      <AppDetailPanel
-        app={selected}
-        template={selected ? templates?.find((tpl) => tpl.name === selected.template) : undefined}
-        open={!!selected}
-        onOpenChange={(open) => { if (!open) setSelected(null); }}
-      />
     </div>
   );
 }
@@ -110,8 +100,6 @@ function MultiNodeAppsPage() {
       staleTime: 10_000,
     })),
   });
-
-  const [selected, setSelected] = useState<AppResponse | null>(null);
 
   // All nodes
   const allNodes = [
@@ -189,7 +177,7 @@ function MultiNodeAppsPage() {
             <Card
               key={templateName}
               className="cursor-pointer overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-              onClick={() => setSelected(primary)}
+              onClick={() => navigate(`/apps/${primary.id}`)}
             >
               <div
                 className="h-[3px] w-full"
@@ -234,12 +222,6 @@ function MultiNodeAppsPage() {
         </div>
       )}
 
-      <AppDetailPanel
-        app={selected}
-        template={selected ? templates?.find((tpl) => tpl.name === selected.template) : undefined}
-        open={!!selected}
-        onOpenChange={(open) => { if (!open) setSelected(null); }}
-      />
     </div>
   );
 }

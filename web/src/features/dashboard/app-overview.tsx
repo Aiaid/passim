@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { AppWindow } from 'lucide-react';
@@ -9,7 +8,6 @@ import { CategoryIcon } from '@/components/shared/category-icon';
 import { StatusIndicator } from '@/components/shared/status-indicator';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AppDetailPanel } from '@/features/apps/app-detail-panel';
 import { cn } from '@/lib/utils';
 import { api, type AppResponse } from '@/lib/api-client';
 import { useEventStream } from '@/hooks/use-event-stream';
@@ -24,8 +22,6 @@ export function AppOverview({ className }: { className?: string }) {
     queryKey: ['templates'],
     queryFn: () => api.getTemplates(),
   });
-  const [selected, setSelected] = useState<AppResponse | null>(null);
-
   // Fetch apps from connected remote nodes
   const connectedNodes = (nodes ?? []).filter(n => n.status === 'connected');
   const nodeAppQueries = useQueries({
@@ -104,7 +100,7 @@ export function AppOverview({ className }: { className?: string }) {
                   <div
                     key={templateName}
                     className="rounded-md px-2 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => setSelected(primary)}
+                    onClick={() => navigate(`/apps/${primary.id}`)}
                   >
                     <div className="flex items-center gap-2.5">
                       <CategoryIcon
@@ -157,7 +153,7 @@ export function AppOverview({ className }: { className?: string }) {
                   <div
                     key={app.id}
                     className="flex items-center gap-2.5 rounded-md px-2 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => setSelected(app)}
+                    onClick={() => navigate(`/apps/${app.id}`)}
                   >
                     <CategoryIcon
                       category={tpl?.category ?? 'vpn'}
@@ -186,18 +182,6 @@ export function AppOverview({ className }: { className?: string }) {
         </div>
       </CardContent>
 
-      <AppDetailPanel
-        app={selected}
-        template={
-          selected
-            ? templates?.find((tpl) => tpl.name === selected.template)
-            : undefined
-        }
-        open={!!selected}
-        onOpenChange={(open) => {
-          if (!open) setSelected(null);
-        }}
-      />
     </Card>
   );
 }
