@@ -73,7 +73,8 @@ func listAppUsersHandler(deps Deps) gin.HandlerFunc {
 
 		resp := make([]appUserResponse, 0, len(users))
 		for i, u := range users {
-			usedBytes, _ := db.GetTotalTrafficByUser(deps.DB, app.ID, u.ID)
+			// Traffic logs are keyed by username (see Doc/apps/hysteria.md schema).
+			usedBytes, _ := db.GetTotalTrafficByUser(deps.DB, app.ID, u.Username)
 			online := 0
 			if onlineCounts != nil {
 				online = onlineCounts[u.Username]

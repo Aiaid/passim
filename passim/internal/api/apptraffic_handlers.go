@@ -202,14 +202,16 @@ func getUserTrafficHistoryHandler(deps Deps) gin.HandlerFunc {
 		since := parsePeriod(period)
 		granularity := periodGranularity(period)
 
-		// Look up user ID from username
+		// Verify the user exists. The traffic log rows are keyed by
+		// username (see Doc/apps/hysteria.md schema), so we query by
+		// username rather than user.ID.
 		user, err := db.GetAppUserByUsername(deps.DB, app.ID, username)
 		if err != nil || user == nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return
 		}
 
-		points, err := db.GetUserTrafficHistory(deps.DB, app.ID, user.ID, since, granularity)
+		points, err := db.GetUserTrafficHistory(deps.DB, app.ID, user.Username, since, granularity)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

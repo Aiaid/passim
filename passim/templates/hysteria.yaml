@@ -148,7 +148,10 @@ users:
 metrics:
   per_user:
     method: api
-    url: "http://{{container_ip}}:9999/traffic"
+    # clear=1 makes Hysteria2 atomically return+reset the counter, so each
+    # poll yields a delta rather than a cumulative total. Without it, the
+    # summed rows would over-count quadratically over time.
+    url: "http://{{container_ip}}:9999/traffic?clear=1"
     secret: "{{generated.stats_secret}}"
     online_url: "http://{{container_ip}}:9999/online"
   interval: "60s"

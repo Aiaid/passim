@@ -597,6 +597,18 @@ func TestHysteriaConfigTemplate(t *testing.T) {
 	if cf.Path != "config.yaml" {
 		t.Errorf("hysteria config path = %q, want config.yaml", cf.Path)
 	}
+
+	// Regression: the traffic URL must include ?clear=1 so each poll
+	// atomically reads+resets the counter. Without it, successive polls
+	// return cumulative values, and the SUM() aggregation in
+	// db.GetTrafficSummary over-counts quadratically over time.
+	// See Doc/apps/hysteria.md:312.
+	if hy.Metrics == nil || hy.Metrics.PerUser == nil {
+		t.Fatal("hysteria metrics.per_user config missing")
+	}
+	if !strings.Contains(hy.Metrics.PerUser.URL, "clear=1") {
+		t.Errorf("hysteria metrics.per_user.url must contain ?clear=1, got %q", hy.Metrics.PerUser.URL)
+	}
 }
 
 func TestV2rayConfigTemplate(t *testing.T) {

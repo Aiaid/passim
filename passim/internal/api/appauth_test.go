@@ -124,9 +124,12 @@ func TestAppAuthOverQuota(t *testing.T) {
 	}
 	db.CreateAppUser(database, user)
 
-	// Insert traffic logs that exceed quota
+	// Insert traffic logs that exceed quota. The collector keys traffic
+	// logs by username (the "id" returned to hy2 auth), not by user.ID —
+	// so the test must insert with UserID=username to exercise the real
+	// production path.
 	db.InsertTrafficLogs(database, []db.TrafficLog{
-		{AppID: "test-app-003", UserID: "user-003", TxBytes: 60, RxBytes: 50},
+		{AppID: "test-app-003", UserID: "charlie", TxBytes: 60, RxBytes: 50},
 	})
 
 	w := postAuth(router, "test-app-003", "charlie:pw")
@@ -134,6 +137,36 @@ func TestAppAuthOverQuota(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp["ok"] != false {
 		t.Errorf("expected ok=false for over-quota user, got %v", resp["ok"])
+	}
+}
+
+// TestAppAuthQuotaNotExceeded verifies a user under quota is allowed through.
+// Complements TestAppAuthOverQuota — protects against the quota check being
+// accidentally disabled by a future refactor (e.g. wrong user_id column key).
+func TestAppAuthQuotaNotExceeded(t *testing.T) {
+	reg := template.NewRegistry()
+	reg.LoadDir(templateDir(t))
+	router, database, _ := testServerFull(t, nil, reg)
+
+	app := &db.App{ID: "test-app-003b", Template: "hysteria", Settings: `{"port":443}`, Status: "running"}
+	db.CreateApp(database, app)
+
+	user := &db.AppUser{
+		ID: "user-003b", AppID: "test-app-003b", Username: "dave", Password: "pw",
+		Enabled: true, QuotaBytes: 10_000,
+	}
+	db.CreateAppUser(database, user)
+
+	// Under quota — 100 bytes used out of 10000
+	db.InsertTrafficLogs(database, []db.TrafficLog{
+		{AppID: "test-app-003b", UserID: "dave", TxBytes: 60, RxBytes: 40},
+	})
+
+	w := postAuth(router, "test-app-003b", "dave:pw")
+	var resp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp["ok"] != true {
+		t.Errorf("expected ok=true for under-quota user, got %v", resp["ok"])
 	}
 }
 

@@ -37,10 +37,12 @@ func setupTrafficTest(t *testing.T) (http.Handler, string, string, *db.AppUser) 
 	}
 	db.CreateAppUser(database, user)
 
-	// Insert some traffic
+	// Insert some traffic. In production the collector keys traffic logs
+	// by username (the "id" returned to hy2 auth), so the test uses
+	// UserID=username to match reality.
 	db.InsertTrafficLogs(database, []db.TrafficLog{
-		{AppID: appID, UserID: "tuser-001", TxBytes: 1000, RxBytes: 2000},
-		{AppID: appID, UserID: "tuser-001", TxBytes: 500, RxBytes: 300},
+		{AppID: appID, UserID: "alice", TxBytes: 1000, RxBytes: 2000},
+		{AppID: appID, UserID: "alice", TxBytes: 500, RxBytes: 300},
 	})
 
 	return router, token, appID, user

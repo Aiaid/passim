@@ -102,9 +102,11 @@ func appAuthHandler(deps Deps) gin.HandlerFunc {
 			return
 		}
 
-		// Check quota
+		// Check quota. NOTE: app_traffic_logs.user_id stores the username
+		// (the "id" returned to Hysteria's auth callback), not user.ID —
+		// see Doc/apps/hysteria.md schema section.
 		if user.QuotaBytes > 0 {
-			total, err := db.GetTotalTrafficByUser(deps.DB, appID, user.ID)
+			total, err := db.GetTotalTrafficByUser(deps.DB, appID, user.Username)
 			if err != nil {
 				c.JSON(http.StatusOK, gin.H{"ok": false})
 				return
