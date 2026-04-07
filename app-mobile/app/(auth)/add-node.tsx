@@ -38,7 +38,7 @@ export default function AddNodeScreen() {
           if (status?.node?.name) name = status.node.name;
         }
       } catch { /* use host as fallback */ }
-      await addNode({ host, token, name });
+      await addNode({ host, token, name, apiKey });
       router.replace('/(tabs)');
     } catch {
       setError('Could not connect. Check the address.');

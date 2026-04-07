@@ -31,6 +31,7 @@ interface NodeState {
   setActiveNode: (id: string) => void;
   updateNodeName: (id: string, name: string) => Promise<void>;
   updateNodeHubRemoteId: (nodeId: string, hubRemoteId: string) => Promise<void>;
+  updateNodeToken: (id: string, token: string) => Promise<void>;
   loadNodes: () => Promise<void>;
 }
 
@@ -120,6 +121,15 @@ export const useNodeStore = create<NodeState>((set, get) => ({
     await persistNodes(nodes);
     const activeNode = get().activeNodeId === nodeId
       ? nodes.find((n) => n.id === nodeId) ?? get().activeNode
+      : get().activeNode;
+    set({ nodes, activeNode, hubNode: nodes[0] ?? null });
+  },
+
+  updateNodeToken: async (id, token) => {
+    const nodes = get().nodes.map((n) => (n.id === id ? { ...n, token } : n));
+    await persistNodes(nodes);
+    const activeNode = get().activeNodeId === id
+      ? nodes.find((n) => n.id === id) ?? get().activeNode
       : get().activeNode;
     set({ nodes, activeNode, hubNode: nodes[0] ?? null });
   },
