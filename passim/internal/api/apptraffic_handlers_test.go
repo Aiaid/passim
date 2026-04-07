@@ -138,3 +138,85 @@ func TestGetUserTrafficHistoryNotFound(t *testing.T) {
 		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestResetTraffic(t *testing.T) {
+	router, token, appID, _ := setupTrafficTest(t)
+
+	// Sanity: traffic exists pre-reset
+	w := doRequest(router, "GET", "/api/apps/"+appID+"/traffic?period=24h", token, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("pre-reset GET expected 200, got %d", w.Code)
+	}
+	var pre trafficResponse
+	json.Unmarshal(w.Body.Bytes(), &pre)
+	if pre.Total.TxBytes == 0 || pre.Total.RxBytes == 0 {
+		t.Fatalf("pre-reset traffic should be non-zero, got %+v", pre.Total)
+	}
+
+	// Reset (no remote nodes in test → only local rows wiped)
+	w = doRequest(router, "POST", "/api/apps/"+appID+"/traffic/reset", token, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("reset expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resetResp struct {
+		OK            bool  `json:"ok"`
+		DeletedLocal  int64 `json:"deleted_local"`
+		DeletedRemote int64 `json:"deleted_remote"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resetResp); err != nil {
+		t.Fatalf("decode reset response: %v", err)
+	}
+	if !resetResp.OK {
+		t.Errorf("reset ok = false")
+	}
+	if resetResp.DeletedLocal != 2 {
+		t.Errorf("deleted_local = %d, want 2", resetResp.DeletedLocal)
+	}
+	if resetResp.DeletedRemote != 0 {
+		t.Errorf("deleted_remote = %d, want 0 (no remote nodes)", resetResp.DeletedRemote)
+	}
+
+	// Post-reset: GET returns zeros and no users
+	w = doRequest(router, "GET", "/api/apps/"+appID+"/traffic?period=24h", token, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("post-reset GET expected 200, got %d", w.Code)
+	}
+	var post trafficResponse
+	json.Unmarshal(w.Body.Bytes(), &post)
+	if post.Total.TxBytes != 0 || post.Total.RxBytes != 0 {
+		t.Errorf("post-reset totals should be zero, got %+v", post.Total)
+	}
+	if len(post.Users) != 0 {
+		t.Errorf("post-reset users should be empty, got %d", len(post.Users))
+	}
+}
+
+func TestResetTrafficNoMetricsSupport(t *testing.T) {
+	reg := template.NewRegistry()
+	reg.LoadDir(templateDir(t))
+	mock := &docker.MockClient{}
+	router, database, apiKey := testServerFull(t, mock, reg)
+	token := getToken(t, router, apiKey)
+
+	// wireguard has no metrics support → reset must 400 like GET does
+	app := &db.App{
+		ID: "app-no-metrics-reset", Template: "wireguard",
+		Settings: `{"peers":1}`, Status: "running",
+	}
+	db.CreateApp(database, app)
+
+	w := doRequest(router, "POST", "/api/apps/app-no-metrics-reset/traffic/reset", token, nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestResetTrafficUnauthorized(t *testing.T) {
+	router, _, appID, _ := setupTrafficTest(t)
+
+	// No token → JWT middleware should reject
+	w := doRequest(router, "POST", "/api/apps/"+appID+"/traffic/reset", "", nil)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+	}
+}

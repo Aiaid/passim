@@ -247,7 +247,11 @@
     "period_24h": "24小时",
     "period_7d": "7天",
     "period_30d": "30天",
-    "no_traffic": "暂无流量数据"
+    "no_traffic": "暂无流量数据",
+    "traffic_reset": "清空",
+    "traffic_reset_title": "清空流量统计?",
+    "traffic_reset_desc": "将删除该应用的所有流量记录,并同步清空所有节点。同时也会重置已用配额,被禁用户可立即恢复连接。此操作不可撤销。",
+    "traffic_reset_failed": "清空失败"
   },
   "speedtest": {
     "title": "网络测速",

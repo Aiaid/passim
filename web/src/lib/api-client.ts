@@ -231,6 +231,11 @@ export const api = {
     request<TrafficResponse>(`/apps/${appId}/traffic?period=${period}`),
   getAppUserTrafficHistory: (appId: string, username: string, period: string) =>
     request<TrafficHistoryResponse>(`/apps/${appId}/traffic/${username}/history?period=${period}`),
+  resetAppTraffic: (appId: string) =>
+    request<{ ok: boolean; deleted_local: number; deleted_remote: number }>(
+      `/apps/${appId}/traffic/reset`,
+      { method: 'POST' },
+    ),
 
   // Connections
   getConnections: () => request<ConnectionInfo[]>('/connections'),

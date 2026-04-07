@@ -140,6 +140,11 @@ export function createApi(request: <T>(path: string, options?: RequestInit) => P
       request<TrafficResponse>(`/apps/${appId}/traffic${period ? `?period=${period}` : ''}`),
     getAppUserTrafficHistory: (appId: string, username: string, period?: string) =>
       request<TrafficHistoryResponse>(`/apps/${appId}/traffic/${username}/history${period ? `?period=${period}` : ''}`),
+    resetAppTraffic: (appId: string) =>
+      request<{ ok: boolean; deleted_local: number; deleted_remote: number }>(
+        `/apps/${appId}/traffic/reset`,
+        { method: 'POST' },
+      ),
 
     // Public share (no auth)
     getShareConfig: (token: string) => request<ShareConfigResponse>(`/s/${token}`),

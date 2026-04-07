@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from '@/lib/i18n';
-import { useAppTraffic } from '@/hooks/use-app-traffic';
+import { useAppTraffic, useResetAppTraffic } from '@/hooks/use-app-traffic';
 import type { TrafficUserSummary } from '@passim/shared/types';
 
 interface Props {
@@ -85,28 +85,61 @@ export function AppTrafficSection({ nodeId, appId }: Props) {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<string>('24h');
   const { data, isLoading } = useAppTraffic(nodeId, appId, period);
+  const resetMutation = useResetAppTraffic(nodeId, appId);
+
+  const confirmReset = () => {
+    Alert.alert(
+      t('app.traffic_reset_title'),
+      t('app.traffic_reset_desc'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('app.traffic_reset'),
+          style: 'destructive',
+          onPress: () => {
+            resetMutation.mutate(undefined, {
+              onError: () => Alert.alert(t('app.traffic_reset_failed')),
+            });
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <View className="mb-4">
-      {/* Period Selector */}
-      <View className="flex-row gap-2 mb-3">
-        {PERIODS.map((p) => (
-          <Pressable
-            key={p}
-            className={`flex-1 py-2 rounded-lg items-center ${
-              period === p ? 'bg-blue-600' : 'bg-gray-900'
-            }`}
-            onPress={() => setPeriod(p)}
-          >
-            <Text
-              className={`text-xs font-medium ${
-                period === p ? 'text-white' : 'text-gray-400'
+      {/* Period Selector + Reset */}
+      <View className="flex-row items-center gap-2 mb-3">
+        <View className="flex-row flex-1 gap-2">
+          {PERIODS.map((p) => (
+            <Pressable
+              key={p}
+              className={`flex-1 py-2 rounded-lg items-center ${
+                period === p ? 'bg-blue-600' : 'bg-gray-900'
               }`}
+              onPress={() => setPeriod(p)}
             >
-              {t(PERIOD_KEYS[p])}
-            </Text>
-          </Pressable>
-        ))}
+              <Text
+                className={`text-xs font-medium ${
+                  period === p ? 'text-white' : 'text-gray-400'
+                }`}
+              >
+                {t(PERIOD_KEYS[p])}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Pressable
+          className="px-3 py-2 rounded-lg bg-gray-900 items-center justify-center"
+          onPress={confirmReset}
+          disabled={resetMutation.isPending}
+        >
+          {resetMutation.isPending ? (
+            <ActivityIndicator size="small" color="#9ca3af" />
+          ) : (
+            <Ionicons name="refresh" size={16} color="#9ca3af" />
+          )}
+        </Pressable>
       </View>
 
       {isLoading ? (

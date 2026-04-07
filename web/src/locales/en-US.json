@@ -262,7 +262,12 @@
     "total": "Total",
     "online": "Online",
     "no_data": "No traffic data",
-    "no_data_desc": "Traffic stats will appear once users start connecting"
+    "no_data_desc": "Traffic stats will appear once users start connecting",
+    "reset": "Reset",
+    "reset_title": "Reset traffic stats?",
+    "reset_desc": "All traffic records for this app will be deleted across every node. Used-quota counters reset too, so any quota-blocked users will be able to connect again. This cannot be undone.",
+    "reset_success": "Traffic stats reset",
+    "reset_failed": "Failed to reset traffic"
   },
   "speedtest": {
     "title": "Speed Test",

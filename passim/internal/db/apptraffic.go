@@ -134,6 +134,23 @@ func GetUserTrafficHistory(database *sql.DB, appID, userID string, since time.Ti
 	return points, rows.Err()
 }
 
+// DeleteTrafficByApp removes all traffic log rows for the given app.
+// Returns the number of rows deleted. Used by the traffic reset endpoint;
+// because traffic logs are stored as per-poll deltas (Hysteria's /traffic
+// endpoint is read with clear=1), wiping the rows is enough to zero out
+// both the displayed totals and the quota counters that sum the table.
+func DeleteTrafficByApp(database *sql.DB, appID string) (int64, error) {
+	res, err := database.Exec(`DELETE FROM app_traffic_logs WHERE app_id = ?`, appID)
+	if err != nil {
+		return 0, fmt.Errorf("delete traffic by app: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("rows affected: %w", err)
+	}
+	return n, nil
+}
+
 // GetTotalTrafficByUser returns the all-time total tx+rx bytes for a user in an app (for quota checking).
 func GetTotalTrafficByUser(database *sql.DB, appID, userID string) (int64, error) {
 	var total int64

@@ -242,6 +242,78 @@ func getOrCreateUser(m map[string]*trafficUserSummary, username string) *traffic
 	return u
 }
 
+// resetTrafficHandler hard-deletes all traffic log rows for the app and
+// (unless ?local=1) broadcasts the reset to remote nodes hosting the same
+// template, so the cluster-wide aggregated view returns to zero in lockstep.
+//
+// Because the collector inserts per-poll deltas (Hysteria's /traffic is
+// queried with clear=1, see Doc/apps/hysteria.md), simply removing the rows
+// resets both the displayed totals and the quota counters in appauth — the
+// next poll picks up only new traffic going forward. No in-memory state to
+// touch on the collector side.
+func resetTrafficHandler(deps Deps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		app, _, ok := loadAppAndTemplateWithMetrics(deps, c)
+		if !ok {
+			return
+		}
+
+		deletedLocal, err := db.DeleteTrafficByApp(deps.DB, app.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var deletedRemote int64
+		if c.Query("local") != "1" {
+			deletedRemote = broadcastResetTraffic(c.Request.Context(), deps, app.Template)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"ok":             true,
+			"deleted_local":  deletedLocal,
+			"deleted_remote": deletedRemote,
+		})
+	}
+}
+
+// broadcastResetTraffic forwards a reset to every connected remote node
+// running the same template. The ?local=1 query param prevents fan-out loops:
+// remote nodes only wipe their own rows and do not re-broadcast.
+func broadcastResetTraffic(ctx context.Context, deps Deps, templateName string) int64 {
+	remoteApps := findRemoteApps(ctx, deps, templateName)
+	if len(remoteApps) == 0 {
+		return 0
+	}
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	var total int64
+
+	for _, ra := range remoteApps {
+		wg.Add(1)
+		go func(ra remoteAppInfo) {
+			defer wg.Done()
+			path := "/api/apps/" + ra.AppID + "/traffic/reset?local=1"
+			status, body, err := deps.NodeHub.ProxyRequest(ctx, ra.NodeID, "POST", path, nil)
+			if err != nil || status != http.StatusOK {
+				return
+			}
+			var resp struct {
+				DeletedLocal int64 `json:"deleted_local"`
+			}
+			if json.Unmarshal(body, &resp) != nil {
+				return
+			}
+			mu.Lock()
+			total += resp.DeletedLocal
+			mu.Unlock()
+		}(ra)
+	}
+	wg.Wait()
+	return total
+}
+
 // fetchRemoteTraffic queries all connected remote nodes for traffic data
 // of apps using the same template. Returns merged per-user summaries.
 func fetchRemoteTraffic(ctx context.Context, deps Deps, templateName, period string) []trafficUserSummary {

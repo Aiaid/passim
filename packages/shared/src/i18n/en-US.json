@@ -247,7 +247,11 @@
     "period_24h": "24h",
     "period_7d": "7d",
     "period_30d": "30d",
-    "no_traffic": "No traffic data"
+    "no_traffic": "No traffic data",
+    "traffic_reset": "Reset",
+    "traffic_reset_title": "Reset traffic stats?",
+    "traffic_reset_desc": "All traffic records for this app will be deleted across every node. Used-quota counters reset too, so any quota-blocked users will be able to connect again. This cannot be undone.",
+    "traffic_reset_failed": "Failed to reset traffic"
   },
   "speedtest": {
     "title": "Speed Test",

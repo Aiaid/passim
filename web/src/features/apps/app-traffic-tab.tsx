@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowUpFromLine, ArrowDownToLine, Activity, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowUpFromLine, ArrowDownToLine, Activity, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -12,9 +12,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { formatBytes } from '@/lib/utils';
-import { useAppTraffic } from './queries';
+import { useAppTraffic, useResetAppTraffic } from './queries';
 import type { TrafficUserSummary } from '@/lib/api-client';
 
 const PERIODS = ['1h', '24h', '7d', '30d'] as const;
@@ -70,26 +71,39 @@ function UserRow({ user }: { user: TrafficUserSummary }) {
 export function AppTrafficTab({ appId }: AppTrafficTabProps) {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<string>('24h');
+  const [resetOpen, setResetOpen] = useState(false);
 
   const { data } = useAppTraffic(appId, period, true);
+  const resetMutation = useResetAppTraffic();
 
   const users = data?.users ?? [];
   const total = data?.total ?? { tx_bytes: 0, rx_bytes: 0 };
 
   return (
     <div className="space-y-4">
-      {/* Period selector */}
-      <div className="flex items-center gap-1">
-        {PERIODS.map((p) => (
-          <Button
-            key={p}
-            variant={period === p ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setPeriod(p)}
-          >
-            {p}
-          </Button>
-        ))}
+      {/* Period selector + reset button */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          {PERIODS.map((p) => (
+            <Button
+              key={p}
+              variant={period === p ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPeriod(p)}
+            >
+              {p}
+            </Button>
+          ))}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setResetOpen(true)}
+          disabled={resetMutation.isPending}
+        >
+          <RotateCcw className="size-3.5" />
+          {t('traffic.reset')}
+        </Button>
       </div>
 
       {/* Summary cards */}
@@ -141,6 +155,19 @@ export function AppTrafficTab({ appId }: AppTrafficTabProps) {
           </Table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        title={t('traffic.reset_title')}
+        description={t('traffic.reset_desc')}
+        confirmLabel={t('traffic.reset')}
+        destructive
+        onConfirm={() => {
+          setResetOpen(false);
+          resetMutation.mutate(appId);
+        }}
+      />
     </div>
   );
 }

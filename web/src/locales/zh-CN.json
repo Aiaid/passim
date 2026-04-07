@@ -262,7 +262,12 @@
     "total": "总计",
     "online": "在线",
     "no_data": "暂无流量数据",
-    "no_data_desc": "用户开始连接后将显示流量统计"
+    "no_data_desc": "用户开始连接后将显示流量统计",
+    "reset": "清空",
+    "reset_title": "清空流量统计?",
+    "reset_desc": "将删除该应用的所有流量记录,并同步清空所有节点。同时也会重置已用配额,被禁用户可立即恢复连接。此操作不可撤销。",
+    "reset_success": "流量已清空",
+    "reset_failed": "清空失败"
   },
   "speedtest": {
     "title": "网络测速",

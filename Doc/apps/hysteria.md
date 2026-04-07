@@ -305,6 +305,18 @@ Hysteria 2 每次客户端连接时调用。
 }
 ```
 
+**POST /api/apps/:id/traffic/reset** — 清空流量统计
+```json
+// 请求无 body
+// 响应:
+{"ok": true, "deleted_local": 142, "deleted_remote": 87}
+```
+- 硬删除 `app_traffic_logs` 中该 app 的所有行(本地)
+- 自动广播到所有运行同模板的远程节点(通过 NodeHub.ProxyRequest),保持与 GET /traffic 聚合视图一致
+- 加 `?local=1` 时只重置本地、不向远程传播,用于内部递归终止
+- 因为采集器使用 `?clear=1` 写入的是增量(delta),删除现有行后下一轮 poll 自然从零开始,无需触碰内存状态
+- 也清空配额计数:`appauth.go` 通过 SUM(`app_traffic_logs`) 检查 `quota_bytes`,被禁用户在重置后立即恢复连接
+
 ### 流量采集流程
 
 ```

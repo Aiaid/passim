@@ -135,6 +135,22 @@ export function useAppTraffic(appId: string, period: string, enabled: boolean) {
   });
 }
 
+export function useResetAppTraffic() {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  return useMutation({
+    mutationFn: (appId: string) => api.resetAppTraffic(appId),
+    onSuccess: (_data, appId) => {
+      queryClient.invalidateQueries({ queryKey: ['app-traffic', appId] });
+      toast.success(t('traffic.reset_success'));
+    },
+    onError: () => {
+      toast.error(t('traffic.reset_failed'));
+    },
+  });
+}
+
 export function useCreateAppUser() {
   const queryClient = useQueryClient();
 

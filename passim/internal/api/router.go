@@ -156,6 +156,7 @@ func NewRouter(deps Deps) http.Handler {
 			// App traffic routes
 			protected.GET("/apps/:id/traffic", getTrafficHandler(deps))
 			protected.GET("/apps/:id/traffic/:username/history", getUserTrafficHistoryHandler(deps))
+			protected.POST("/apps/:id/traffic/reset", resetTrafficHandler(deps))
 
 			// Task routes
 			protected.GET("/tasks", listTasksHandler(deps))

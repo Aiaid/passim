@@ -233,6 +233,50 @@ func TestGetTotalTrafficByUser(t *testing.T) {
 	}
 }
 
+func TestDeleteTrafficByApp(t *testing.T) {
+	database := setupTestDB(t)
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	logs := []TrafficLog{
+		{AppID: "app-A", UserID: "alice", TxBytes: 100, RxBytes: 200, RecordedAt: now},
+		{AppID: "app-A", UserID: "bob", TxBytes: 50, RxBytes: 70, RecordedAt: now},
+		{AppID: "app-A", UserID: "alice", TxBytes: 33, RxBytes: 44, RecordedAt: now},
+		{AppID: "app-B", UserID: "alice", TxBytes: 999, RxBytes: 888, RecordedAt: now},
+	}
+	if err := InsertTrafficLogs(database, logs); err != nil {
+		t.Fatal(err)
+	}
+
+	deleted, err := DeleteTrafficByApp(database, "app-A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 3 {
+		t.Errorf("deleted = %d, want 3", deleted)
+	}
+
+	// app-A is gone
+	totalA, _ := GetTotalTrafficByUser(database, "app-A", "alice")
+	if totalA != 0 {
+		t.Errorf("app-A alice total = %d, want 0", totalA)
+	}
+
+	// app-B is untouched
+	totalB, _ := GetTotalTrafficByUser(database, "app-B", "alice")
+	if totalB != 1887 {
+		t.Errorf("app-B alice total = %d, want 1887", totalB)
+	}
+
+	// Re-deleting an empty app is a no-op (0 rows)
+	deleted2, err := DeleteTrafficByApp(database, "app-A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted2 != 0 {
+		t.Errorf("second delete = %d, want 0", deleted2)
+	}
+}
+
 func TestBatchInsertLargeSet(t *testing.T) {
 	database := setupTestDB(t)
 
