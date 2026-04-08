@@ -6,6 +6,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -191,8 +192,11 @@ export default function AppDetailScreen() {
   const nodeId = useNodeStore((s) => s.activeNodeId) ?? '';
   const hubNode = useNodeStore((s) => s.hubNode);
   const hubNodeId = hubNode?.id ?? '';
-  const { data: app, isLoading: appLoading } = useApp(nodeId, id);
-  const { data: templateDetail } = useTemplate(nodeId, app?.template ?? '');
+  const appQuery = useApp(nodeId, id);
+  const { data: app, isLoading: appLoading } = appQuery;
+  const templateQuery = useTemplate(nodeId, app?.template ?? '');
+  const { data: templateDetail } = templateQuery;
+  const [refreshing, setRefreshing] = useState(false);
   const deleteApp = useDeleteApp(nodeId);
   const startContainer = useStartContainer(nodeId);
   const stopContainer = useStopContainer(nodeId);
@@ -215,6 +219,19 @@ export default function AppDetailScreen() {
 
   const isRunning = app?.status === 'running';
   const containerId = app?.container_id;
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        appQuery.refetch(),
+        templateQuery.refetch(),
+        ...remoteAppQueries.map((q) => q.refetch()),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [appQuery, templateQuery, remoteAppQueries]);
 
   const handleDelete = useCallback(() => {
     if (!app) return;
@@ -265,7 +282,13 @@ export default function AppDetailScreen() {
           <ActivityIndicator size="large" color="#30d158" />
         </View>
       ) : app ? (
-        <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView
+          className="flex-1 px-4"
+          contentContainerStyle={{ paddingBottom: 40 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#666" />
+          }
+        >
           {/* Status */}
           <View className="bg-gray-900 rounded-xl p-4 mb-4">
             <View className="flex-row items-center gap-2 mb-3">

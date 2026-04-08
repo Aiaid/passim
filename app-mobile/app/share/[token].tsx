@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Alert,
   Linking,
   Share,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useGlobalSearchParams, router } from 'expo-router';
@@ -40,7 +41,18 @@ export default function ShareScreen() {
   // Host can come from deep link query param or be empty (not expected in practice)
   const host = globalParams.host ?? '';
 
-  const { data, isLoading, error } = useShareConfig(host, token ?? '');
+  const shareQuery = useShareConfig(host, token ?? '');
+  const { data, isLoading, error } = shareQuery;
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await shareQuery.refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [shareQuery]);
 
   if (!host) {
     return (
@@ -96,6 +108,9 @@ export default function ShareScreen() {
         className="w-full"
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#666" />
+        }
       >
         <View className="gap-5 max-w-lg self-center w-full">
           {/* Header */}

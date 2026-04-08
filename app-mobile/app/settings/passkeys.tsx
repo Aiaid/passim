@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   FlatList,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -74,8 +75,19 @@ function PasskeyCard({
 export default function PasskeysScreen() {
   const { t } = useTranslation();
   const nodeId = useNodeStore((s) => s.activeNodeId) ?? '';
-  const { data: passkeys, isLoading } = usePasskeys(nodeId);
+  const passkeysQuery = usePasskeys(nodeId);
+  const { data: passkeys, isLoading } = passkeysQuery;
   const deleteMutation = useDeletePasskey(nodeId);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await passkeysQuery.refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [passkeysQuery]);
 
   const handleDelete = useCallback(
     (passkey: Passkey) => {
@@ -140,25 +152,31 @@ export default function PasskeysScreen() {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#30d158" />
         </View>
-      ) : !passkeys?.length ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="bg-gray-900 rounded-2xl p-8 items-center w-full">
-            <Ionicons name="finger-print-outline" size={64} color="#666" />
-            <Text className="text-white text-xl font-bold mt-4 mb-2 text-center">
-              {t('settings.passkey_empty')}
-            </Text>
-            <Text className="text-gray-400 text-center leading-5">
-              {t('settings.passkey_empty_desc')}
-            </Text>
-          </View>
-        </View>
       ) : (
         <FlatList
           className="flex-1 px-4"
-          data={passkeys}
+          data={passkeys ?? []}
           keyExtractor={(item) => item.id}
           renderItem={renderPasskey}
-          contentContainerStyle={{ paddingBottom: 32, paddingTop: 8 }}
+          contentContainerStyle={
+            passkeys?.length
+              ? { paddingBottom: 32, paddingTop: 8 }
+              : { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 16 }
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#666" />
+          }
+          ListEmptyComponent={
+            <View className="bg-gray-900 rounded-2xl p-8 items-center w-full">
+              <Ionicons name="finger-print-outline" size={64} color="#666" />
+              <Text className="text-white text-xl font-bold mt-4 mb-2 text-center">
+                {t('settings.passkey_empty')}
+              </Text>
+              <Text className="text-gray-400 text-center leading-5">
+                {t('settings.passkey_empty_desc')}
+              </Text>
+            </View>
+          }
         />
       )}
     </SafeAreaView>

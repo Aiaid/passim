@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -52,9 +53,13 @@ export default function NodeDetailScreen() {
   const removeNode = useNodeStore((s) => s.removeNode);
   const { getNodeSSE } = useMultiNodeSSE();
   const sse = getNodeSSE(id);
-  const { data: status, isLoading } = useStatus(id);
-  const { data: containers } = useContainers(id);
-  const { data: apps } = useApps(id);
+  const statusQuery = useStatus(id);
+  const { data: status, isLoading } = statusQuery;
+  const containersQuery = useContainers(id);
+  const { data: containers } = containersQuery;
+  const appsQuery = useApps(id);
+  const { data: apps } = appsQuery;
+  const [refreshing, setRefreshing] = useState(false);
   const startContainer = useStartContainer(id);
   const stopContainer = useStopContainer(id);
   const restartContainer = useRestartContainer(id);
@@ -66,6 +71,19 @@ export default function NodeDetailScreen() {
 
   const nodeName = status?.node.name ?? node?.name ?? t('nav.nodes');
   const flag = status?.node.country ? countryFlag(status.node.country) : '';
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        statusQuery.refetch(),
+        containersQuery.refetch(),
+        appsQuery.refetch(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [statusQuery, containersQuery, appsQuery]);
 
   const handleRemove = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -112,7 +130,13 @@ export default function NodeDetailScreen() {
           <ActivityIndicator size="large" color="#30d158" />
         </View>
       ) : (
-        <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView
+          className="flex-1 px-4"
+          contentContainerStyle={{ paddingBottom: 40 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#666" />
+          }
+        >
           {/* Node Info */}
           <View className="bg-gray-900 rounded-xl p-4 mb-4">
             {status ? (

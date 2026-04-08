@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -148,6 +149,7 @@ export default function SettingsScreen() {
 
   // Local state
   const [nameModalVisible, setNameModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [updateResult, setUpdateResult] = useState<{
     available: boolean;
     latest: string;
@@ -312,6 +314,19 @@ export default function SettingsScreen() {
     }
   }, [activeNode, t]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        settingsQuery.refetch(),
+        sslQuery.refetch(),
+        versionQuery.refetch(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [settingsQuery, sslQuery, versionQuery]);
+
   // Derived data
   const nodeName = settingsQuery.data?.node_name ?? '--';
 
@@ -321,12 +336,18 @@ export default function SettingsScreen() {
   const updateValue = checkUpdateMut.isPending
     ? t('settings.check_update') + '...'
     : updateResult?.available
-      ? `v${updateResult.latest} ${t('settings.update_available')}`
+      ? `${updateResult.latest} ${t('settings.update_available')}`
       : undefined;
 
   return (
     <View className="flex-1 bg-black">
-      <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingTop: top, paddingBottom: 48 }}>
+      <ScrollView
+        className="flex-1 px-4"
+        contentContainerStyle={{ paddingTop: top, paddingBottom: 48 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#666" />
+        }
+      >
         <Text className="text-2xl font-bold text-white mt-4 mb-4">{t('settings.title')}</Text>
 
         {/* ── Node Picker (pill style, same as dashboard) ── */}
