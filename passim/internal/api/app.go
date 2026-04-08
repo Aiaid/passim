@@ -205,6 +205,7 @@ func deployAppHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		// Sync path: deploy immediately
+		ensureSharedCertForDeploy(deps, deployReq)
 		result, err := docker.Deploy(c.Request.Context(), deps.Docker, deployReq)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "deploy failed: " + err.Error()})
@@ -511,6 +512,7 @@ func updateAppHandler(deps Deps) gin.HandlerFunc {
 		}
 
 		// Sync path: redeploy immediately
+		ensureSharedCertForDeploy(deps, deployReq)
 		result, err := docker.Deploy(c.Request.Context(), deps.Docker, deployReq)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "redeploy failed: " + err.Error()})

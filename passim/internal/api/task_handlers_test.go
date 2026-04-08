@@ -14,6 +14,7 @@ import (
 	"github.com/passim/passim/internal/db"
 	"github.com/passim/passim/internal/docker"
 	"github.com/passim/passim/internal/sse"
+	"github.com/passim/passim/internal/ssl"
 	"github.com/passim/passim/internal/task"
 )
 
@@ -247,5 +248,92 @@ func TestUndeployHandler_Success(t *testing.T) {
 	}
 	if !hasRemove {
 		t.Error("expected RemoveContainer call")
+	}
+}
+
+func TestVolumesNeedSharedCert(t *testing.T) {
+	const sharedDir = "/data/ssl/shared"
+
+	cases := []struct {
+		name    string
+		volumes []string
+		want    bool
+	}{
+		{"nil", nil, false},
+		{"empty", []string{}, false},
+		{"unrelated bind", []string{"/data/apps/foo:/etc/foo"}, false},
+		{"exact match", []string{"/data/ssl/shared:/etc/passim-ssl:ro"}, true},
+		{"under prefix", []string{"/data/ssl/shared/sub:/etc/x"}, true},
+		{"prefix lookalike not under", []string{"/data/ssl/shared-other:/etc/x"}, false},
+		{"mixed", []string{"/data/apps/foo:/etc/foo", "/data/ssl/shared:/etc/passim-ssl"}, true},
+		{"host-only spec", []string{"/data/ssl/shared"}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := volumesNeedSharedCert(tc.volumes, sharedDir); got != tc.want {
+				t.Errorf("volumesNeedSharedCert(%v, %q) = %v, want %v", tc.volumes, sharedDir, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestVolumesNeedSharedCert_EmptySharedDir(t *testing.T) {
+	if volumesNeedSharedCert([]string{"/data/ssl/shared:/etc/passim-ssl"}, "") {
+		t.Error("expected false when sharedDir is empty")
+	}
+}
+
+func TestEnsureSharedCertForDeploy_NilSSL(t *testing.T) {
+	// Should be a no-op (and not panic) when deps.SSL is nil.
+	deps := Deps{}
+	req := &docker.DeployRequest{
+		AppName: "hysteria",
+		Volumes: []string{"/data/ssl/shared:/etc/passim-ssl:ro"},
+	}
+	ensureSharedCertForDeploy(deps, req) // would panic if it dereferenced nil
+}
+
+func TestEnsureSharedCertForDeploy_WritesCert(t *testing.T) {
+	dir := t.TempDir()
+	mgr := ssl.NewSSLManager(ssl.SSLManagerConfig{Mode: "self-signed", DataDir: dir})
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("ssl init: %v", err)
+	}
+
+	deps := Deps{SSL: mgr}
+	sharedDir := mgr.SharedCertDir()
+	req := &docker.DeployRequest{
+		AppName: "hysteria",
+		Volumes: []string{sharedDir + ":/etc/passim-ssl:ro"},
+	}
+
+	ensureSharedCertForDeploy(deps, req)
+
+	if _, err := os.Stat(filepath.Join(sharedDir, "cert.pem")); err != nil {
+		t.Errorf("expected cert.pem to exist after ensureSharedCertForDeploy: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(sharedDir, "key.pem")); err != nil {
+		t.Errorf("expected key.pem to exist after ensureSharedCertForDeploy: %v", err)
+	}
+}
+
+func TestEnsureSharedCertForDeploy_SkipsUnrelatedVolumes(t *testing.T) {
+	dir := t.TempDir()
+	mgr := ssl.NewSSLManager(ssl.SSLManagerConfig{Mode: "self-signed", DataDir: dir})
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("ssl init: %v", err)
+	}
+
+	deps := Deps{SSL: mgr}
+	req := &docker.DeployRequest{
+		AppName: "wireguard",
+		Volumes: []string{"/data/apps/wg/configs:/config"},
+	}
+
+	ensureSharedCertForDeploy(deps, req)
+
+	// Shared dir should not even exist — export must not have run.
+	if _, err := os.Stat(filepath.Join(mgr.SharedCertDir(), "cert.pem")); !os.IsNotExist(err) {
+		t.Errorf("expected cert.pem to NOT exist (no relevant volume), got err=%v", err)
 	}
 }

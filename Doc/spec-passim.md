@@ -825,6 +825,27 @@ Passim 不使用配置文件——所有配置通过**环境变量**传入，运
 2. 未设 `SSL_DOMAIN`，设了 `DNS_BASE_DOMAIN` → 自动发现公网 IP，Base32 编码拼成域名（如 `ywahcia8.dns.passim.io`）
 3. 两个都未设 → 报错
 
+### 证书共享给子容器 (`/data/ssl/shared/`)
+
+部分 App 模板（如 Hysteria 2）需要复用 Passim 自身的 TLS 证书。Passim 把当前证书+私钥导出到 `{DATA_DIR}/ssl/shared/{cert,key}.pem`，模板通过卷挂载引入：
+
+```yaml
+container:
+  volumes:
+    - "{{node.data_dir}}/ssl/shared:/etc/passim-ssl:ro"
+```
+
+`SSLManager.ExportToShared()` 在以下时机被触发：
+
+1. **启动时**（`self-signed` / `custom` 模式）— 证书立即可用，同步导出。
+2. **后台同步 goroutine**（`auto/letsencrypt` 模式）—
+   - 启动后 15s 首次尝试；如果 autocert 还没拿到证书，按 **30s 间隔短轮询**重试，直到首次成功。
+   - 首次成功后切换到 **1h 常规 ticker**，捕获 ACME 续期。
+   - 内容变化时调用 `restartTLSApps()` 重启依赖该证书的 App 容器。
+3. **App 部署前的兜底**（`deployAppHandler`）— 渲染出的 volumes 如果引用 `SharedCertDir()` 前缀，部署前同步调一次 `ExportToShared()`，避免 auto 模式下后台同步还没成功就部署导致 App 启动失败。失败只记 warning，不阻断部署。
+
+> 历史上 (≤ v0.7.2) 失败重试间隔是写死的 1h，导致初次 ACME 失败后整整 1h 内 App 部署不可用。已修复。
+
 ### Docker Compose
 
 ```yaml

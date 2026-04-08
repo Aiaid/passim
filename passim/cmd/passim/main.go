@@ -123,16 +123,30 @@ func main() {
 				log.Printf("warning: SSL cert export: %v", err)
 			}
 		}
-		// Periodic re-export (catches autocert lazy init + renewals)
+		// Periodic re-export (catches autocert lazy init + renewals).
+		// auto mode is lazy: the ACME flow only runs on the first TLS handshake
+		// (or first explicit GetCertificate call). The initial 15s call may hit
+		// transient ACME errors (e.g. stale "No such authorization"); retry on
+		// a short interval until the first export succeeds, then switch to a
+		// long ticker for renewals.
 		go func() {
 			// Wait for the HTTPS + HTTP-01 servers to start so that the
 			// ACME HTTP-01 challenge can be served on port 80.
 			time.Sleep(15 * time.Second)
-			changed, err := sslMgr.ExportToShared()
-			if err != nil {
-				log.Printf("warning: SSL cert export: %v", err)
-			} else if changed && dockerClient != nil {
-				restartTLSApps(database, dockerClient, dataDir)
+
+			retry := time.NewTicker(30 * time.Second)
+			defer retry.Stop()
+			for {
+				changed, err := sslMgr.ExportToShared()
+				if err != nil {
+					log.Printf("warning: SSL cert export: %v", err)
+					<-retry.C
+					continue
+				}
+				if changed && dockerClient != nil {
+					restartTLSApps(database, dockerClient, dataDir)
+				}
+				break
 			}
 
 			ticker := time.NewTicker(1 * time.Hour)
