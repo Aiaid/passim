@@ -241,8 +241,14 @@ if [[ "$SSL_MODE" == "off" ]]; then
 elif [[ -n "$SSL_DOMAIN" ]]; then
   ACCESS_URL="https://${SSL_DOMAIN}:${PORT}"
 elif [[ -n "$DNS_BASE_DOMAIN" && "$PUBLIC_IP" != "<your-server-ip>" ]]; then
-  # Base32-encode IP to match DNS reflector domain (same algorithm as Go backend)
-  ENCODED=$(printf '%s' "$PUBLIC_IP" | awk -F. '{printf "%c%c%c%c", $1,$2,$3,$4}' | base32 | tr '=' '8' | tr 'A-Z' 'a-z')
+  # Base32-encode IP to match DNS reflector domain (same algorithm as Go backend).
+  # NOTE: Must emit raw single bytes — awk '%c' in a UTF-8 locale (gawk/mawk on Linux)
+  # turns octets > 127 into 2-byte UTF-8 sequences, inflating the 4-byte IPv4 to 6+ bytes
+  # and producing 16-char domains like "yknbvqv6ei888888" instead of 8-char "tinl4iq8".
+  # Shell printf with octal escapes is locale-independent and always emits single bytes.
+  IFS=. read -r _o1 _o2 _o3 _o4 <<< "$PUBLIC_IP"
+  ENCODED=$(printf "\\$(printf '%03o' "$_o1")\\$(printf '%03o' "$_o2")\\$(printf '%03o' "$_o3")\\$(printf '%03o' "$_o4")" \
+    | base32 | tr '=' '8' | tr 'A-Z' 'a-z')
   ACCESS_URL="https://${ENCODED}.${DNS_BASE_DOMAIN}:${PORT}"
 else
   ACCESS_URL="https://${PUBLIC_IP}:${PORT}"

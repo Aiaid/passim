@@ -73,3 +73,27 @@ func TestIPToBase32_DNSSafe(t *testing.T) {
 		}
 	}
 }
+
+// TestIPToBase32_PinnedVectors freezes the exact encoding for specific IPs so that
+// install.sh (which must reproduce this algorithm in shell) can be verified against
+// the same golden values. Cases include octets > 127 because that's where install.sh's
+// earlier awk '%c' approach silently corrupted output under UTF-8 locales on Linux.
+func TestIPToBase32_PinnedVectors(t *testing.T) {
+	cases := []struct {
+		ip, want string
+	}{
+		{"203.0.113.10", "zmahccq8"},
+		{"154.26.190.34", "tinl4iq8"},
+		{"198.51.100.200", "yyzwjsa8"},
+		{"255.255.255.255", "777777y8"}, // trailing '8' is the replacement for a single '=' pad
+	}
+	for _, tc := range cases {
+		got, err := IPToBase32(tc.ip)
+		if err != nil {
+			t.Fatalf("IPToBase32(%q) error: %v", tc.ip, err)
+		}
+		if got != tc.want {
+			t.Errorf("IPToBase32(%q) = %q, want %q", tc.ip, got, tc.want)
+		}
+	}
+}
