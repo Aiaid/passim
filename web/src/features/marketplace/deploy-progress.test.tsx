@@ -30,7 +30,7 @@ function renderProgress(
 
   return render(
     <DeployProgress
-      appId="app-1"
+      templateName="wireguard"
       taskId="task-1"
       onRetry={opts.onRetry ?? vi.fn()}
     />,

@@ -114,6 +114,22 @@ export function useDeployNodeApp(hubNodeId: string) {
       }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: qk.apps(variables.nodeId) });
+      queryClient.invalidateQueries({ queryKey: ['hub-nodes', hubNodeId, variables.nodeId, 'apps'] });
+    },
+  });
+}
+
+/**
+ * Delete an app on a specific remote node via the Hub.
+ */
+export function useDeleteNodeApp(hubNodeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { nodeId: string; appId: string }) =>
+      getNodeApi(hubNodeId).deleteNodeApp(data.nodeId, data.appId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: qk.apps(variables.nodeId) });
+      queryClient.invalidateQueries({ queryKey: ['hub-nodes', hubNodeId, variables.nodeId, 'apps'] });
     },
   });
 }

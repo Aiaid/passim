@@ -69,7 +69,7 @@ function SingleNodeAppsPage() {
               key={app.id}
               app={app}
               template={templates?.find((tpl) => tpl.name === app.template)}
-              onClick={() => navigate(`/apps/${app.id}`)}
+              onClick={() => navigate(`/apps/${app.template}`)}
             />
           ))}
         </div>
@@ -173,11 +173,11 @@ function MultiNodeAppsPage() {
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 app-stagger">
-          {groups.map(({ templateName, template, primary, deployedNodes }) => (
+          {groups.map(({ templateName, template, deployedNodes }) => (
             <Card
               key={templateName}
               className="cursor-pointer overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-              onClick={() => navigate(`/apps/${primary.id}`)}
+              onClick={() => navigate(`/apps/${templateName}`)}
             >
               <div
                 className="h-[3px] w-full"

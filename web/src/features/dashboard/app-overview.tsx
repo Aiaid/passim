@@ -95,12 +95,11 @@ export function AppOverview({ className }: { className?: string }) {
             <div className="space-y-1">
               {entries.map(([templateName, deployments]) => {
                 const tpl = templates?.find(t => t.name === templateName);
-                const primary = Array.from(deployments.values())[0];
                 return (
                   <div
                     key={templateName}
                     className="rounded-md px-2 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => navigate(`/apps/${primary.id}`)}
+                    onClick={() => navigate(`/apps/${templateName}`)}
                   >
                     <div className="flex items-center gap-2.5">
                       <CategoryIcon
@@ -153,7 +152,7 @@ export function AppOverview({ className }: { className?: string }) {
                   <div
                     key={app.id}
                     className="flex items-center gap-2.5 rounded-md px-2 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => navigate(`/apps/${app.id}`)}
+                    onClick={() => navigate(`/apps/${app.template}`)}
                   >
                     <CategoryIcon
                       category={tpl?.category ?? 'vpn'}

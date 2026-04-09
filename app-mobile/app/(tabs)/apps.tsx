@@ -32,7 +32,7 @@ export default function AppsScreen() {
   const renderApp = useCallback(
     ({ item }: { item: AppResponse }) => (
       <View className="mb-3">
-        <AppCard app={item} onPress={() => router.push(`/apps/${item.id}`)} />
+        <AppCard app={item} onPress={() => router.push(`/apps/${item.template}`)} />
       </View>
     ),
     [],

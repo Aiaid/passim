@@ -196,6 +196,8 @@ export function createApi(request: <T>(path: string, options?: RequestInit) => P
       request<ClientConfigResponse>(`/nodes/${nodeId}/apps/${appId}/client-config`),
     deployNodeApp: (nodeId: string, data: { template: string; settings: Record<string, unknown> }) =>
       request<AppResponse>(`/nodes/${nodeId}/apps`, { method: 'POST', body: JSON.stringify(data) }),
+    deleteNodeApp: (nodeId: string, appId: string) =>
+      request<void>(`/nodes/${nodeId}/apps/${appId}`, { method: 'DELETE' }),
     batchDeploy: (data: { template: string; settings: Record<string, unknown>; targets: string[] }) =>
       request<{ task_id: string }>('/batch/deploy', { method: 'POST', body: JSON.stringify(data) }),
     runNodeSpeedTest: (nodeId: string) =>

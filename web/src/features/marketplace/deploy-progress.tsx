@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { useTaskStatus } from './queries';
 
 interface DeployProgressProps {
-  appId: string;
+  templateName: string;
   taskId?: string;
   onRetry: () => void;
 }
@@ -35,7 +35,7 @@ function statusToStepIndex(status: string): number {
   }
 }
 
-export function DeployProgress({ appId, taskId, onRetry }: DeployProgressProps) {
+export function DeployProgress({ templateName, taskId, onRetry }: DeployProgressProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -117,7 +117,7 @@ export function DeployProgress({ appId, taskId, onRetry }: DeployProgressProps) 
           <p className="text-sm text-muted-foreground">
             {t('marketplace.connection_info_available')}
           </p>
-          <Button onClick={() => navigate(`/apps/${appId}`)} className="mt-2">
+          <Button onClick={() => navigate(`/apps/${templateName}`)} className="mt-2">
             {t('marketplace.view_app')}
           </Button>
         </div>

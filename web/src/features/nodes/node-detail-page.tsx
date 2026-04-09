@@ -280,7 +280,7 @@ function ContainersTab({ nodeId, containers, isLoading }: { nodeId: string; cont
   );
 }
 
-function AppsTab({ apps, isLoading }: { apps?: AppResponse[]; isLoading: boolean }) {
+function AppsTab({ nodeId, apps, isLoading }: { nodeId: string; apps?: AppResponse[]; isLoading: boolean }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -301,7 +301,7 @@ function AppsTab({ apps, isLoading }: { apps?: AppResponse[]; isLoading: boolean
         <Card
           key={app.id}
           className="cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
-          onClick={() => navigate(`/apps/${app.id}`)}
+          onClick={() => navigate(`/apps/${app.template}/${nodeId}`)}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-2">
@@ -421,7 +421,7 @@ export function NodeDetailPage() {
         </TabsContent>
 
         <TabsContent value="apps" className="mt-6">
-          <AppsTab apps={apps} isLoading={appsLoading} />
+          <AppsTab nodeId={id!} apps={apps} isLoading={appsLoading} />
         </TabsContent>
       </Tabs>
 

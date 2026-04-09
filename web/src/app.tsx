@@ -30,7 +30,8 @@ export function App() {
             <Route path="/apps" element={<AppsPage />} />
             <Route path="/apps/new" element={<MarketplacePage />} />
             <Route path="/apps/new/:template" element={<DeployWizardPage />} />
-            <Route path="/apps/:id" element={<AppDetailPage />} />
+            <Route path="/apps/:template" element={<AppDetailPage />} />
+            <Route path="/apps/:template/:nodeId" element={<AppDetailPage />} />
             <Route path="/nodes" element={<NodesPage />} />
             <Route path="/nodes/:id" element={<NodeDetailPage />} />
             <Route path="/settings" element={<SettingsPage />} />

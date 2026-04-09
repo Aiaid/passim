@@ -223,7 +223,7 @@ export function DeployWizardPage() {
           <CardContent className="p-0">
             {deployResult ? (
               <DeployProgress
-                appId={deployResult.appId}
+                templateName={template.name}
                 taskId={deployResult.taskId}
                 onRetry={handleRetry}
               />

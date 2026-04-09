@@ -274,7 +274,7 @@ export default function NodeDetailScreen() {
                   <AppCard
                     key={app.id}
                     app={app}
-                    onPress={() => router.push(`/apps/${app.id}`)}
+                    onPress={() => router.push(`/apps/${app.template}`)}
                   />
                 ))}
               </View>
