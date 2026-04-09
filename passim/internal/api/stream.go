@@ -63,14 +63,18 @@ func unifiedStreamHandler(deps Deps) gin.HandlerFunc {
 
 		cache := &metricsCache{}
 
-		// --- Initial snapshot ---
-		sendInitialSnapshot(ctx, deps, cache, writeEvent)
-
-		// --- Subscribe to broker for real-time events ---
+		// --- Subscribe to broker BEFORE the initial snapshot ---
+		// The snapshot can take ~1s (metrics.Collect samples CPU). If a
+		// client publishes an event during that window, subscribing after
+		// the snapshot would miss it. Subscribing first queues such events
+		// in the subscriber's channel for the forwarder goroutine to drain.
 		var brokerSub *sse.Subscriber
 		if deps.SSE != nil {
 			brokerSub = deps.SSE.SubscribeAll()
 		}
+
+		// --- Initial snapshot ---
+		sendInitialSnapshot(ctx, deps, cache, writeEvent)
 
 		// --- Start periodic goroutines ---
 		done := make(chan struct{})
