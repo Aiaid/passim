@@ -90,6 +90,41 @@ func TestStaticAPIRouteReturns404JSON(t *testing.T) {
 	}
 }
 
+func TestStaticCacheHeaders(t *testing.T) {
+	// Regression: embed.FS has zero ModTime → http.FileServer emits no
+	// Last-Modified / ETag / Cache-Control, so browsers fall back to heuristic
+	// caching and keep serving a stale index.html across upgrades. We must
+	// explicitly mark index.html as no-cache (revalidate every load) and hashed
+	// assets as immutable (cacheable forever because the URL changes with
+	// content).
+	webFS := fstest.MapFS{
+		"index.html":                &fstest.MapFile{Data: []byte("<html>hello</html>")},
+		"favicon.ico":               &fstest.MapFile{Data: []byte{0, 0, 1, 0}},
+		"assets/index-abc12345.js":  &fstest.MapFile{Data: []byte(`console.log("ok")`)},
+		"assets/index-abc12345.css": &fstest.MapFile{Data: []byte("body{}")},
+	}
+	router := setupStaticRouter(webFS)
+
+	cases := []struct {
+		path string
+		want string
+	}{
+		{"/", "no-cache, must-revalidate"},                                // SPA shell
+		{"/dashboard", "no-cache, must-revalidate"},                       // SPA fallback
+		{"/favicon.ico", "no-cache, must-revalidate"},                     // non-hashed root file
+		{"/assets/index-abc12345.js", "public, max-age=31536000, immutable"},
+		{"/assets/index-abc12345.css", "public, max-age=31536000, immutable"},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest("GET", tc.path, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if got := w.Header().Get("Cache-Control"); got != tc.want {
+			t.Errorf("GET %s → Cache-Control=%q, want %q", tc.path, got, tc.want)
+		}
+	}
+}
+
 func TestStaticFavicon(t *testing.T) {
 	faviconData := []byte{0x00, 0x00, 0x01, 0x00} // minimal ICO header bytes
 	webFS := fstest.MapFS{
