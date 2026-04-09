@@ -933,8 +933,9 @@
   border-radius: 10px;
   background: oklch(0.12 0.015 265);
   color: oklch(0.82 0.06 185);
-  overflow-x: auto;
-  word-break: break-all;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   border: 1px solid oklch(1 0 0 / 0.06);
 }
 
