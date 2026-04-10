@@ -80,7 +80,6 @@ export default function AddNodeScreen() {
             });
             await useNodeStore.getState().updateNodeHubRemoteId(newNodeId, result.id);
           } catch (hubErr: unknown) {
-            // Check if Hub returned a TLS error
             const errBody = hubErr instanceof Error ? hubErr.message : '';
             if (errBody.includes('tls_error') || errBody.includes('TLS certificate')) {
               Alert.alert(
@@ -92,7 +91,6 @@ export default function AddNodeScreen() {
                     text: t('mobile.tls_skip_connect'),
                     style: 'destructive',
                     onPress: () => {
-                      // Retry Hub registration with TLS skip
                       getNodeApi(hubNode.id).addNode({
                         address: trimmedHost,
                         api_key: apiKey.trim(),
@@ -105,8 +103,16 @@ export default function AddNodeScreen() {
                   },
                 ],
               );
+            } else {
+              // Show Hub sync failure so the user knows
+              Alert.alert(
+                t('mobile.hub_sync_failed_title', { defaultValue: 'Hub Sync Failed' }),
+                t('mobile.hub_sync_failed_message', {
+                  defaultValue: 'Node added locally but failed to register on Hub: {{error}}',
+                  error: errBody || 'unknown',
+                }),
+              );
             }
-            // Hub unreachable — will sync later
           }
         }
       }

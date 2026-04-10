@@ -1,18 +1,23 @@
-import type { RemoteNode, StatusResponse } from '../types';
+import type { RemoteNode } from '../types';
 import { COUNTRY_COORDS } from './constants';
 
-export interface NodeEntry {
+/**
+ * Generic node entry for clustering.
+ *
+ * The `data` payload is untyped by the clustering algorithm — consumers on web
+ * and mobile use different node shapes (StatusResponse vs. a normalized view),
+ * so we make the payload a free-form generic parameter.
+ */
+export interface NodeEntry<T = unknown> {
   id: string;
   lat: number;
   lon: number;
-  type: 'local' | 'remote';
-  localData?: StatusResponse;
-  remoteData?: RemoteNode;
+  data: T;
 }
 
-export interface NodeCluster {
+export interface NodeCluster<T = unknown> {
   centroid: [number, number];
-  members: NodeEntry[];
+  members: NodeEntry<T>[];
 }
 
 function angularDist(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -21,9 +26,14 @@ function angularDist(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return Math.sqrt(dLat * dLat + dLon * dLon);
 }
 
-export function buildClusters(entries: NodeEntry[], threshold = 15): NodeCluster[] {
+/**
+ * Greedy clustering: for each ungrouped entry, pull in every other ungrouped
+ * entry within `threshold` angular degrees of any existing cluster member.
+ * Returns clusters whose `centroid` is the arithmetic mean of the members.
+ */
+export function buildClusters<T>(entries: NodeEntry<T>[], threshold = 15): NodeCluster<T>[] {
   const used = new Set<number>();
-  const clusters: NodeCluster[] = [];
+  const clusters: NodeCluster<T>[] = [];
 
   for (let i = 0; i < entries.length; i++) {
     if (used.has(i)) continue;

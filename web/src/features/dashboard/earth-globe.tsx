@@ -212,6 +212,8 @@ function buildClusters(entries: NodeEntry[], threshold = 15): NodeCluster[] {
 }
 
 // ── Billboard info card (HTML overlay above marker) ──────────────────
+// The inner column (LocalBillboardCol) is shared with the cluster variant to
+// guarantee identical layout between stand-alone and clustered local cards.
 function MarkerBillboard({
   status,
   onClick,
@@ -221,8 +223,6 @@ function MarkerBillboard({
   onClick?: () => void;
   visible: boolean;
 }) {
-  const { node, system, containers } = status;
-
   return (
     <Html
       position={[0, 0, 0]}
@@ -244,51 +244,8 @@ function MarkerBillboard({
         onMouseLeave={() => { document.body.style.cursor = 'default'; }}
         className="node-billboard"
       >
-        {/* Card */}
         <div className="node-billboard-card">
-          {/* Header row */}
-          <div className="node-billboard-header">
-            <span className="node-billboard-ping">
-              <span className="node-billboard-ping-ring" />
-              <span className="node-billboard-ping-dot" />
-            </span>
-            <span className="node-billboard-name">{node.name}</span>
-            {node.country && (
-              <span className="node-billboard-flag">{countryFlag(node.country)}</span>
-            )}
-          </div>
-
-          {/* Stats row */}
-          <div className="node-billboard-stats">
-            <div className="node-billboard-stat">
-              <span className="node-billboard-stat-value">
-                {system.cpu.usage_percent.toFixed(0)}%
-              </span>
-              <span className="node-billboard-stat-label">CPU</span>
-            </div>
-            <div className="node-billboard-divider" />
-            <div className="node-billboard-stat">
-              <span className="node-billboard-stat-value">
-                {system.memory.usage_percent.toFixed(0)}%
-              </span>
-              <span className="node-billboard-stat-label">MEM</span>
-            </div>
-            <div className="node-billboard-divider" />
-            <div className="node-billboard-stat">
-              <span className="node-billboard-stat-value">{containers.running}</span>
-              <span className="node-billboard-stat-label">
-                CTR
-              </span>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="node-billboard-footer">
-            {node.version && <span>{node.version}</span>}
-            <span>{node.public_ip ?? '—'}</span>
-          </div>
-
-          {/* Triangle pointer */}
+          <LocalBillboardCol data={status} />
           <div className="node-billboard-arrow" />
         </div>
       </div>
@@ -641,10 +598,11 @@ function RemoteBillboardCol({ data }: { data: RemoteNode }) {
             <div className="node-billboard-divider" />
             <div className="node-billboard-stat">
               <span className="node-billboard-stat-value">{metrics.containers.running}</span>
-              <span className="node-billboard-stat-label">CTRs</span>
+              <span className="node-billboard-stat-label">CTR</span>
             </div>
           </div>
           <div className="node-billboard-footer">
+            {data.version && <span>{data.version}</span>}
             <span>{data.address}</span>
           </div>
         </>

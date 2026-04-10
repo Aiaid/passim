@@ -68,7 +68,7 @@ function GaugeCard({ label, percent, detail, icon: Icon, color }: GaugeCardProps
               </span>
             </div>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 whitespace-nowrap">
             <div className="flex items-center gap-1.5">
               <Icon className="size-3.5 text-muted-foreground" />
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">

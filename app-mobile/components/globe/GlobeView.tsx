@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { Fragment, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
 import { Renderer, loadTextureAsync } from 'expo-three';
@@ -6,6 +6,7 @@ import { Asset } from 'expo-asset';
 import * as THREE from 'three';
 import { earthVert, earthFrag, atmosVert, atmosFrag } from '@passim/shared/globe/shaders';
 import { EARTH_RADIUS, COUNTRY_COORDS } from '@passim/shared/globe/constants';
+import { buildClusters, type NodeEntry } from '@passim/shared/globe/clustering';
 import { useGlobeGesture } from './use-globe-gesture';
 import { getSunDirection } from './helpers';
 import type { StatusResponse } from '@passim/shared/types';
@@ -22,20 +23,30 @@ function latLonToPos(lat: number, lon: number, radius = EARTH_RADIUS): Vec3Tuple
   ];
 }
 
-interface BillboardData {
-  x: number;
-  y: number;
-  visible: boolean;
+// One node's display payload inside a cluster column.
+interface MemberData {
+  nodeId: string;
   name: string;
   flag: string;
   cpu: string;
   mem: string;
   containers: number;
   ip: string;
-  uptime: string;
   version: string;
+  color: number;   // marker colour in webgl (0xRRGGBB)
+  dotColor: string; // matching CSS-like string for the billboard header dot
   isActive: boolean;
-  nodeId: string;
+  isHub: boolean;
+  isConnected: boolean;
+}
+
+// Per-cluster HTML overlay data. Multiple members render as multiple columns.
+interface BillboardData {
+  x: number;
+  y: number;
+  visible: boolean;
+  hasActive: boolean;
+  members: MemberData[];
 }
 
 export interface GlobeNodeStatus {
@@ -171,23 +182,17 @@ export function GlobeView({ nodeStatuses, activeNodeId, hubNodeId, fullscreen, o
     const markerGroup = new THREE.Group();
     globe.add(markerGroup);
 
-    interface MarkerEntry {
+    // One WebGL mesh per cluster centroid (not per node): nodes sharing a
+    // coordinate collapse into a single dot with a combined billboard.
+    interface ClusterMarker {
       pos: Vec3Tuple;
-      color: number;
-      isActive: boolean;
-      nodeId: string;
-      name: string;
-      flag: string;
-      cpu: string;
-      mem: string;
-      containers: number;
-      ip: string;
-      uptime: string;
-      version: string;
+      members: MemberData[];
+      hasActive: boolean;
+      meshColor: number;  // dominant colour for the centroid dot
     }
 
     let lastMarkersKey = '';
-    let markerEntries: MarkerEntry[] = [];
+    let clusterMarkers: ClusterMarker[] = [];
 
     function toFlag(country: string): string {
       return [...country.toUpperCase()]
@@ -197,7 +202,7 @@ export function GlobeView({ nodeStatuses, activeNodeId, hubNodeId, fullscreen, o
 
     function syncMarkers() {
       const { nodeStatuses: ns, activeNodeId: activeId, hubNodeId: hubId } = propsRef.current;
-      const entries: MarkerEntry[] = [];
+      const entries: NodeEntry<MemberData>[] = [];
 
       for (const { nodeId, status: s, isConnected } of ns) {
         if (!s?.node?.country) continue;
@@ -207,27 +212,53 @@ export function GlobeView({ nodeStatuses, activeNodeId, hubNodeId, fullscreen, o
         // Hub = green, Remote = purple, disconnected = gray
         const isHub = nodeId === hubId;
         const connectedColor = isHub ? 0x30d158 : 0x5e5ce6;
+        const connectedDot = isHub ? '#30d158' : '#5e5ce6';
 
         entries.push({
-          pos: latLonToPos(cc[0], cc[1], EARTH_RADIUS * 1.01),
-          color: isConnected ? connectedColor : 0x666666,
-          isActive: nodeId === activeId,
-          nodeId,
-          name: s.node.name ?? nodeId,
-          flag: toFlag(s.node.country),
-          cpu: `${s.system.cpu.usage_percent.toFixed(0)}%`,
-          mem: `${s.system.memory.usage_percent.toFixed(0)}%`,
-          containers: s.containers.running,
-          ip: s.node.public_ip ?? '--',
-          uptime: formatUptime(s.node.uptime),
-          version: s.node.version ?? '',
+          id: nodeId,
+          lat: cc[0],
+          lon: cc[1],
+          data: {
+            nodeId,
+            name: s.node.name ?? nodeId,
+            flag: toFlag(s.node.country),
+            cpu: `${s.system.cpu.usage_percent.toFixed(0)}%`,
+            mem: `${s.system.memory.usage_percent.toFixed(0)}%`,
+            containers: s.containers.running,
+            ip: s.node.public_ip ?? '--',
+            version: s.node.version ?? '',
+            color: isConnected ? connectedColor : 0x666666,
+            dotColor: isConnected ? connectedDot : '#888',
+            isActive: nodeId === activeId,
+            isHub,
+            isConnected,
+          },
         });
       }
 
-      const key = entries.map(e => `${e.pos.join(',')}_${e.isActive}`).join(';');
+      // Collapse nearby nodes into clusters (threshold in angular degrees).
+      const clusters = buildClusters(entries, 15);
+      const next: ClusterMarker[] = clusters.map((c) => {
+        const members = c.members.map((m) => m.data);
+        // Prefer hub colour if any hub is in the cluster, otherwise pick the
+        // first member's colour so the dot stays meaningful.
+        const hub = members.find((m) => m.isHub && m.isConnected);
+        const meshColor = hub?.color ?? members[0].color;
+        return {
+          pos: latLonToPos(c.centroid[0], c.centroid[1], EARTH_RADIUS * 1.01),
+          members,
+          hasActive: members.some((m) => m.isActive),
+          meshColor,
+        };
+      });
+
+      // Cheap identity key so we skip re-uploading geometry every frame.
+      const key = next
+        .map((c) => `${c.pos.join(',')}|${c.hasActive}|${c.members.map((m) => m.nodeId).join('+')}`)
+        .join(';');
       if (key === lastMarkersKey) return;
       lastMarkersKey = key;
-      markerEntries = entries;
+      clusterMarkers = next;
 
       while (markerGroup.children.length) {
         const c = markerGroup.children[0] as THREE.Mesh;
@@ -235,12 +266,12 @@ export function GlobeView({ nodeStatuses, activeNodeId, hubNodeId, fullscreen, o
         c.geometry.dispose();
         (c.material as THREE.Material).dispose();
       }
-      for (const e of entries) {
+      for (const cm of clusterMarkers) {
         const m = new THREE.Mesh(
-          new THREE.SphereGeometry(e.isActive ? 0.04 : 0.03, 8, 8),
-          new THREE.MeshBasicMaterial({ color: e.color }),
+          new THREE.SphereGeometry(cm.hasActive ? 0.04 : 0.03, 8, 8),
+          new THREE.MeshBasicMaterial({ color: cm.meshColor }),
         );
-        m.position.set(...e.pos);
+        m.position.set(...cm.pos);
         markerGroup.add(m);
       }
     }
@@ -282,14 +313,14 @@ export function GlobeView({ nodeStatuses, activeNodeId, hubNodeId, fullscreen, o
         const newBillboards: BillboardData[] = [];
         const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
 
-        for (const entry of markerEntries) {
-          projVec.set(...entry.pos);
+        for (const cluster of clusterMarkers) {
+          projVec.set(...cluster.pos);
           projVec.project(camera);
 
           const isBehind = projVec.z > 1;
 
           // Ray-sphere occlusion: cast ray from camera toward marker, test intersection with earth sphere
-          dirVec.set(entry.pos[0] - cx, entry.pos[1] - cy, entry.pos[2] - cz);
+          dirVec.set(cluster.pos[0] - cx, cluster.pos[1] - cy, cluster.pos[2] - cz);
           const tMarker = dirVec.length();
           dirVec.multiplyScalar(1 / tMarker); // normalize without creating new vec
           // Solve |camera + t*dir|² = R² → t²(dir·dir) + 2t(cam·dir) + (cam·cam - R²) = 0
@@ -302,16 +333,8 @@ export function GlobeView({ nodeStatuses, activeNodeId, hubNodeId, fullscreen, o
             x: (projVec.x * 0.5 + 0.5) * 100,
             y: (-projVec.y * 0.5 + 0.5) * 100,
             visible: !isBehind && !behindEarth,
-            name: entry.name,
-            flag: entry.flag,
-            cpu: entry.cpu,
-            mem: entry.mem,
-            containers: entry.containers,
-            ip: entry.ip,
-            uptime: entry.uptime,
-            version: entry.version,
-            isActive: entry.isActive,
-            nodeId: entry.nodeId,
+            hasActive: cluster.hasActive,
+            members: cluster.members,
           });
         }
         setBillboards(newBillboards);
@@ -327,12 +350,11 @@ export function GlobeView({ nodeStatuses, activeNodeId, hubNodeId, fullscreen, o
   return (
     <View style={fullscreen ? styles.fullscreen : styles.container} {...panResponder.panHandlers}>
       <GLView style={styles.canvas} onContextCreate={onContextCreate} />
-      {/* Billboard overlays */}
+      {/* Billboard overlays — one card per cluster, multi-node = multi-column */}
       {billboards.map((b, i) => (
-        <TouchableOpacity
+        <View
           key={i}
-          activeOpacity={0.7}
-          onPress={() => onNodeSelect?.(b.nodeId)}
+          pointerEvents={b.visible ? 'box-none' : 'none'}
           style={[
             styles.billboard,
             {
@@ -342,52 +364,66 @@ export function GlobeView({ nodeStatuses, activeNodeId, hubNodeId, fullscreen, o
             },
           ]}
         >
-          <View style={[styles.billboardCard, b.isActive && styles.billboardCardActive]}>
-            {/* Header */}
-            <View style={styles.billboardHeader}>
-              <View style={[styles.pingDot, { backgroundColor: b.isActive ? '#30d158' : '#888' }]} />
-              <Text style={styles.billboardName} numberOfLines={1}>{b.name}</Text>
-              {b.flag ? <Text style={styles.billboardFlag}>{b.flag}</Text> : null}
-            </View>
-            {/* Stats */}
-            <View style={styles.billboardStats}>
-              <View style={styles.billboardStat}>
-                <Text style={styles.billboardValue}>{b.cpu}</Text>
-                <Text style={styles.billboardLabel}>CPU</Text>
-              </View>
-              <View style={styles.billboardDivider} />
-              <View style={styles.billboardStat}>
-                <Text style={styles.billboardValue}>{b.mem}</Text>
-                <Text style={styles.billboardLabel}>MEM</Text>
-              </View>
-              <View style={styles.billboardDivider} />
-              <View style={styles.billboardStat}>
-                <Text style={styles.billboardValue}>{b.containers}</Text>
-                <Text style={styles.billboardLabel}>CTR</Text>
-              </View>
-            </View>
-            {/* Footer: version + DNS address */}
-            {(b.version || b.ip !== '--') ? (
-              <View style={styles.billboardFooter}>
-                {b.version ? <Text style={styles.billboardMeta}>{b.version}</Text> : null}
-                {b.ip !== '--' ? <Text style={styles.billboardMeta} numberOfLines={1}>{b.ip}</Text> : null}
-              </View>
-            ) : null}
+          <View style={[styles.billboardCard, b.hasActive && styles.billboardCardActive]}>
+            {b.members.map((m, mi) => (
+              <Fragment key={m.nodeId}>
+                {mi > 0 && <View style={styles.billboardColSep} />}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => onNodeSelect?.(m.nodeId)}
+                  style={styles.billboardCol}
+                >
+                  {/* Header */}
+                  <View style={styles.billboardHeader}>
+                    <View style={[styles.pingDot, { backgroundColor: m.dotColor }]} />
+                    <Text style={styles.billboardName} numberOfLines={1}>{m.name}</Text>
+                    {m.flag ? <Text style={styles.billboardFlag}>{m.flag}</Text> : null}
+                  </View>
+                  {m.isConnected ? (
+                    <>
+                      {/* Stats */}
+                      <View style={styles.billboardStats}>
+                        <View style={styles.billboardStat}>
+                          <Text style={styles.billboardValue} numberOfLines={1}>{m.cpu}</Text>
+                          <Text style={styles.billboardLabel}>CPU</Text>
+                        </View>
+                        <View style={styles.billboardDivider} />
+                        <View style={styles.billboardStat}>
+                          <Text style={styles.billboardValue} numberOfLines={1}>{m.mem}</Text>
+                          <Text style={styles.billboardLabel}>MEM</Text>
+                        </View>
+                        <View style={styles.billboardDivider} />
+                        <View style={styles.billboardStat}>
+                          <Text style={styles.billboardValue} numberOfLines={1}>{m.containers}</Text>
+                          <Text style={styles.billboardLabel}>CTR</Text>
+                        </View>
+                      </View>
+                      {/* Footer: version + address */}
+                      {(m.version || m.ip !== '--') ? (
+                        <View style={styles.billboardFooter}>
+                          {m.version ? <Text style={styles.billboardMeta}>{m.version}</Text> : null}
+                          {m.ip !== '--' ? <Text style={styles.billboardMeta} numberOfLines={1}>{m.ip}</Text> : null}
+                        </View>
+                      ) : null}
+                    </>
+                  ) : (
+                    <View style={styles.billboardOfflineRow}>
+                      <Text style={styles.billboardOfflineText}>offline</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Fragment>
+            ))}
             {/* Arrow */}
             <View style={styles.billboardArrow} />
           </View>
-        </TouchableOpacity>
+        </View>
       ))}
     </View>
   );
 }
 
-function formatUptime(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  return `${Math.floor(seconds / 86400)}d`;
-}
+const BILLBOARD_COL_WIDTH = 108;
 
 const styles = StyleSheet.create({
   container: {
@@ -404,26 +440,39 @@ const styles = StyleSheet.create({
   canvas: { flex: 1 },
   billboard: {
     position: 'absolute',
-    transform: [{ translateX: -60 }, { translateY: -75 }],
+    // Anchor the arrow tip roughly at the marker. translateX centred in
+    // onLayout would be more accurate but costs extra renders — half the
+    // single-column width is a good-enough default for 1–3 nodes.
+    transform: [{ translateX: -BILLBOARD_COL_WIDTH / 2 }, { translateY: -75 }],
   },
   billboardCard: {
-    backgroundColor: 'rgba(20, 20, 30, 0.92)',
-    borderRadius: 8,
-    paddingHorizontal: 10,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(10, 14, 20, 0.92)',
+    borderRadius: 10,
     paddingVertical: 6,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    width: 120,
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
   billboardCardActive: {
     borderColor: 'rgba(48, 209, 88, 0.5)',
+  },
+  billboardCol: {
+    paddingHorizontal: 10,
+    width: BILLBOARD_COL_WIDTH,
+    alignItems: 'center',
+  },
+  billboardColSep: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   billboardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginBottom: 4,
+    width: '100%',
   },
   pingDot: {
     width: 6,
@@ -443,6 +492,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingVertical: 3,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    alignSelf: 'stretch',
   },
   billboardStat: {
     alignItems: 'center',
@@ -473,6 +527,14 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontFamily: 'monospace',
   },
+  billboardOfflineRow: {
+    paddingTop: 6,
+    alignItems: 'center',
+  },
+  billboardOfflineText: {
+    color: 'rgba(255, 255, 255, 0.3)',
+    fontSize: 9,
+  },
   billboardArrow: {
     width: 0,
     height: 0,
@@ -481,9 +543,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 5,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: 'rgba(20, 20, 30, 0.92)',
+    borderTopColor: 'rgba(10, 14, 20, 0.92)',
     marginTop: -1,
     position: 'absolute',
     bottom: -5,
+    left: '50%',
+    marginLeft: -5,
   },
 });

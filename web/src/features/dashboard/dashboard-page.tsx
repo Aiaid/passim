@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Monitor, Globe } from 'lucide-react';
 import { SystemMetrics } from './system-metrics';
 import { MetricsChart } from './metrics-chart';
 import { AppOverview } from './app-overview';
@@ -9,23 +10,47 @@ import { EarthGlobe } from './earth-globe';
 import { NodeDetailPanel } from './node-detail-panel';
 import { useEventStream } from '@/hooks/use-event-stream';
 
+type DashMode = 'single' | 'multi';
+
+function DashToggle({ mode, onChange }: { mode: DashMode; onChange: (m: DashMode) => void }) {
+  return (
+    <div className="absolute top-3 right-3 z-20 flex items-center bg-background/60 backdrop-blur-sm rounded-lg border p-0.5 gap-0.5">
+      <button
+        type="button"
+        className={`p-1.5 rounded-md transition-colors ${mode === 'single' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        onClick={() => onChange('single')}
+      >
+        <Monitor className="size-3.5" />
+      </button>
+      <button
+        type="button"
+        className={`p-1.5 rounded-md transition-colors ${mode === 'multi' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        onClick={() => onChange('multi')}
+      >
+        <Globe className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
 export function DashboardPage() {
   const { nodes } = useEventStream();
   const hasRemoteNodes = nodes && nodes.length > 0;
+  const [mode, setMode] = useState<DashMode>(hasRemoteNodes ? 'multi' : 'single');
 
-  if (hasRemoteNodes) {
-    return <MultiNodeDashboard />;
+  if (mode === 'multi' && hasRemoteNodes) {
+    return <MultiNodeDashboard toggle={<DashToggle mode={mode} onChange={setMode} />} />;
   }
-
-  return <SingleNodeDashboard />;
+  return <SingleNodeDashboard toggle={hasRemoteNodes ? <DashToggle mode={mode} onChange={setMode} /> : null} />;
 }
 
-/* ── Original single-node layout (unchanged) ─────────────── */
-function SingleNodeDashboard() {
+/* ── Original single-node layout ───────────────────────────── */
+function SingleNodeDashboard({ toggle }: { toggle?: React.ReactNode }) {
   const [nodePanel, setNodePanel] = useState(false);
 
   return (
     <div className="relative h-[calc(100vh-6.5rem)] overflow-hidden dashboard-glass">
+      {toggle}
       <div className="absolute inset-0 dash-globe-enter dash-globe-position">
         <EarthGlobe onMarkerClick={() => setNodePanel(true)} />
       </div>
@@ -46,12 +71,13 @@ function SingleNodeDashboard() {
   );
 }
 
-/* ── Multi-node layout: same structure, different cards ──── */
-function MultiNodeDashboard() {
+/* ── Multi-node layout ─────────────────────────────────────── */
+function MultiNodeDashboard({ toggle }: { toggle?: React.ReactNode }) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   return (
     <div className="relative h-[calc(100vh-6.5rem)] overflow-hidden dashboard-glass">
+      {toggle}
       <div className="absolute inset-0 dash-globe-enter dash-globe-position">
         <EarthGlobe onMarkerClick={(nodeId) => setSelectedNodeId(nodeId)} />
       </div>
