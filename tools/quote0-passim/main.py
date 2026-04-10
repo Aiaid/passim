@@ -63,7 +63,10 @@ class AuthError(Exception):
 
 class PassimClient:
     def __init__(self, base_url: str, api_key: str):
-        self.base = base_url.rstrip("/")
+        base = base_url.strip().rstrip("/")
+        if base and "://" not in base:
+            base = "https://" + base
+        self.base = base
         self.api_key = api_key
         self.token = None
         self.expires = None
@@ -87,25 +90,38 @@ class PassimClient:
         except Exception:
             self.expires = datetime.now(timezone.utc) + timedelta(hours=1)
 
-    def _get(self, path: str) -> dict:
+    def _get(self, path: str, retries: int = 3) -> dict:
         now = datetime.now(timezone.utc)
         if not self.token or not self.expires or now >= self.expires:
             self._login()
-        r = requests.get(
-            f"{self.base}{path}",
-            headers={"Authorization": f"Bearer {self.token}"},
-            verify=VERIFY_SSL, proxies=PX, timeout=10,
-        )
-        if r.status_code in (401, 403):
-            self.token = None
-            self._login()
-            r = requests.get(
-                f"{self.base}{path}",
-                headers={"Authorization": f"Bearer {self.token}"},
-                verify=VERIFY_SSL, proxies=PX, timeout=10,
-            )
-        r.raise_for_status()
-        return r.json()
+
+        last_err = None
+        for attempt in range(retries):
+            if attempt > 0:
+                time.sleep(min(2 ** attempt, 10))
+                log.info("Retry %d/%d  %s", attempt + 1, retries, path)
+            try:
+                r = requests.get(
+                    f"{self.base}{path}",
+                    headers={"Authorization": f"Bearer {self.token}"},
+                    verify=VERIFY_SSL, proxies=PX, timeout=10,
+                )
+                if r.status_code in (401, 403):
+                    self.token = None
+                    self._login()
+                    r = requests.get(
+                        f"{self.base}{path}",
+                        headers={"Authorization": f"Bearer {self.token}"},
+                        verify=VERIFY_SSL, proxies=PX, timeout=10,
+                    )
+                r.raise_for_status()
+                return r.json()
+            except AuthError:
+                raise
+            except Exception as e:
+                last_err = e
+
+        raise last_err
 
     def status(self) -> dict:
         return self._get("/api/status")
@@ -160,14 +176,22 @@ def right_text(draw: ImageDraw.ImageDraw, y: int, text: str, font, margin: int =
     draw.text((W - margin - tw, y), text, font=font, fill="black")
 
 
-def stamp(draw: ImageDraw.ImageDraw):
+def stamp(draw: ImageDraw.ImageDraw, stale: bool = False):
     now = datetime.now(zoneinfo.ZoneInfo(TZ_NAME))
-    right_text(draw, H - 13, now.strftime("%m-%d %H:%M"), SMALL)
+    ts = now.strftime("%m-%d %H:%M")
+    if stale:
+        label = f"! STALE  {ts}"
+        tw = draw.textlength(label, font=SMALL)
+        x = W - 4 - tw
+        draw.rectangle([x - 2, H - 14, W - 2, H - 1], fill="black")
+        draw.text((x, H - 13), label, font=SMALL, fill="white")
+    else:
+        right_text(draw, H - 13, ts, SMALL)
 
 
 # ── Single-node detailed view ─────────────────────────────
 
-def render_single(status: dict) -> Image.Image:
+def render_single(status: dict, stale: bool = False) -> Image.Image:
     img = Image.new("1", (W, H), 1)
     d = ImageDraw.Draw(img)
 
@@ -224,7 +248,7 @@ def render_single(status: dict) -> Image.Image:
     # Bottom: IP + timestamp
     if nd.get("public_ip"):
         d.text((4, H - 13), nd["public_ip"], font=SMALL, fill="black")
-    stamp(d)
+    stamp(d, stale=stale)
 
     return img
 
@@ -377,7 +401,7 @@ def _draw_compact(d: ImageDraw.ImageDraw, y: int, nodes: list) -> int:
     return y
 
 
-def render_cluster(status: dict, nodes: list) -> Image.Image:
+def render_cluster(status: dict, nodes: list, stale: bool = False) -> Image.Image:
     img = Image.new("1", (W, H), 1)
     d = ImageDraw.Draw(img)
 
@@ -399,7 +423,7 @@ def render_cluster(status: dict, nodes: list) -> Image.Image:
     else:
         _draw_compact(d, y, all_nodes)
 
-    stamp(d)
+    stamp(d, stale=stale)
     return img
 
 
@@ -441,34 +465,87 @@ def push(image_b64: str):
 
 # ── Main loop ─────────────────────────────────────────────
 
+def _err_brief(e: Exception) -> str:
+    """One-line error description for display."""
+    name = type(e).__name__
+    if "Timeout" in name or "timeout" in str(e).lower():
+        return "timeout"
+    if "Connection" in name:
+        return "connect refused"
+    if "DNS" in str(e) or "Name or service" in str(e):
+        return "DNS failed"
+    return name
+
+
 def main():
     log.info("Starting  url=%s  interval=%ds  proxy=%s",
              PASSIM_URL, INTERVAL, PROXY or "none")
 
     client = PassimClient(PASSIM_URL, PASSIM_API_KEY)
+    last_status = None
+    last_nodes = None
 
     while True:
         try:
-            st = client.status()
-            nd = client.nodes()
-            log.info("Fetched: node=%s  remote_nodes=%d",
-                     st["node"].get("name"), len(nd))
+            stale = False
 
-            img = render_cluster(st, nd) if nd else render_single(st)
+            # ── fetch status (with retry) ──
+            try:
+                st = client.status()
+                last_status = st
+            except AuthError:
+                raise
+            except Exception as e:
+                log.warning("status() failed (%s), using cache", _err_brief(e))
+                st = last_status
+                stale = True
+
+            if st is None:
+                raise RuntimeError("No cached status available")
+
+            # ── fetch nodes (with retry), degrade on failure ──
+            try:
+                nd = client.nodes()
+                last_nodes = nd
+            except AuthError:
+                raise
+            except Exception as e:
+                log.warning("nodes() failed (%s), using cache", _err_brief(e))
+                nd = last_nodes
+                stale = True
+            if nd is None:
+                nd = []
+
+            log.info("Fetched: node=%s  remote_nodes=%d%s",
+                     st["node"].get("name"), len(nd),
+                     "  [stale]" if stale else "")
+
+            img = render_cluster(st, nd, stale=stale) if nd else render_single(st, stale=stale)
             push(img_to_b64(img))
 
         except AuthError as e:
             log.warning("Auth: %s", e)
             try:
-                push(img_to_b64(render_error(str(e))))
+                push(img_to_b64(render_error(f"Auth: {e}")))
             except Exception:
                 log.exception("Push error image failed")
-        except Exception:
+        except Exception as e:
             log.exception("Loop error")
-            try:
-                push(img_to_b64(render_error("Connection failed")))
-            except Exception:
-                log.exception("Push error image failed")
+            # try cached data first
+            if last_status is not None:
+                log.info("Rendering stale cache with error flag")
+                try:
+                    nd = last_nodes or []
+                    img = (render_cluster(last_status, nd, stale=True)
+                           if nd else render_single(last_status, stale=True))
+                    push(img_to_b64(img))
+                except Exception:
+                    log.exception("Push stale image failed")
+            else:
+                try:
+                    push(img_to_b64(render_error(f"No data: {_err_brief(e)}")))
+                except Exception:
+                    log.exception("Push error image failed")
 
         time.sleep(INTERVAL)
 
