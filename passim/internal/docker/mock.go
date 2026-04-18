@@ -94,6 +94,11 @@ func (m *MockClient) ContainerLogs(ctx context.Context, id string, lines int) (i
 	return m.LogsReader, m.LogsErr
 }
 
+func (m *MockClient) ContainerLogsFollow(ctx context.Context, id string, lines int) (io.ReadCloser, error) {
+	m.record("ContainerLogsFollow", id, lines)
+	return m.LogsReader, m.LogsErr
+}
+
 func (m *MockClient) PullImage(ctx context.Context, ref string) (io.ReadCloser, error) {
 	m.record("PullImage", ref)
 	return m.PullReader, m.PullErr

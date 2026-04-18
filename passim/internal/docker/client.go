@@ -31,6 +31,7 @@ type DockerClient interface {
 	RemoveContainer(ctx context.Context, id string) error
 	InspectContainer(ctx context.Context, id string) (types.ContainerJSON, error)
 	ContainerLogs(ctx context.Context, id string, lines int) (io.ReadCloser, error)
+	ContainerLogsFollow(ctx context.Context, id string, lines int) (io.ReadCloser, error)
 	PullImage(ctx context.Context, ref string) (io.ReadCloser, error)
 	CreateAndStartContainer(ctx context.Context, cfg *ContainerConfig) (string, error)
 	RenameContainer(ctx context.Context, id string, newName string) error
@@ -119,6 +120,16 @@ func (c *Client) ContainerLogs(ctx context.Context, id string, lines int) (io.Re
 		ShowStdout: true,
 		ShowStderr: true,
 		Tail:       tail,
+	})
+}
+
+func (c *Client) ContainerLogsFollow(ctx context.Context, id string, lines int) (io.ReadCloser, error) {
+	tail := fmt.Sprintf("%d", lines)
+	return c.cli.ContainerLogs(ctx, id, container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       tail,
+		Follow:     true,
 	})
 }
 

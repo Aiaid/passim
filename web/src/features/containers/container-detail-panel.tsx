@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { X, Play, Square, RotateCcw, Trash2 } from 'lucide-react';
+import { Terminal, useTerminal } from '@wterm/react';
+import '@wterm/react/css';
 import {
   Sheet,
   SheetContent,
@@ -13,9 +15,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { Container } from '@/lib/api-client';
-import { useContainerAction, useRemoveContainer, useContainerLogs, useNodeContainerAction, useNodeRemoveContainer, useNodeContainerLogs } from './queries';
+import { useContainerAction, useRemoveContainer, useNodeContainerAction, useNodeRemoveContainer, useNodeContainerLogs } from './queries';
 import { mapState } from './utils';
 import { TerminalTab } from './terminal-tab';
+
+// ANSI: erase screen + move cursor home. Used to clear the terminal on refresh.
+const CLEAR_SCREEN = '\x1b[2J\x1b[H';
+
+function decodeBase64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
 
 interface ContainerDetailPanelProps {
   container: Container | null;
@@ -244,30 +256,106 @@ function LogsTab({
   containerName: string;
   nodeId?: string;
 }) {
-  const { t } = useTranslation();
-  const localLogs = useContainerLogs(nodeId ? null : containerId);
-  const nodeLogs = useNodeContainerLogs(nodeId ?? '', nodeId ? containerId : null);
-  const { data, isLoading, refetch } = nodeId ? nodeLogs : localLogs;
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  return nodeId ? (
+    <NodeLogsView nodeId={nodeId} containerId={containerId} containerName={containerName} />
+  ) : (
+    <LocalLogsView containerId={containerId} containerName={containerName} />
+  );
+}
 
-  const logs = data?.logs;
-  const lines = useMemo(() => {
-    if (!logs) return [];
-    const raw = logs.split('\n');
-    while (raw.length > 0 && raw[raw.length - 1] === '') raw.pop();
-    return raw;
-  }, [logs]);
+/**
+ * Local container logs: open an SSE `?follow=1` stream, decode base64 chunks,
+ * and pipe them into a readonly wterm terminal so ANSI colors, selection,
+ * and browser find work out of the box.
+ */
+function LocalLogsView({ containerId, containerName }: { containerId: string; containerName: string }) {
+  const { ref, write } = useTerminal();
+  const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   useEffect(() => {
-    if (lines.length > 0) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [lines]);
+    // Clear previous session visuals when reconnecting.
+    write(CLEAR_SCREEN);
+    setStatus('connecting');
+
+    const token = localStorage.getItem('auth-token') ?? '';
+    const url = `/api/containers/${containerId}/logs?follow=1&lines=200&token=${encodeURIComponent(token)}`;
+    const source = new EventSource(url);
+
+    source.onopen = () => setStatus('connected');
+    source.addEventListener('log', ((e: MessageEvent) => {
+      try {
+        write(decodeBase64ToBytes(e.data));
+      } catch {
+        /* ignore malformed frame */
+      }
+    }) as EventListener);
+    source.onerror = () => setStatus('disconnected');
+
+    return () => source.close();
+  }, [containerId, reloadNonce, write]);
 
   return (
+    <LogsChrome
+      containerName={containerName}
+      onRefresh={() => setReloadNonce((n) => n + 1)}
+      refreshDisabled={status === 'connecting'}
+    >
+      <Terminal ref={ref} autoResize className="h-full w-full" />
+    </LogsChrome>
+  );
+}
+
+/**
+ * Remote node logs: the proxy layer is currently non-streaming, so we
+ * one-shot the existing JSON endpoint and pipe the result into wterm so the
+ * visual is consistent with local logs (ANSI colors, selection, find).
+ */
+function NodeLogsView({
+  nodeId,
+  containerId,
+  containerName,
+}: {
+  nodeId: string;
+  containerId: string;
+  containerName: string;
+}) {
+  const { ref, write } = useTerminal();
+  const { data, isLoading, refetch } = useNodeContainerLogs(nodeId, containerId);
+
+  useEffect(() => {
+    if (!data?.logs) return;
+    write(CLEAR_SCREEN);
+    write(data.logs);
+  }, [data, write]);
+
+  return (
+    <LogsChrome
+      containerName={containerName}
+      onRefresh={() => refetch()}
+      refreshDisabled={isLoading}
+      refreshing={isLoading}
+    >
+      <Terminal ref={ref} autoResize className="h-full w-full" />
+    </LogsChrome>
+  );
+}
+
+function LogsChrome({
+  containerName,
+  onRefresh,
+  refreshDisabled,
+  refreshing,
+  children,
+}: {
+  containerName: string;
+  onRefresh: () => void;
+  refreshDisabled?: boolean;
+  refreshing?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Terminal chrome */}
       <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-zinc-800">
         <div className="flex items-center gap-2">
           <div className="flex gap-1.5">
@@ -283,44 +371,13 @@ function LogsTab({
           variant="ghost"
           size="icon"
           className="size-7 text-zinc-400 hover:text-zinc-200"
-          onClick={() => refetch()}
-          disabled={isLoading}
+          onClick={onRefresh}
+          disabled={refreshDisabled}
         >
-          <RotateCcw className={`size-3 ${isLoading ? 'animate-spin' : ''}`} />
+          <RotateCcw className={`size-3 ${refreshing ? 'animate-spin' : ''}`} />
         </Button>
       </div>
-
-      {/* Terminal body */}
-      <div className="flex-1 min-h-0 bg-zinc-950 overflow-y-auto" ref={scrollRef}>
-        <div className="p-3">
-          {isLoading ? (
-            <p className="text-xs font-mono text-zinc-500 p-2">
-              {t('common.loading')}
-            </p>
-          ) : lines.length === 0 ? (
-            <p className="text-xs font-mono text-zinc-500 p-2">
-              {t('common.no_data')}
-            </p>
-          ) : (
-            <div className="font-mono text-xs leading-5">
-              {lines.map((line, i) => (
-                <div
-                  key={i}
-                  className="flex hover:bg-zinc-900/60 rounded-sm group"
-                >
-                  <span className="select-none text-right text-zinc-600 w-8 shrink-0 pr-3 group-hover:text-zinc-500">
-                    {i + 1}
-                  </span>
-                  <span className="text-zinc-300 whitespace-pre-wrap break-all flex-1">
-                    {line}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-      </div>
+      <div className="flex-1 min-h-0 bg-zinc-950">{children}</div>
     </div>
   );
 }

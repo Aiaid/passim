@@ -2,9 +2,13 @@ package api
 
 import (
 	"bytes"
+	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/gin-gonic/gin"
@@ -127,6 +131,11 @@ func containerLogsHandler(deps Deps) gin.HandlerFunc {
 			}
 		}
 
+		if follow := c.Query("follow"); follow == "1" || follow == "true" {
+			streamContainerLogs(deps, c, id, lines)
+			return
+		}
+
 		reader, err := deps.Docker.ContainerLogs(c.Request.Context(), id, lines)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get container logs"})
@@ -151,4 +160,95 @@ func containerLogsHandler(deps Deps) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, gin.H{"logs": buf.String()})
 	}
+}
+
+// sseKeepaliveInterval is how often an SSE comment is emitted on an idle
+// stream to keep proxies from closing the connection. Exported as a var so
+// tests can shrink it.
+var sseKeepaliveInterval = 20 * time.Second
+
+// streamContainerLogs pushes container logs as an SSE stream.
+// Each chunk is emitted as `event: log` with base64-encoded data so that
+// newlines, ANSI escapes, and other control bytes survive transport intact.
+func streamContainerLogs(deps Deps, c *gin.Context, id string, lines int) {
+	// Detect TTY mode: multiplexed streams only exist for non-TTY containers.
+	tty := false
+	if inspect, err := deps.Docker.InspectContainer(c.Request.Context(), id); err == nil {
+		if inspect.Config != nil {
+			tty = inspect.Config.Tty
+		}
+	}
+
+	reader, err := deps.Docker.ContainerLogsFollow(c.Request.Context(), id, lines)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get container logs"})
+		return
+	}
+	defer reader.Close()
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	c.Status(http.StatusOK)
+	c.Writer.Flush()
+
+	w := &sseLogWriter{w: c.Writer}
+
+	// Idle keepalive: SSE comment lines (`: ...`) are ignored by the client
+	// but keep TCP/proxies from treating the stream as idle and closing it.
+	stop := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(sseKeepaliveInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-c.Request.Context().Done():
+				return
+			case <-ticker.C:
+				w.ping()
+			}
+		}
+	}()
+	defer close(stop)
+
+	if tty {
+		_, _ = io.Copy(w, reader)
+	} else {
+		_, _ = stdcopy.StdCopy(w, w, reader)
+	}
+}
+
+// sseLogWriter adapts io.Writer.Write to SSE `event: log` frames.
+// Chunks are base64-encoded so the payload is safe for SSE's line-oriented format.
+// Writes are serialized with a mutex so the keepalive ticker cannot interleave
+// a comment in the middle of a data frame.
+type sseLogWriter struct {
+	mu sync.Mutex
+	w  gin.ResponseWriter
+}
+
+func (s *sseLogWriter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	enc := base64.StdEncoding.EncodeToString(p)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := fmt.Fprintf(s.w, "event: log\ndata: %s\n\n", enc); err != nil {
+		return 0, err
+	}
+	s.w.Flush()
+	return len(p), nil
+}
+
+func (s *sseLogWriter) ping() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := fmt.Fprint(s.w, ": ping\n\n"); err != nil {
+		return
+	}
+	s.w.Flush()
 }

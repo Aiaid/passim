@@ -252,9 +252,18 @@ data: {"hostname":"...","cpu_percent":23.5,"mem_percent":37.5,...,"timestamp":"2
 { "status": "removed" }
 ```
 
-#### `GET /api/containers/:id/logs?lines=200`
+#### `GET /api/containers/:id/logs?lines=200[&follow=1]`
 
-返回纯文本日志（Content-Type: text/plain）。默认 200 行。
+- 默认（无 `follow`）：一次性返回 JSON `{"logs": "..."}`，最多 `lines` 行。
+- `follow=1`：切换为 **SSE 流式**（`Content-Type: text/event-stream`）。服务端先发送历史 `lines` 行，随后持续推送新日志，直至客户端断开。Docker multiplex 帧在服务端已解析，每条 `data:` 都是原始 UTF-8 片段（含 ANSI 序列）。
+
+SSE 事件:
+```
+event: log
+data: <原始 chunk，base64 编码以保证换行/控制字符原样传输>
+```
+
+空闲 20s 服务端会发送一条 SSE 注释 (`: ping\n\n`) 作为 keepalive，防止中间代理把长时间无日志的流当作 idle 切断。客户端可忽略。
 
 #### `GET /api/containers/:id/terminal` (WebSocket) ✅ Phase 4
 
@@ -278,7 +287,7 @@ data: {"hostname":"...","cpu_percent":23.5,"mem_percent":37.5,...,"timestamp":"2
 | `shell` | `/bin/sh` | 要启动的 shell 路径 |
 
 **Go 依赖**: `github.com/gorilla/websocket`
-**前端**: `@xterm/xterm` + `@xterm/addon-fit` + `@xterm/addon-web-links`
+**前端**: `@wterm/react` + `@wterm/dom`（Zig→WASM 终端模拟器，DOM 渲染，内联 WASM 无需额外资源配置）。Terminal 与 Logs 共用同一个 `<Terminal>` 组件 —— Terminal 绑定 `onData` 双向 WebSocket；Logs 不绑定 `onData`，通过 ref `write()` 注入 SSE 流式输出，实现"只读终端"效果，天然支持 ANSI 色、文本选中、浏览器查找。
 
 ### 应用管理 ✅ Phase 1
 
