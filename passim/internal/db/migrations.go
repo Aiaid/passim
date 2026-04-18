@@ -113,6 +113,18 @@ var migrations = []string{
 
 	`CREATE INDEX IF NOT EXISTS idx_app_users_app
 		ON app_users(app_id)`,
+
+	`CREATE TABLE IF NOT EXISTS stacks (
+		id         TEXT PRIMARY KEY,
+		name       TEXT NOT NULL UNIQUE,
+		yaml_text  TEXT NOT NULL,
+		env_text   TEXT NOT NULL DEFAULT '',
+		profiles   TEXT NOT NULL DEFAULT '[]',
+		status     TEXT NOT NULL DEFAULT 'stopped',
+		last_error TEXT,
+		created_at TEXT DEFAULT (datetime('now')),
+		updated_at TEXT DEFAULT (datetime('now'))
+	)`,
 }
 
 // alterColumns are idempotent column additions for existing tables.
