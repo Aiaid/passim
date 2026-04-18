@@ -268,7 +268,7 @@ function LogsTab({
  * and pipe them into a readonly wterm terminal so ANSI colors, selection,
  * and browser find work out of the box.
  */
-function LocalLogsView({ containerId, containerName }: { containerId: string; containerName: string }) {
+export function LocalLogsView({ containerId, containerName }: { containerId: string; containerName: string }) {
   const { ref, write } = useTerminal();
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [reloadNonce, setReloadNonce] = useState(0);
