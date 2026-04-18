@@ -19,14 +19,19 @@ import type {
   AppUsersResponse,
   TrafficResponse,
   TrafficHistoryResponse,
+  Stack,
+  StackValidateResponse,
 } from '../types';
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** Stable error identifier (e.g. "stack.build_not_supported") when the server returns one. */
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -241,6 +246,22 @@ export function createApi(request: <T>(path: string, options?: RequestInit) => P
         method: 'PUT',
         body: JSON.stringify(settings),
       }),
+
+    // Stacks (docker compose)
+    validateStack: (data: { name: string; yaml_text: string; env_text?: string; profiles?: string[] }) =>
+      request<StackValidateResponse>('/stacks/validate', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    createStack: (data: { name: string; yaml_text: string; env_text?: string; profiles?: string[] }) =>
+      request<{ stack_id: string; task_id: string }>('/stacks', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    getStacks: () => request<{ stacks: Stack[] }>('/stacks'),
+    getStack: (id: string) => request<Stack>(`/stacks/${id}`),
+    deleteStack: (id: string) =>
+      request<{ stack_id: string; task_id: string }>(`/stacks/${id}`, { method: 'DELETE' }),
   };
 }
 

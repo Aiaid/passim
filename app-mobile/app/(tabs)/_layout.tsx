@@ -15,6 +15,7 @@ const TAB_CONFIG: {
 }[] = [
   { key: 'index', activeIcon: 'home', inactiveIcon: 'home-outline', labelKey: 'mobile.home' },
   { key: 'apps', activeIcon: 'grid', inactiveIcon: 'grid-outline', labelKey: 'nav.apps' },
+  { key: 'stacks', activeIcon: 'layers', inactiveIcon: 'layers-outline', labelKey: 'nav.stacks' },
   { key: 'nodes', activeIcon: 'hardware-chip', inactiveIcon: 'hardware-chip-outline', labelKey: 'nav.nodes' },
   { key: 'settings', activeIcon: 'settings', inactiveIcon: 'settings-outline', labelKey: 'nav.settings' },
 ];
@@ -141,6 +142,7 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" options={{ title: t('dashboard.title') }} />
       <Tabs.Screen name="apps" options={{ title: t('nav.apps') }} />
+      <Tabs.Screen name="stacks" options={{ title: t('nav.stacks') }} />
       <Tabs.Screen name="nodes" options={{ title: t('nav.nodes') }} />
       <Tabs.Screen name="settings" options={{ title: t('nav.settings') }} />
     </Tabs>

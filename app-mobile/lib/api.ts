@@ -72,7 +72,8 @@ export function getNodeApi(nodeId: string) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-      throw new ApiError(res.status, err.error || 'Unknown error');
+      const message = err.message || err.error || 'Unknown error';
+      throw new ApiError(res.status, message, err.code);
     }
 
     if (res.status === 204) return undefined as T;

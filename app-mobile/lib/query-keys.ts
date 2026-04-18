@@ -17,4 +17,6 @@ export const qk = {
   shareConfig: (host: string, token: string) => ['share', host, token] as const,
   appUsers: (nodeId: string, appId: string) => ['app-users', nodeId, appId] as const,
   appTraffic: (nodeId: string, appId: string, period: string) => ['app-traffic', nodeId, appId, period] as const,
+  stacks: (nodeId: string) => ['stacks', nodeId] as const,
+  stack: (nodeId: string, stackId: string) => ['stacks', nodeId, stackId] as const,
 };

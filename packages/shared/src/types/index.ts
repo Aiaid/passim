@@ -304,6 +304,33 @@ export interface MetricsCapability {
   interval: string;
 }
 
+// Stacks (docker compose)
+export type StackStatus = 'stopped' | 'deploying' | 'running' | 'error' | 'tearing_down';
+
+export interface Stack {
+  id: string;
+  name: string;
+  yaml_text: string;
+  env_text: string;
+  profiles: string[];
+  status: StackStatus;
+  last_error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StackWarning {
+  code: string;
+  message: string;
+}
+
+export interface StackValidateResponse {
+  ok: true;
+  name: string;
+  services: string[];
+  warnings: StackWarning[];
+}
+
 // Common type aliases
 export type Theme = 'light' | 'dark' | 'system';
 export type Language = 'zh-CN' | 'en-US';
