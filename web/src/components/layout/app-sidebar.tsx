@@ -1,7 +1,7 @@
 import { useLocation, Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { LayoutDashboard, Container, AppWindow, Globe, Settings, LogOut, ArrowUpCircle } from 'lucide-react';
+import { LayoutDashboard, Container, AppWindow, Globe, Layers, Settings, LogOut, ArrowUpCircle } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEventStream } from '@/hooks/use-event-stream';
 import { api } from '@/lib/api-client';
@@ -22,6 +22,7 @@ import {
 const navItems = [
   { key: 'dashboard', path: '/', icon: LayoutDashboard },
   { key: 'containers', path: '/containers', icon: Container },
+  { key: 'stacks', path: '/stacks', icon: Layers },
   { key: 'apps', path: '/apps', icon: AppWindow },
   { key: 'nodes', path: '/nodes', icon: Globe },
 ];

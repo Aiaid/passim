@@ -5,10 +5,13 @@ const BASE = '/api';
 export class ApiError extends Error {
   status: number;
   tlsError?: boolean;
-  constructor(status: number, message: string) {
+  /** Stable error identifier (e.g. "stack.build_not_supported") when the server returns one. */
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -39,7 +42,8 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-    const apiErr = new ApiError(res.status, err.error || 'Unknown error');
+    const message = err.message || err.error || 'Unknown error';
+    const apiErr = new ApiError(res.status, message, err.code);
     if (err.tls_error) apiErr.tlsError = true;
     throw apiErr;
   }
@@ -240,6 +244,15 @@ export const api = {
   // Connections
   getConnections: () => request<ConnectionInfo[]>('/connections'),
   disconnect: (id: string) => request<void>(`/connections/${id}`, { method: 'DELETE' }),
+
+  // Stacks (docker compose)
+  validateStack: (data: { name: string; yaml_text: string; env_text?: string; profiles?: string[] }) =>
+    request<StackValidateResponse>('/stacks/validate', { method: 'POST', body: JSON.stringify(data) }),
+  createStack: (data: { name: string; yaml_text: string; env_text?: string; profiles?: string[] }) =>
+    request<{ stack_id: string; task_id: string }>('/stacks', { method: 'POST', body: JSON.stringify(data) }),
+  getStacks: () => request<{ stacks: Stack[] }>('/stacks'),
+  getStack: (id: string) => request<Stack>(`/stacks/${id}`),
+  deleteStack: (id: string) => request<{ stack_id: string; task_id: string }>(`/stacks/${id}`, { method: 'DELETE' }),
 };
 
 // Type definitions used by api client
@@ -471,6 +484,36 @@ export interface ConnectionInfo {
   remote_ip: string;
   connected_at: string;
 }
+
+// Stack status values map 1:1 with backend stack.StatusXxx constants.
+export type StackStatus = 'stopped' | 'deploying' | 'running' | 'error' | 'tearing_down';
+
+export interface Stack {
+  id: string;
+  name: string;
+  yaml_text: string;
+  env_text: string;
+  profiles: string[];
+  status: StackStatus;
+  last_error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StackWarning {
+  code: string;
+  message: string;
+}
+
+export interface StackValidateResponse {
+  ok: true;
+  name: string;
+  services: string[];
+  warnings: StackWarning[];
+}
+
+// 4xx responses from the stack API include { code, message } — captured by
+// ApiError.message; UI can look up the code in i18n for localized text.
 
 export interface AppUser {
   id: string;

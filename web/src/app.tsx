@@ -15,6 +15,7 @@ import { GlobeTestPage } from '@/features/dashboard/globe-test-page';
 import { NodesPage } from '@/features/nodes/nodes-page';
 import { NodeDetailPage } from '@/features/nodes/node-detail-page';
 import { SharePage } from '@/features/share/share-page';
+import { StacksPage } from '@/features/stacks/stacks-page';
 
 export function App() {
   return (
@@ -27,6 +28,7 @@ export function App() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/containers" element={<ContainersPage />} />
+            <Route path="/stacks" element={<StacksPage />} />
             <Route path="/apps" element={<AppsPage />} />
             <Route path="/apps/new" element={<MarketplacePage />} />
             <Route path="/apps/new/:template" element={<DeployWizardPage />} />
