@@ -78,6 +78,9 @@ func validateStackHandler(_ Deps) gin.HandlerFunc {
 		for n := range proj.Services {
 			services = append(services, n)
 		}
+		if warnings == nil {
+			warnings = []stack.Warning{}
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"ok":       true,
 			"name":     name,

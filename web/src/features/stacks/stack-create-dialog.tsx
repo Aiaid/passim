@@ -126,26 +126,30 @@ export function StackCreateDialog({ open, onOpenChange }: StackCreateDialogProps
           {validate.isPending && (
             <p className="text-xs text-muted-foreground">{t('stacks.validating')}</p>
           )}
-          {validateData && (
-            <div className="flex items-start gap-2 rounded-md border border-status-running/30 bg-status-running/5 p-3 text-sm">
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-status-running" />
-              <div className="flex-1">
-                <p>
-                  {t('stacks.validate_ok', {
-                    count: validateData.services.length,
-                    services: validateData.services.join(', '),
-                  })}
-                </p>
-                {validateData.warnings.length > 0 && (
-                  <ul className="mt-1 list-disc pl-4 text-xs text-muted-foreground">
-                    {validateData.warnings.map((w, i) => (
-                      <li key={i}>{w.message}</li>
-                    ))}
-                  </ul>
-                )}
+          {validateData && (() => {
+            const services = validateData.services ?? [];
+            const warnings = validateData.warnings ?? [];
+            return (
+              <div className="flex items-start gap-2 rounded-md border border-status-running/30 bg-status-running/5 p-3 text-sm">
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-status-running" />
+                <div className="flex-1">
+                  <p>
+                    {t('stacks.validate_ok', {
+                      count: services.length,
+                      services: services.join(', '),
+                    })}
+                  </p>
+                  {warnings.length > 0 && (
+                    <ul className="mt-1 list-disc pl-4 text-xs text-muted-foreground">
+                      {warnings.map((w, i) => (
+                        <li key={i}>{w.message}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           {validateError && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
               <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
