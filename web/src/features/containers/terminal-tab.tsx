@@ -24,7 +24,6 @@ export function TerminalTab({ containerId, containerName }: TerminalTabProps) {
     const token = localStorage.getItem('auth-token') ?? '';
     const url = `${proto}//${location.host}/api/containers/${containerId}/terminal?token=${encodeURIComponent(token)}`;
 
-    setStatus('connecting');
     const ws = new WebSocket(url);
     ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
@@ -81,7 +80,10 @@ export function TerminalTab({ containerId, containerName }: TerminalTabProps) {
             variant="ghost"
             size="icon"
             className="size-7 text-zinc-400 hover:text-zinc-200"
-            onClick={() => setReconnectNonce((n) => n + 1)}
+            onClick={() => {
+              setStatus('connecting');
+              setReconnectNonce((n) => n + 1);
+            }}
           >
             <RotateCcw className="size-3" />
           </Button>

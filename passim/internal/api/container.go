@@ -197,8 +197,13 @@ func streamContainerLogs(deps Deps, c *gin.Context, id string, lines int) {
 
 	// Idle keepalive: SSE comment lines (`: ...`) are ignored by the client
 	// but keep TCP/proxies from treating the stream as idle and closing it.
+	// We must wait for the goroutine to finish before returning so it can't
+	// race with the gin logger's post-handler access to the response writer.
 	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		ticker := time.NewTicker(sseKeepaliveInterval)
 		defer ticker.Stop()
 		for {
@@ -212,6 +217,9 @@ func streamContainerLogs(deps Deps, c *gin.Context, id string, lines int) {
 			}
 		}
 	}()
+	// LIFO: close(stop) first, then wg.Wait() — guarantees the keepalive
+	// goroutine has exited before the handler unwinds past defer reader.Close.
+	defer wg.Wait()
 	defer close(stop)
 
 	if tty {

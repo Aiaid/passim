@@ -276,7 +276,6 @@ function LocalLogsView({ containerId, containerName }: { containerId: string; co
   useEffect(() => {
     // Clear previous session visuals when reconnecting.
     write(CLEAR_SCREEN);
-    setStatus('connecting');
 
     const token = localStorage.getItem('auth-token') ?? '';
     const url = `/api/containers/${containerId}/logs?follow=1&lines=200&token=${encodeURIComponent(token)}`;
@@ -295,10 +294,15 @@ function LocalLogsView({ containerId, containerName }: { containerId: string; co
     return () => source.close();
   }, [containerId, reloadNonce, write]);
 
+  const handleRefresh = () => {
+    setStatus('connecting');
+    setReloadNonce((n) => n + 1);
+  };
+
   return (
     <LogsChrome
       containerName={containerName}
-      onRefresh={() => setReloadNonce((n) => n + 1)}
+      onRefresh={handleRefresh}
       refreshDisabled={status === 'connecting'}
     >
       <Terminal ref={ref} autoResize className="h-full w-full" />
