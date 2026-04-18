@@ -217,6 +217,13 @@ func NewRouter(deps Deps) http.Handler {
 			// Batch deploy
 			protected.POST("/batch/deploy", batchDeployHandler(deps))
 
+			// Stack (docker compose) routes
+			protected.POST("/stacks/validate", validateStackHandler(deps))
+			protected.POST("/stacks", createStackHandler(deps))
+			protected.GET("/stacks", listStacksHandler(deps))
+			protected.GET("/stacks/:id", getStackHandler(deps))
+			protected.DELETE("/stacks/:id", deleteStackHandler(deps))
+
 			// Connections
 			protected.GET("/connections", listConnectionsHandler(deps))
 			protected.DELETE("/connections/:id", disconnectHandler(deps))

@@ -55,6 +55,7 @@ func volumesNeedSharedCert(volumes []string, sharedDir string) bool {
 func RegisterTaskHandlers(q *task.Queue, deps Deps) {
 	q.RegisterHandler("deploy", makeDeployHandler(deps))
 	q.RegisterHandler("undeploy", makeUndeployHandler(deps))
+	RegisterStackTaskHandlers(q, deps)
 }
 
 func makeDeployHandler(deps Deps) task.TaskHandler {
