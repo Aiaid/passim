@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
@@ -54,6 +55,11 @@ type DockerClient interface {
 	CreateVolume(ctx context.Context, name string, opts VolumeCreateOpts) error
 	VolumeExists(ctx context.Context, name string) (bool, error)
 	RemoveVolume(ctx context.Context, name string) error
+	// Label-filtered lookups so tear-down can sweep resources the stack
+	// created even when the YAML has since changed (e.g. PUT rewrite
+	// removed a network).
+	ListNetworksByLabel(ctx context.Context, key, value string) ([]string, error)
+	ListVolumesByLabel(ctx context.Context, key, value string) ([]string, error)
 }
 
 // NetworkCreateOpts is the subset of docker network create we need for stacks.
@@ -431,6 +437,32 @@ func (c *Client) RemoveVolume(ctx context.Context, name string) error {
 		return fmt.Errorf("remove volume %s: %w", name, err)
 	}
 	return nil
+}
+
+func (c *Client) ListNetworksByLabel(ctx context.Context, key, value string) ([]string, error) {
+	f := filters.NewArgs(filters.Arg("label", key+"="+value))
+	nets, err := c.cli.NetworkList(ctx, network.ListOptions{Filters: f})
+	if err != nil {
+		return nil, fmt.Errorf("list networks by label: %w", err)
+	}
+	out := make([]string, 0, len(nets))
+	for _, n := range nets {
+		out = append(out, n.Name)
+	}
+	return out, nil
+}
+
+func (c *Client) ListVolumesByLabel(ctx context.Context, key, value string) ([]string, error) {
+	f := filters.NewArgs(filters.Arg("label", key+"="+value))
+	resp, err := c.cli.VolumeList(ctx, volume.ListOptions{Filters: f})
+	if err != nil {
+		return nil, fmt.Errorf("list volumes by label: %w", err)
+	}
+	out := make([]string, 0, len(resp.Volumes))
+	for _, v := range resp.Volumes {
+		out = append(out, v.Name)
+	}
+	return out, nil
 }
 
 func (c *Client) Ping(ctx context.Context) error {

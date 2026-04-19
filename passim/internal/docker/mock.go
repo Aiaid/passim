@@ -52,6 +52,10 @@ type MockClient struct {
 	CreateVolumeErr   error
 	VolumeExistsErr   error
 	RemoveVolumeErr   error
+	LabeledNetworks       []string
+	LabeledVolumes        []string
+	ListNetworksByLabelErr error
+	ListVolumesByLabelErr  error
 }
 
 func (m *MockClient) record(method string, args ...interface{}) {
@@ -199,4 +203,14 @@ func (m *MockClient) VolumeExists(ctx context.Context, name string) (bool, error
 func (m *MockClient) RemoveVolume(ctx context.Context, name string) error {
 	m.record("RemoveVolume", name)
 	return m.RemoveVolumeErr
+}
+
+func (m *MockClient) ListNetworksByLabel(ctx context.Context, key, value string) ([]string, error) {
+	m.record("ListNetworksByLabel", key, value)
+	return m.LabeledNetworks, m.ListNetworksByLabelErr
+}
+
+func (m *MockClient) ListVolumesByLabel(ctx context.Context, key, value string) ([]string, error) {
+	m.record("ListVolumesByLabel", key, value)
+	return m.LabeledVolumes, m.ListVolumesByLabelErr
 }

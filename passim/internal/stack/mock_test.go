@@ -136,3 +136,11 @@ func (m *dockerMock) RemoveVolume(ctx context.Context, name string) error {
 	m.mu.Unlock()
 	return nil
 }
+
+func (m *dockerMock) ListNetworksByLabel(ctx context.Context, key, value string) ([]string, error) {
+	return nil, nil
+}
+
+func (m *dockerMock) ListVolumesByLabel(ctx context.Context, key, value string) ([]string, error) {
+	return nil, nil
+}

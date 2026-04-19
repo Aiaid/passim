@@ -411,6 +411,11 @@ func uniqueStrings(in []string) []string {
 // TearDown removes every container, network and volume carrying the stack's
 // passim label. Best-effort; the return is an aggregate of anything that
 // couldn't be cleaned.
+//
+// All sweeps are by `passim.stack.id=<uuid>` label, so PUT-rewritten stacks
+// still find their original resources even if the new YAML doesn't declare
+// them. External networks/volumes never get our label so they're always
+// left alone.
 func TearDown(ctx context.Context, client docker.DockerClient, stack *Stack, removeVolumes bool) error {
 	var errs []string
 
@@ -419,7 +424,7 @@ func TearDown(ctx context.Context, client docker.DockerClient, stack *Stack, rem
 		errs = append(errs, fmt.Sprintf("list containers: %v", err))
 	}
 	for _, c := range all {
-		if c.Labels[LabelStackName] != stack.Name {
+		if c.Labels[LabelStackID] != stack.ID {
 			continue
 		}
 		if err := client.RemoveContainer(ctx, c.ID); err != nil {
@@ -427,24 +432,26 @@ func TearDown(ctx context.Context, client docker.DockerClient, stack *Stack, rem
 		}
 	}
 
-	// Networks: try both "<project>_default" and every declared top-level
-	// network name. Non-existent ones are tolerated.
-	if stack.Name != "" {
-		candidates := []string{defaultNetworkName(stack.Name)}
-		// Declared networks come from the parsed YAML — try heuristic name
-		// lookup via the label filter would be more robust, but sticking to
-		// convention keeps TearDown cheap and predictable.
-		for _, name := range candidates {
-			_ = client.RemoveNetwork(ctx, name)
+	nets, err := client.ListNetworksByLabel(ctx, LabelStackID, stack.ID)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("list networks: %v", err))
+	}
+	for _, name := range nets {
+		if err := client.RemoveNetwork(ctx, name); err != nil {
+			errs = append(errs, fmt.Sprintf("remove network %s: %v", name, err))
 		}
 	}
 
 	if removeVolumes {
-		// No volume-listing call in the interface yet (it'd come with
-		// prune semantics); the phase-2 deployer only creates volumes named
-		// "<project>_<key>", and TearDown currently doesn't know the keys.
-		// Callers (DELETE handler) that want volume deletion pass the parsed
-		// project via TearDownWithProject.
+		vols, err := client.ListVolumesByLabel(ctx, LabelStackID, stack.ID)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("list volumes: %v", err))
+		}
+		for _, name := range vols {
+			if err := client.RemoveVolume(ctx, name); err != nil {
+				errs = append(errs, fmt.Sprintf("remove volume %s: %v", name, err))
+			}
+		}
 	}
 
 	if len(errs) > 0 {
@@ -453,42 +460,11 @@ func TearDown(ctx context.Context, client docker.DockerClient, stack *Stack, rem
 	return nil
 }
 
-// TearDownWithProject extends TearDown with knowledge of the stack's parsed
-// project, so it can also remove top-level non-external volumes when
-// removeVolumes is true. Separate function to avoid changing the simpler
-// TearDown call-site.
-func TearDownWithProject(ctx context.Context, client docker.DockerClient, stack *Stack, project *types.Project, removeVolumes bool) error {
-	if err := TearDown(ctx, client, stack, removeVolumes); err != nil {
-		return err
-	}
-	var errs []string
-	if project != nil {
-		// Top-level networks (non-external) — best-effort since some may share
-		// names across stacks; we only ever create names prefixed with the
-		// stack name, so deleting those is safe.
-		for key, cfg := range project.Networks {
-			if bool(cfg.External) {
-				continue
-			}
-			name := resolveNetworkName(stack.Name, key, cfg)
-			_ = client.RemoveNetwork(ctx, name)
-		}
-		if removeVolumes {
-			for key, cfg := range project.Volumes {
-				if bool(cfg.External) {
-					continue
-				}
-				name := resolveVolumeName(stack.Name, key, cfg)
-				if err := client.RemoveVolume(ctx, name); err != nil {
-					errs = append(errs, fmt.Sprintf("remove volume %s: %v", name, err))
-				}
-			}
-		}
-	}
-	if len(errs) > 0 {
-		return errors.New(strings.Join(errs, "; "))
-	}
-	return nil
+// TearDownWithProject is kept for API compatibility — the label-based
+// TearDown no longer needs the parsed project, but callers pass it anyway.
+// project is ignored; the signature remains for callsite stability.
+func TearDownWithProject(ctx context.Context, client docker.DockerClient, stack *Stack, _ *types.Project, removeVolumes bool) error {
+	return TearDown(ctx, client, stack, removeVolumes)
 }
 
 // TranslateService converts a compose-go ServiceConfig into the Passim
