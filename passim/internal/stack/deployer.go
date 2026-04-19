@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/passim/passim/internal/docker"
@@ -107,8 +108,171 @@ func Deploy(ctx context.Context, req *DeployRequest) error {
 			rb.run()
 			return err
 		}
+		// After every service in this layer has started, wait for the
+		// conditions each *next-layer* service demands. We wait here (not
+		// inside startLayer) so parallel starters in a layer don't block
+		// each other — only downstream layers wait.
+		if err := awaitLayerConditions(ctx, req, topo, layer, started, &startedMu); err != nil {
+			rb.run()
+			return err
+		}
 	}
 	return nil
+}
+
+// ConditionTimeout caps how long we wait for any single depends_on
+// condition. compose has no universal default; Passim's choice is a
+// generous 2 minutes, enough for most DB bring-ups without hanging
+// deploy indefinitely on a wedged healthcheck.
+const ConditionTimeout = 2 * time.Minute
+
+// awaitLayerConditions inspects every service that depends on something in
+// the just-started layer and blocks until that dependency reaches the
+// compose-declared condition (service_started is already satisfied by
+// start; healthy and completed_successfully need polling).
+func awaitLayerConditions(
+	ctx context.Context,
+	req *DeployRequest,
+	topo *Topology,
+	layer []string,
+	started map[string]string,
+	startedMu *sync.Mutex,
+) error {
+	justStarted := make(map[string]struct{}, len(layer))
+	for _, s := range layer {
+		justStarted[s] = struct{}{}
+	}
+
+	// For each service *anywhere* in the project, look at its deps — if any
+	// dep is in this layer and requires healthy/completed, we need to wait
+	// before moving on. We key the wait on the dep itself so each dep is
+	// awaited exactly once per deploy.
+	waits := make(map[string]string) // dep-service → condition
+	for _, deps := range topo.Dependencies {
+		for _, d := range deps {
+			if _, ok := justStarted[d.Service]; !ok {
+				continue
+			}
+			// started is satisfied by the time we got here.
+			if d.Condition == CondStarted {
+				continue
+			}
+			// Upgrade to the strongest condition if multiple callers demand
+			// different things (healthy > started, completed independent).
+			existing, seen := waits[d.Service]
+			if !seen || strongerCondition(d.Condition, existing) {
+				waits[d.Service] = d.Condition
+			}
+		}
+	}
+	if len(waits) == 0 {
+		return nil
+	}
+
+	type result struct {
+		service string
+		err     error
+	}
+	results := make(chan result, len(waits))
+	for svc, cond := range waits {
+		startedMu.Lock()
+		cid, ok := started[svc]
+		startedMu.Unlock()
+		if !ok {
+			return fmt.Errorf("condition wait: service %s has no container", svc)
+		}
+		go func(svc, cond, cid string) {
+			waitCtx, cancel := context.WithTimeout(ctx, ConditionTimeout)
+			defer cancel()
+			err := waitForCondition(waitCtx, req.Docker, cid, cond)
+			if err != nil {
+				results <- result{service: svc, err: fmt.Errorf("service %s %s: %w", svc, cond, err)}
+				return
+			}
+			results <- result{service: svc}
+		}(svc, cond, cid)
+	}
+	var firstErr error
+	for range waits {
+		r := <-results
+		if r.err != nil && firstErr == nil {
+			firstErr = r.err
+		}
+	}
+	return firstErr
+}
+
+func strongerCondition(a, b string) bool {
+	rank := func(c string) int {
+		switch c {
+		case CondStarted:
+			return 1
+		case CondHealthy:
+			return 2
+		case CondCompletedOK:
+			return 3
+		default:
+			return 0
+		}
+	}
+	return rank(a) > rank(b)
+}
+
+// waitForCondition polls the container until it matches the requested
+// condition. service_healthy requires the container's HEALTHCHECK to report
+// "healthy"; service_completed_successfully requires the container to exit
+// with code 0. Context cancellation (usually the ConditionTimeout) surfaces
+// as an informative error so the deploy-level rollback knows why it fired.
+func waitForCondition(ctx context.Context, client docker.DockerClient, containerID, cond string) error {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		info, err := client.InspectContainer(ctx, containerID)
+		if err != nil {
+			return fmt.Errorf("inspect: %w", err)
+		}
+		switch cond {
+		case CondHealthy:
+			if info.State == nil {
+				// nothing yet
+			} else if info.State.Health != nil {
+				switch info.State.Health.Status {
+				case "healthy":
+					return nil
+				case "unhealthy":
+					return fmt.Errorf("healthcheck reported unhealthy")
+				}
+			} else if !info.State.Running {
+				return fmt.Errorf("container stopped before becoming healthy (exit %d)", info.State.ExitCode)
+			} else {
+				// No healthcheck defined but condition asked for healthy —
+				// Docker fills Health when a HEALTHCHECK exists. Treat
+				// missing healthcheck as an error so the user fixes the
+				// compose file.
+				return fmt.Errorf("service has no healthcheck configured")
+			}
+		case CondCompletedOK:
+			if info.State == nil {
+				// keep waiting
+			} else if info.State.Running {
+				// keep waiting
+			} else if info.State.Status == "exited" {
+				if info.State.ExitCode == 0 {
+					return nil
+				}
+				return fmt.Errorf("container exited with code %d", info.State.ExitCode)
+			} else if info.State.Dead {
+				return fmt.Errorf("container dead")
+			}
+		default:
+			return fmt.Errorf("unknown condition %q", cond)
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for %s", cond)
+		case <-ticker.C:
+		}
+	}
 }
 
 // ensureNetworks creates every top-level network the stack declares, plus a
@@ -474,22 +638,103 @@ func TearDownWithProject(ctx context.Context, client docker.DockerClient, stack 
 func TranslateService(s *Stack, svc types.ServiceConfig, dataDir, dataVolume, dataHostPath string) (*docker.ContainerConfig, error) {
 	labels := ContainerLabels(s.ID, s.Name, svc.Name, 1, svc.Labels)
 	cfg := &docker.ContainerConfig{
-		Name:         ComposeContainerName(s.Name, svc.Name, 1),
-		Image:        svc.Image,
-		Env:          translateEnv(svc.Environment),
-		Ports:        translatePorts(svc.Ports),
-		Volumes:      translateVolumes(svc.Volumes),
-		Labels:       labels,
-		CapAdd:       svc.CapAdd,
-		Sysctls:      translateMapping(svc.Sysctls),
-		Cmd:          []string(svc.Command),
-		ExtraHosts:   translateExtraHosts(svc.ExtraHosts),
+		Name:          ComposeContainerName(s.Name, svc.Name, 1),
+		Image:         svc.Image,
+		Env:           translateEnv(svc.Environment),
+		Ports:         translatePorts(svc.Ports),
+		Volumes:       translateVolumes(svc.Volumes),
+		Labels:        labels,
+		CapAdd:        svc.CapAdd,
+		CapDrop:       svc.CapDrop,
+		Sysctls:       translateMapping(svc.Sysctls),
+		Cmd:           []string(svc.Command),
+		Entrypoint:    []string(svc.Entrypoint),
+		ExtraHosts:    translateExtraHosts(svc.ExtraHosts),
 		RestartPolicy: translateRestart(svc.Restart),
-		DataDir:      dataDir,
-		DataVolume:   dataVolume,
-		DataHostPath: dataHostPath,
+		Healthcheck:   translateHealthcheckCompose(svc.HealthCheck),
+		Tmpfs:         translateTmpfs(svc.Tmpfs),
+		Privileged:    svc.Privileged,
+		ReadOnly:      svc.ReadOnly,
+		User:          svc.User,
+		WorkingDir:    svc.WorkingDir,
+		Hostname:      svc.Hostname,
+		Domainname:    svc.DomainName,
+		Tty:           svc.Tty,
+		StdinOpen:     svc.StdinOpen,
+		Init:          svc.Init,
+		PidMode:       svc.Pid,
+		IpcMode:       svc.Ipc,
+		UTSMode:       svc.Uts,
+		ShmSize:       int64(svc.ShmSize),
+		MemLimit:      int64(svc.MemLimit),
+		NanoCPUs:      nanoCPUs(svc.CPUS),
+		DNS:           []string(svc.DNS),
+		DNSSearch:     []string(svc.DNSSearch),
+		StopSignal:    svc.StopSignal,
+		SecurityOpt:   svc.SecurityOpt,
+		DataDir:       dataDir,
+		DataVolume:    dataVolume,
+		DataHostPath:  dataHostPath,
+	}
+	if svc.StopGracePeriod != nil {
+		d := int(time.Duration(*svc.StopGracePeriod).Seconds())
+		cfg.StopTimeout = &d
 	}
 	return cfg, nil
+}
+
+// nanoCPUs: compose `cpus: 1.5` → 1_500_000_000 nano CPUs. Matches Docker's
+// resource limit unit so the host config can consume it directly.
+func nanoCPUs(cpus float32) int64 {
+	if cpus <= 0 {
+		return 0
+	}
+	return int64(float64(cpus) * 1e9)
+}
+
+// translateHealthcheckCompose maps compose HealthCheckConfig to the Passim
+// wrapper. compose's `disable: true` surfaces as Test=["NONE"].
+func translateHealthcheckCompose(h *types.HealthCheckConfig) *docker.HealthcheckConfig {
+	if h == nil {
+		return nil
+	}
+	if h.Disable {
+		return &docker.HealthcheckConfig{Test: []string{"NONE"}}
+	}
+	if len(h.Test) == 0 {
+		return nil
+	}
+	out := &docker.HealthcheckConfig{Test: []string(h.Test)}
+	if h.Interval != nil {
+		out.Interval = time.Duration(*h.Interval)
+	}
+	if h.Timeout != nil {
+		out.Timeout = time.Duration(*h.Timeout)
+	}
+	if h.Retries != nil {
+		out.Retries = int(*h.Retries)
+	}
+	if h.StartPeriod != nil {
+		out.StartPeriod = time.Duration(*h.StartPeriod)
+	}
+	return out
+}
+
+// translateTmpfs converts compose StringList ("[target1, target2]" or
+// "target:opts") into the docker map[target]opts form.
+func translateTmpfs(list types.StringList) map[string]string {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(list))
+	for _, entry := range list {
+		if i := strings.Index(entry, ":"); i >= 0 {
+			out[entry[:i]] = entry[i+1:]
+		} else {
+			out[entry] = ""
+		}
+	}
+	return out
 }
 
 // ComposeContainerName produces the "<project>_<service>_<n>" form that

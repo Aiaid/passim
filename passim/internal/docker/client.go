@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -88,13 +89,40 @@ type ContainerConfig struct {
 	Volumes       []string          // "host:container[:ro]" format
 	Labels        map[string]string
 	CapAdd        []string
+	CapDrop       []string
 	Sysctls       map[string]string
 	Cmd           []string
+	Entrypoint    []string
 	ExtraHosts    []string
 	NetworkName   string // Docker network to connect the container to (e.g. "passim")
 	NetworkMode   string // Raw Docker network mode: "host", "none", "container:<id>". Skips NetworkName when non-empty.
 	RestartPolicy string
 	AutoRemove    bool
+
+	// Phase-3 extensions, drawn to cover common compose-spec fields.
+	Healthcheck *HealthcheckConfig
+	Tmpfs       map[string]string // "target" → "options" (e.g. "size=64m,noexec")
+	Privileged  bool
+	ReadOnly    bool
+	User        string
+	WorkingDir  string
+	Hostname    string
+	Domainname  string
+	Tty         bool
+	StdinOpen   bool
+	Init        *bool
+	PidMode     string
+	IpcMode     string
+	UTSMode     string
+	ShmSize     int64
+	MemLimit    int64
+	NanoCPUs    int64 // CPU limit in nano CPUs (1 cpu = 1e9)
+	DNS         []string
+	DNSSearch   []string
+	StopSignal  string
+	StopTimeout *int
+	SecurityOpt []string
+
 	// DataDir is the data directory path inside the Passim container (e.g. "/data").
 	// Used to identify which volume specs should be converted to named volume mounts.
 	DataDir string
@@ -107,6 +135,21 @@ type ContainerConfig struct {
 	// When DataVolume is empty but DataHostPath is set, volume specs under DataDir
 	// are rewritten to use the host path instead (bind mount Docker-in-Docker mode).
 	DataHostPath string
+}
+
+// HealthcheckConfig mirrors compose healthcheck + Docker's HEALTHCHECK.
+//
+// Test conventions:
+//   - ["NONE"] disables the image's healthcheck.
+//   - ["CMD", "arg1", "arg2", ...] exec form.
+//   - ["CMD-SHELL", "some shell string"] shell form.
+//   - nil / empty → leave the image's HEALTHCHECK intact.
+type HealthcheckConfig struct {
+	Test        []string
+	Interval    time.Duration
+	Timeout     time.Duration
+	Retries     int
+	StartPeriod time.Duration
 }
 
 // Client wraps the Docker SDK client and implements DockerClient.
@@ -187,16 +230,43 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, cfg *ContainerConf
 		Labels:       cfg.Labels,
 		ExposedPorts: exposedPorts,
 		Cmd:          cfg.Cmd,
+		Entrypoint:   cfg.Entrypoint,
+		User:         cfg.User,
+		WorkingDir:   cfg.WorkingDir,
+		Hostname:     cfg.Hostname,
+		Domainname:   cfg.Domainname,
+		Tty:          cfg.Tty,
+		OpenStdin:    cfg.StdinOpen,
+		StdinOnce:    cfg.StdinOpen,
+		StopSignal:   cfg.StopSignal,
+		StopTimeout:  cfg.StopTimeout,
+		Healthcheck:  translateHealthcheck(cfg.Healthcheck),
 	}
 
 	hostCfg := &container.HostConfig{
-		Binds:        binds,
-		Mounts:       mounts,
-		CapAdd:       cfg.CapAdd,
-		PortBindings: portBindings,
-		Sysctls:      cfg.Sysctls,
-		ExtraHosts:   cfg.ExtraHosts,
-		NetworkMode:  container.NetworkMode(cfg.NetworkMode),
+		Binds:          binds,
+		Mounts:         mounts,
+		CapAdd:         cfg.CapAdd,
+		CapDrop:        cfg.CapDrop,
+		PortBindings:   portBindings,
+		Sysctls:        cfg.Sysctls,
+		ExtraHosts:     cfg.ExtraHosts,
+		NetworkMode:    container.NetworkMode(cfg.NetworkMode),
+		Tmpfs:          cfg.Tmpfs,
+		Privileged:     cfg.Privileged,
+		ReadonlyRootfs: cfg.ReadOnly,
+		Init:           cfg.Init,
+		PidMode:        container.PidMode(cfg.PidMode),
+		IpcMode:        container.IpcMode(cfg.IpcMode),
+		UTSMode:        container.UTSMode(cfg.UTSMode),
+		ShmSize:        cfg.ShmSize,
+		DNS:            cfg.DNS,
+		DNSSearch:      cfg.DNSSearch,
+		SecurityOpt:    cfg.SecurityOpt,
+		Resources: container.Resources{
+			Memory:    cfg.MemLimit,
+			NanoCPUs:  cfg.NanoCPUs,
+		},
 	}
 
 	if cfg.RestartPolicy != "" {
@@ -223,6 +293,22 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, cfg *ContainerConf
 		return "", fmt.Errorf("start container: %w", err)
 	}
 	return resp.ID, nil
+}
+
+// translateHealthcheck adapts Passim's HealthcheckConfig to Docker's
+// container.HealthConfig. Returns nil when the user didn't specify one so
+// the image's own HEALTHCHECK is preserved.
+func translateHealthcheck(h *HealthcheckConfig) *container.HealthConfig {
+	if h == nil || len(h.Test) == 0 {
+		return nil
+	}
+	return &container.HealthConfig{
+		Test:        h.Test,
+		Interval:    h.Interval,
+		Timeout:     h.Timeout,
+		Retries:     h.Retries,
+		StartPeriod: h.StartPeriod,
+	}
 }
 
 // splitVolumes separates volume specs into bind mounts and named volume mounts.

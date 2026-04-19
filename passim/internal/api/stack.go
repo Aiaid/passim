@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/gin-gonic/gin"
@@ -47,9 +48,10 @@ type stackService struct {
 	Name        string   `json:"name"`
 	Image       string   `json:"image,omitempty"`
 	ContainerID string   `json:"container_id,omitempty"`
-	State       string   `json:"state,omitempty"`  // running / exited / ...
-	Status      string   `json:"status,omitempty"` // "Up 30 seconds"
-	Ports       []string `json:"ports,omitempty"`  // "0.0.0.0:8080->80/tcp"
+	State       string   `json:"state,omitempty"`   // running / exited / ...
+	Status      string   `json:"status,omitempty"`  // "Up 30 seconds (healthy)"
+	Health      string   `json:"health,omitempty"`  // healthy / unhealthy / starting — parsed from Status
+	Ports       []string `json:"ports,omitempty"`   // "0.0.0.0:8080->80/tcp"
 }
 
 func toStackResponse(s *stack.Stack) stackResponse {
@@ -58,6 +60,22 @@ func toStackResponse(s *stack.Stack) stackResponse {
 		Profiles: s.Profiles, Status: s.Status, LastError: s.LastError,
 		CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt,
 	}
+}
+
+// parseHealth pulls the docker health state out of a ContainerSummary.Status
+// string like "Up 2 hours (healthy)" / "Up 3 seconds (health: starting)".
+// Docker's ListContainers doesn't expose health as a typed field, so the
+// status text is the only source without an extra InspectContainer call.
+func parseHealth(status string) string {
+	switch {
+	case strings.Contains(status, "(healthy)"):
+		return "healthy"
+	case strings.Contains(status, "(unhealthy)"):
+		return "unhealthy"
+	case strings.Contains(status, "health: starting"):
+		return "starting"
+	}
+	return ""
 }
 
 // collectStackServices asks Docker for every container labeled with the
@@ -97,6 +115,7 @@ func collectStackServices(ctx context.Context, deps Deps, s *stack.Stack) []stac
 				ContainerID: c.ID,
 				State:       c.State,
 				Status:      c.Status,
+				Health:      parseHealth(c.Status),
 				Ports:       ports,
 			}
 		}

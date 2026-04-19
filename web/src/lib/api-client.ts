@@ -502,7 +502,8 @@ export interface StackService {
   image?: string;
   container_id?: string;
   state?: string;  // running / exited / ...
-  status?: string; // "Up 30 seconds"
+  status?: string; // "Up 30 seconds (healthy)"
+  health?: string; // healthy / unhealthy / starting / ""
   ports?: string[];
 }
 

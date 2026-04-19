@@ -261,6 +261,78 @@ networks:
 // TestDeployContainerFailureRollsBack: image pull succeeds on both services,
 // but the second CreateAndStart fails — we should see the first container
 // and the default network removed.
+func TestTranslateHealthcheckDisabled(t *testing.T) {
+	hc := &types.HealthCheckConfig{Disable: true}
+	got := translateHealthcheckCompose(hc)
+	if got == nil || len(got.Test) != 1 || got.Test[0] != "NONE" {
+		t.Errorf("got %+v, want Test=[NONE]", got)
+	}
+}
+
+func TestTranslateHealthcheckFullSpec(t *testing.T) {
+	d := types.Duration(10 * 1e9) // 10s
+	retries := uint64(3)
+	hc := &types.HealthCheckConfig{
+		Test:        []string{"CMD", "curl", "-f", "http://localhost"},
+		Interval:    &d,
+		Timeout:     &d,
+		Retries:     &retries,
+		StartPeriod: &d,
+	}
+	got := translateHealthcheckCompose(hc)
+	if got == nil {
+		t.Fatal("nil")
+	}
+	if got.Retries != 3 {
+		t.Errorf("retries = %d", got.Retries)
+	}
+	if got.Test[0] != "CMD" {
+		t.Errorf("test = %v", got.Test)
+	}
+}
+
+func TestTranslateHealthcheckNil(t *testing.T) {
+	if got := translateHealthcheckCompose(nil); got != nil {
+		t.Errorf("nil input should produce nil output, got %+v", got)
+	}
+}
+
+func TestStrongerCondition(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want bool
+	}{
+		{CondHealthy, CondStarted, true},
+		{CondStarted, CondHealthy, false},
+		{CondCompletedOK, CondHealthy, true},
+		{CondStarted, CondStarted, false},
+	}
+	for _, c := range cases {
+		if got := strongerCondition(c.a, c.b); got != c.want {
+			t.Errorf("stronger(%q, %q) = %v, want %v", c.a, c.b, got, c.want)
+		}
+	}
+}
+
+func TestTranslateTmpfs(t *testing.T) {
+	got := translateTmpfs(types.StringList{"/tmp", "/run:size=64m,noexec"})
+	if got["/tmp"] != "" {
+		t.Errorf("/tmp = %q", got["/tmp"])
+	}
+	if got["/run"] != "size=64m,noexec" {
+		t.Errorf("/run = %q", got["/run"])
+	}
+}
+
+func TestNanoCPUs(t *testing.T) {
+	if nanoCPUs(0) != 0 {
+		t.Error("zero should be 0")
+	}
+	if nanoCPUs(1.5) != 1_500_000_000 {
+		t.Errorf("1.5 → %d", nanoCPUs(1.5))
+	}
+}
+
 func TestDeployContainerFailureRollsBack(t *testing.T) {
 	mock := &dockerMock{
 		createErrAfter: 1, // first create ok, second fails

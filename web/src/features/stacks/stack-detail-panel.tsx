@@ -204,7 +204,10 @@ function ServiceRow({ service }: { service: StackService }) {
     <div className="flex items-center gap-3 p-3 text-sm">
       <StatusBadge status={serviceBadgeStatus(service.state)} />
       <div className="min-w-0 flex-1">
-        <div className="font-medium truncate">{service.name}</div>
+        <div className="flex items-center gap-2">
+          <span className="font-medium truncate">{service.name}</span>
+          {service.health && <HealthDot health={service.health} />}
+        </div>
         {service.image && (
           <div className="text-xs text-muted-foreground truncate">{service.image}</div>
         )}
@@ -220,5 +223,18 @@ function ServiceRow({ service }: { service: StackService }) {
         </div>
       )}
     </div>
+  );
+}
+
+function HealthDot({ health }: { health: string }) {
+  const color =
+    health === 'healthy' ? 'bg-status-running'
+    : health === 'unhealthy' ? 'bg-status-failed'
+    : 'bg-status-deploying';
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <span className={`size-1.5 rounded-full ${color}`} />
+      {health}
+    </span>
   );
 }
