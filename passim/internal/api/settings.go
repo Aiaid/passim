@@ -9,7 +9,8 @@ import (
 )
 
 type updateSettingsRequest struct {
-	NodeName *string `json:"node_name"`
+	NodeName     *string `json:"node_name"`
+	AdvancedMode *bool   `json:"advanced_mode"`
 }
 
 func updateSettingsHandler(deps Deps) gin.HandlerFunc {
@@ -32,6 +33,17 @@ func updateSettingsHandler(deps Deps) gin.HandlerFunc {
 			}
 		}
 
+		if req.AdvancedMode != nil {
+			value := "0"
+			if *req.AdvancedMode {
+				value = "1"
+			}
+			if err := db.SetConfig(deps.DB, "advanced_mode", value); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save advanced_mode"})
+				return
+			}
+		}
+
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	}
 }
@@ -39,8 +51,10 @@ func updateSettingsHandler(deps Deps) gin.HandlerFunc {
 func getSettingsHandler(deps Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		nodeName, _ := db.GetConfig(deps.DB, "node_name")
+		advanced, _ := db.GetConfig(deps.DB, "advanced_mode")
 		c.JSON(http.StatusOK, gin.H{
-			"node_name": nodeName,
+			"node_name":     nodeName,
+			"advanced_mode": advanced == "1",
 		})
 	}
 }

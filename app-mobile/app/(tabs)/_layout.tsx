@@ -2,7 +2,10 @@ import { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@/lib/i18n';
+import { useNodeStore } from '@/stores/node-store';
+import { getNodeApi } from '@/lib/api';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
@@ -12,16 +15,29 @@ const TAB_CONFIG: {
   activeIcon: IoniconsName;
   inactiveIcon: IoniconsName;
   labelKey: string;
+  advanced?: boolean;
 }[] = [
   { key: 'index', activeIcon: 'home', inactiveIcon: 'home-outline', labelKey: 'mobile.home' },
   { key: 'apps', activeIcon: 'grid', inactiveIcon: 'grid-outline', labelKey: 'nav.apps' },
-  { key: 'stacks', activeIcon: 'layers', inactiveIcon: 'layers-outline', labelKey: 'nav.stacks' },
+  { key: 'stacks', activeIcon: 'layers', inactiveIcon: 'layers-outline', labelKey: 'nav.stacks', advanced: true },
   { key: 'nodes', activeIcon: 'hardware-chip', inactiveIcon: 'hardware-chip-outline', labelKey: 'nav.nodes' },
   { key: 'settings', activeIcon: 'settings', inactiveIcon: 'settings-outline', labelKey: 'nav.settings' },
 ];
 
+function useAdvancedMode() {
+  const nodeId = useNodeStore((s) => s.activeNodeId) ?? '';
+  const { data } = useQuery({
+    queryKey: ['settings', nodeId],
+    queryFn: () => getNodeApi(nodeId).getSettings(),
+    enabled: !!nodeId,
+    staleTime: 30_000,
+  });
+  return data?.advanced_mode ?? false;
+}
+
 function LiquidGlassTabBar({ state, navigation }: BottomTabBarProps) {
   const { t } = useTranslation();
+  const advanced = useAdvancedMode();
 
   return (
     <View style={styles.wrapper} pointerEvents="box-none">
@@ -31,6 +47,7 @@ function LiquidGlassTabBar({ state, navigation }: BottomTabBarProps) {
             const focused = state.index === index;
             const config = TAB_CONFIG.find((c) => c.key === route.name);
             if (!config) return null;
+            if (config.advanced && !advanced) return null;
 
             const onPress = () => {
               const event = navigation.emit({

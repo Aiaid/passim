@@ -153,8 +153,8 @@ export const api = {
   getTask: (id: string) => request<Task>(`/tasks/${id}`),
 
   // Settings
-  getSettings: () => request<{ node_name: string }>('/settings'),
-  updateSettings: (data: { node_name?: string }) =>
+  getSettings: () => request<{ node_name: string; advanced_mode: boolean }>('/settings'),
+  updateSettings: (data: { node_name?: string; advanced_mode?: boolean }) =>
     request<{ ok: boolean }>('/settings', { method: 'PATCH', body: JSON.stringify(data) }),
 
   // Version & Update

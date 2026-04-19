@@ -84,6 +84,8 @@
     "theme_system": "跟随系统",
     "language": "语言",
     "language_desc": "选择界面语言",
+    "advanced_mode": "高级模式",
+    "advanced_mode_desc": "显示容器和 Stacks 管理。仅推荐熟悉 Docker 的用户。",
     "api_key": "API Key",
     "api_key_desc": "用于登录和远程节点连接的密钥",
     "api_key_configured": "已配置",

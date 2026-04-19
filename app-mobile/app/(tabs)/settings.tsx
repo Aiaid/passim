@@ -41,6 +41,7 @@ function SettingsSection({ title, children }: { title: string; children: React.R
 
 function SettingsRow({
   label,
+  sublabel,
   value,
   onPress,
   right,
@@ -49,6 +50,7 @@ function SettingsRow({
   testID,
 }: {
   label: string;
+  sublabel?: string;
   value?: string;
   onPress?: () => void;
   right?: React.ReactNode;
@@ -63,7 +65,14 @@ function SettingsRow({
       onPress={onPress}
       disabled={!onPress && !right}
     >
-      <Text className={`text-base ${danger ? 'text-red-500' : 'text-white'}`}>{label}</Text>
+      <View className="flex-1 pr-3">
+        <Text className={`text-base ${danger ? 'text-red-500' : 'text-white'}`}>{label}</Text>
+        {sublabel ? (
+          <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={2}>
+            {sublabel}
+          </Text>
+        ) : null}
+      </View>
       <View className="flex-row items-center gap-2">
         {value != null && (
           <Text className={`text-base ${danger ? 'text-red-400' : 'text-gray-400'}`}>{value}</Text>
@@ -179,10 +188,12 @@ export default function SettingsScreen() {
 
   // Mutations
   const updateSettingsMut = useMutation({
-    mutationFn: (data: { node_name?: string }) => getNodeApi(nodeId).updateSettings(data),
+    mutationFn: (data: { node_name?: string; advanced_mode?: boolean }) =>
+      getNodeApi(nodeId).updateSettings(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.settings(nodeId) });
       queryClient.invalidateQueries({ queryKey: qk.status(nodeId) });
+      queryClient.invalidateQueries({ queryKey: ['settings', nodeId] });
     },
   });
 
@@ -496,6 +507,19 @@ export default function SettingsScreen() {
               <Switch
                 value={biometricEnabled}
                 onValueChange={setBiometricEnabled}
+                trackColor={{ false: '#333', true: '#30d158' }}
+                thumbColor="#fff"
+              />
+            }
+          />
+          <SettingsRow
+            testID="switch-advanced-mode"
+            label={t('settings.advanced_mode')}
+            sublabel={t('settings.advanced_mode_desc')}
+            right={
+              <Switch
+                value={settingsQuery.data?.advanced_mode ?? false}
+                onValueChange={(v) => updateSettingsMut.mutate({ advanced_mode: v })}
                 trackColor={{ false: '#333', true: '#30d158' }}
                 thumbColor="#fff"
               />

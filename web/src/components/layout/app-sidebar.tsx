@@ -19,10 +19,15 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 
-const navItems = [
+const navItems: {
+  key: string;
+  path: string;
+  icon: typeof LayoutDashboard;
+  advanced?: boolean;
+}[] = [
   { key: 'dashboard', path: '/', icon: LayoutDashboard },
-  { key: 'containers', path: '/containers', icon: Container },
-  { key: 'stacks', path: '/stacks', icon: Layers },
+  { key: 'containers', path: '/containers', icon: Container, advanced: true },
+  { key: 'stacks', path: '/stacks', icon: Layers, advanced: true },
   { key: 'apps', path: '/apps', icon: AppWindow },
   { key: 'nodes', path: '/nodes', icon: Globe },
 ];
@@ -43,6 +48,14 @@ export function AppSidebar() {
     queryFn: () => api.getVersion(),
     staleTime: Infinity,
   });
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.getSettings(),
+    staleTime: 60_000,
+  });
+  const advanced = settings?.advanced_mode ?? false;
+  const visibleNavItems = navItems.filter((i) => !i.advanced || advanced);
 
   const { data: updateInfo } = useQuery({
     queryKey: ['update-check', false],
@@ -94,7 +107,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>{t('nav.local')}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.path} size="lg" className="text-base">
                     <Link to={item.path}>

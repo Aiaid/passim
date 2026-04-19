@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/hooks/use-theme';
 import { usePreferencesStore } from '@/stores/preferences-store';
 import { api } from '@/lib/api-client';
@@ -37,7 +38,7 @@ export function GeneralSettings() {
   const displayName = nodeName ?? settings?.node_name ?? '';
 
   const updateSettings = useMutation({
-    mutationFn: (data: { node_name?: string }) => api.updateSettings(data),
+    mutationFn: (data: { node_name?: string; advanced_mode?: boolean }) => api.updateSettings(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       queryClient.invalidateQueries({ queryKey: ['status'] });
@@ -127,6 +128,19 @@ export function GeneralSettings() {
                 </Button>
               ))}
             </div>
+          </div>
+
+          {/* Advanced Mode */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">{t('settings.advanced_mode')}</Label>
+              <p className="text-sm text-muted-foreground">{t('settings.advanced_mode_desc')}</p>
+            </div>
+            <Switch
+              checked={settings?.advanced_mode ?? false}
+              onCheckedChange={(v) => updateSettings.mutate({ advanced_mode: v })}
+              disabled={updateSettings.isPending}
+            />
           </div>
         </CardContent>
       </Card>

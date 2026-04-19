@@ -85,6 +85,8 @@
     "theme_system": "System",
     "language": "Language",
     "language_desc": "Choose interface language",
+    "advanced_mode": "Advanced mode",
+    "advanced_mode_desc": "Expose Containers and Stacks. Recommended only for users comfortable with Docker.",
     "api_key": "API Key",
     "api_key_desc": "Key used for login and remote node connections",
     "api_key_configured": "Configured",
