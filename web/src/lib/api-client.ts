@@ -252,7 +252,16 @@ export const api = {
     request<{ stack_id: string; task_id: string }>('/stacks', { method: 'POST', body: JSON.stringify(data) }),
   getStacks: () => request<{ stacks: Stack[] }>('/stacks'),
   getStack: (id: string) => request<Stack>(`/stacks/${id}`),
-  deleteStack: (id: string) => request<{ stack_id: string; task_id: string }>(`/stacks/${id}`, { method: 'DELETE' }),
+  updateStack: (id: string, data: { name: string; yaml_text: string; env_text?: string; profiles?: string[] }) =>
+    request<{ stack_id: string; task_id: string }>(`/stacks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteStack: (id: string, keepVolumes = false) =>
+    request<{ stack_id: string; task_id: string }>(
+      `/stacks/${id}${keepVolumes ? '?keep_volumes=true' : ''}`,
+      { method: 'DELETE' },
+    ),
+  stackUp: (id: string) => request<{ stack_id: string; task_id: string }>(`/stacks/${id}/up`, { method: 'POST' }),
+  stackDown: (id: string) => request<{ stack_id: string; task_id: string }>(`/stacks/${id}/down`, { method: 'POST' }),
+  stackRestart: (id: string) => request<{ stack_id: string; task_id: string }>(`/stacks/${id}/restart`, { method: 'POST' }),
 };
 
 // Type definitions used by api client
@@ -488,6 +497,15 @@ export interface ConnectionInfo {
 // Stack status values map 1:1 with backend stack.StatusXxx constants.
 export type StackStatus = 'stopped' | 'deploying' | 'running' | 'error' | 'tearing_down';
 
+export interface StackService {
+  name: string;
+  image?: string;
+  container_id?: string;
+  state?: string;  // running / exited / ...
+  status?: string; // "Up 30 seconds"
+  ports?: string[];
+}
+
 export interface Stack {
   id: string;
   name: string;
@@ -498,6 +516,8 @@ export interface Stack {
   last_error?: string;
   created_at: string;
   updated_at: string;
+  /** Populated only by GET /api/stacks/:id, not by list. */
+  services?: StackService[];
 }
 
 export interface StackWarning {

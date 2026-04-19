@@ -31,6 +31,13 @@
     "delete_queued": "已加入清理队列",
     "delete_confirm_title": "删除 Stack？",
     "delete_confirm_desc": "将停止并删除 {{name}} 的所有容器。该操作不可撤销。",
+    "services": "服务",
+    "action_up": "启动",
+    "action_down": "停止",
+    "action_restart": "重启",
+    "up_queued": "已加入启动队列",
+    "down_queued": "已加入停止队列",
+    "restart_queued": "已加入重启队列",
     "error": {
       "stack.invalid_name": "名称格式不合法，只允许小写字母、数字、- 和 _",
       "stack.name_taken": "已存在同名 Stack",

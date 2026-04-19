@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/gin-gonic/gin"
@@ -26,15 +27,29 @@ type validateStackRequest struct {
 type createStackRequest = validateStackRequest
 
 type stackResponse struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	YAMLText  string   `json:"yaml_text"`
-	EnvText   string   `json:"env_text"`
-	Profiles  []string `json:"profiles"`
-	Status    string   `json:"status"`
-	LastError string   `json:"last_error,omitempty"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	YAMLText  string         `json:"yaml_text"`
+	EnvText   string         `json:"env_text"`
+	Profiles  []string       `json:"profiles"`
+	Status    string         `json:"status"`
+	LastError string         `json:"last_error,omitempty"`
+	CreatedAt string         `json:"created_at"`
+	UpdatedAt string         `json:"updated_at"`
+	Services  []stackService `json:"services,omitempty"`
+}
+
+// stackService is the per-service container snapshot GET /api/stacks/:id
+// attaches so the UI can render a service list without extra round-trips.
+// Populated only for single-stack lookups — the list endpoint skips it to
+// keep that hot path cheap.
+type stackService struct {
+	Name        string   `json:"name"`
+	Image       string   `json:"image,omitempty"`
+	ContainerID string   `json:"container_id,omitempty"`
+	State       string   `json:"state,omitempty"`  // running / exited / ...
+	Status      string   `json:"status,omitempty"` // "Up 30 seconds"
+	Ports       []string `json:"ports,omitempty"`  // "0.0.0.0:8080->80/tcp"
 }
 
 func toStackResponse(s *stack.Stack) stackResponse {
@@ -43,6 +58,70 @@ func toStackResponse(s *stack.Stack) stackResponse {
 		Profiles: s.Profiles, Status: s.Status, LastError: s.LastError,
 		CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt,
 	}
+}
+
+// collectStackServices asks Docker for every container labeled with the
+// stack's id and shapes them into per-service snapshots. Services without a
+// container (not yet started, or torn down) appear with empty fields so the
+// UI can distinguish "service exists in YAML" from "service is running".
+func collectStackServices(ctx context.Context, deps Deps, s *stack.Stack) []stackService {
+	// Parse YAML to enumerate declared services even when no containers
+	// exist (e.g. stopped stack). Failures fall back to label-only data.
+	var serviceNames []string
+	if proj, _, err := stack.ParseAndValidate(ctx, s.Name, s.YAMLText, s.EnvText, s.Profiles); err == nil && proj != nil {
+		for name := range proj.Services {
+			serviceNames = append(serviceNames, name)
+		}
+	}
+
+	byService := make(map[string]stackService)
+	if containers, err := deps.Docker.ListContainers(ctx); err == nil {
+		for _, c := range containers {
+			if c.Labels[stack.LabelStackID] != s.ID {
+				continue
+			}
+			svcName := c.Labels[stack.LabelStackService]
+			if svcName == "" {
+				continue
+			}
+			ports := make([]string, 0, len(c.Ports))
+			for _, p := range c.Ports {
+				if p.PublicPort == 0 {
+					continue
+				}
+				ports = append(ports, fmt.Sprintf("%d:%d/%s", p.PublicPort, p.PrivatePort, p.Type))
+			}
+			byService[svcName] = stackService{
+				Name:        svcName,
+				Image:       c.Image,
+				ContainerID: c.ID,
+				State:       c.State,
+				Status:      c.Status,
+				Ports:       ports,
+			}
+		}
+	}
+
+	out := make([]stackService, 0, len(serviceNames))
+	seen := make(map[string]struct{}, len(serviceNames))
+	for _, name := range serviceNames {
+		seen[name] = struct{}{}
+		if snap, ok := byService[name]; ok {
+			out = append(out, snap)
+		} else {
+			out = append(out, stackService{Name: name})
+		}
+	}
+	// Containers whose service name isn't in the (current) YAML — can happen
+	// right after a PUT that dropped a service; still useful to show so the
+	// user can see what's winding down.
+	for name, snap := range byService {
+		if _, ok := seen[name]; !ok {
+			out = append(out, snap)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 // writeValidationError turns a stack.ValidationError into a 400 JSON body
@@ -178,7 +257,9 @@ func getStackHandler(deps Deps) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "stack not found"})
 			return
 		}
-		c.JSON(http.StatusOK, toStackResponse(s))
+		resp := toStackResponse(s)
+		resp.Services = collectStackServices(c.Request.Context(), deps, s)
+		c.JSON(http.StatusOK, resp)
 	}
 }
 

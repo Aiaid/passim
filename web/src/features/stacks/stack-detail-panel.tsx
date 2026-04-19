@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Play, Square, RotateCcw } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -10,8 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { StatusBadge } from '@/components/shared/status-badge';
-import { ApiError, type Stack, type StackStatus } from '@/lib/api-client';
-import { useDeleteStack, useStack } from './queries';
+import { ApiError, type Stack, type StackStatus, type StackService } from '@/lib/api-client';
+import { useDeleteStack, useStack, useStackAction } from './queries';
 import { useState } from 'react';
 
 interface StackDetailPanelProps {
@@ -30,6 +30,18 @@ function badgeStatus(s: StackStatus): string {
   }
 }
 
+// Service container state → StatusBadge vocabulary.
+function serviceBadgeStatus(state?: string): string {
+  switch (state) {
+    case 'running': return 'running';
+    case 'exited': return 'stopped';
+    case 'dead': return 'failed';
+    case 'created': return 'deploying';
+    case 'restarting': return 'deploying';
+    default: return 'stopped';
+  }
+}
+
 export function StackDetailPanel({ stack, open, onOpenChange }: StackDetailPanelProps) {
   const { t } = useTranslation();
 
@@ -39,25 +51,53 @@ export function StackDetailPanel({ stack, open, onOpenChange }: StackDetailPanel
   const s = live ?? stack;
 
   const deleteStack = useDeleteStack();
+  const action = useStackAction();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!s) return null;
 
   const handleDelete = () => {
-    deleteStack.mutate(s.id, {
-      onSuccess: () => {
-        toast.success(t('stacks.delete_queued'));
-        onOpenChange(false);
+    deleteStack.mutate(
+      { id: s.id },
+      {
+        onSuccess: () => {
+          toast.success(t('stacks.delete_queued'));
+          onOpenChange(false);
+        },
+        onError: (err) => {
+          const apiErr = err as ApiError;
+          toast.error(apiErr.message || t('common.error'));
+        },
       },
-      onError: (err) => {
-        const apiErr = err as ApiError;
-        toast.error(apiErr.message || t('common.error'));
-      },
-    });
+    );
     setConfirmDelete(false);
   };
 
-  const canDelete = s.status !== 'deploying' && s.status !== 'tearing_down';
+  const handleAction = (kind: 'up' | 'down' | 'restart') => {
+    action.mutate(
+      { id: s.id, action: kind },
+      {
+        onSuccess: () => toast.success(t(`stacks.${kind}_queued`)),
+        onError: (err) => {
+          const apiErr = err as ApiError;
+          const translated =
+            apiErr.code && t(`stacks.error.${apiErr.code}`, { defaultValue: '' });
+          toast.error(translated || apiErr.message || t('common.error'));
+        },
+      },
+    );
+  };
+
+  const busy =
+    s.status === 'deploying' ||
+    s.status === 'tearing_down' ||
+    action.isPending ||
+    deleteStack.isPending;
+  const canUp = !busy && (s.status === 'stopped' || s.status === 'error');
+  const canDown = !busy && s.status === 'running';
+  const canRestart = !busy && (s.status === 'running' || s.status === 'error');
+  const canDelete = !busy;
+  const services = s.services ?? [];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -77,6 +117,36 @@ export function StackDetailPanel({ stack, open, onOpenChange }: StackDetailPanel
                 {s.last_error}
               </p>
             </div>
+          )}
+
+          {/* Lifecycle actions */}
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" disabled={!canUp} onClick={() => handleAction('up')}>
+              <Play className="size-4" />
+              {t('stacks.action_up')}
+            </Button>
+            <Button size="sm" variant="outline" disabled={!canDown} onClick={() => handleAction('down')}>
+              <Square className="size-4" />
+              {t('stacks.action_down')}
+            </Button>
+            <Button size="sm" variant="outline" disabled={!canRestart} onClick={() => handleAction('restart')}>
+              <RotateCcw className="size-4" />
+              {t('stacks.action_restart')}
+            </Button>
+          </div>
+
+          {/* Services */}
+          {services.length > 0 && (
+            <section>
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                {t('stacks.services')}
+              </h3>
+              <div className="rounded-md border divide-y">
+                {services.map((svc) => (
+                  <ServiceRow key={svc.name} service={svc} />
+                ))}
+              </div>
+            </section>
           )}
 
           <section>
@@ -106,7 +176,7 @@ export function StackDetailPanel({ stack, open, onOpenChange }: StackDetailPanel
             <Button
               variant="destructive"
               size="sm"
-              disabled={!canDelete || deleteStack.isPending}
+              disabled={!canDelete}
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="size-4" />
@@ -126,5 +196,29 @@ export function StackDetailPanel({ stack, open, onOpenChange }: StackDetailPanel
         />
       </SheetContent>
     </Sheet>
+  );
+}
+
+function ServiceRow({ service }: { service: StackService }) {
+  return (
+    <div className="flex items-center gap-3 p-3 text-sm">
+      <StatusBadge status={serviceBadgeStatus(service.state)} />
+      <div className="min-w-0 flex-1">
+        <div className="font-medium truncate">{service.name}</div>
+        {service.image && (
+          <div className="text-xs text-muted-foreground truncate">{service.image}</div>
+        )}
+        {service.status && (
+          <div className="text-xs text-muted-foreground truncate">{service.status}</div>
+        )}
+      </div>
+      {service.ports && service.ports.length > 0 && (
+        <div className="text-xs font-mono text-muted-foreground text-right shrink-0">
+          {service.ports.map((p) => (
+            <div key={p}>{p}</div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
