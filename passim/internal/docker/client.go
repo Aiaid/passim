@@ -11,7 +11,9 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 )
 
@@ -42,6 +44,33 @@ type DockerClient interface {
 	ConnectNetwork(ctx context.Context, networkName, containerID string, aliases []string) error
 	Ping(ctx context.Context) error
 	Close() error
+
+	// Stack-oriented primitives (Phase 2+). Shaped so callers can do their
+	// own idempotency and rollback: Create* errors if the resource exists,
+	// Exists() probes without side effects, Remove* tears down.
+	CreateNetwork(ctx context.Context, name string, opts NetworkCreateOpts) error
+	NetworkExists(ctx context.Context, name string) (bool, error)
+	RemoveNetwork(ctx context.Context, name string) error
+	CreateVolume(ctx context.Context, name string, opts VolumeCreateOpts) error
+	VolumeExists(ctx context.Context, name string) (bool, error)
+	RemoveVolume(ctx context.Context, name string) error
+}
+
+// NetworkCreateOpts is the subset of docker network create we need for stacks.
+// Driver defaults to "bridge" when empty.
+type NetworkCreateOpts struct {
+	Driver     string
+	Labels     map[string]string
+	Internal   bool
+	Attachable bool
+}
+
+// VolumeCreateOpts is the subset of docker volume create we need for stacks.
+// Driver defaults to "local" when empty.
+type VolumeCreateOpts struct {
+	Driver     string
+	Labels     map[string]string
+	DriverOpts map[string]string
 }
 
 // ContainerConfig holds the configuration for creating a new container.
@@ -57,6 +86,7 @@ type ContainerConfig struct {
 	Cmd           []string
 	ExtraHosts    []string
 	NetworkName   string // Docker network to connect the container to (e.g. "passim")
+	NetworkMode   string // Raw Docker network mode: "host", "none", "container:<id>". Skips NetworkName when non-empty.
 	RestartPolicy string
 	AutoRemove    bool
 	// DataDir is the data directory path inside the Passim container (e.g. "/data").
@@ -160,6 +190,7 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, cfg *ContainerConf
 		PortBindings: portBindings,
 		Sysctls:      cfg.Sysctls,
 		ExtraHosts:   cfg.ExtraHosts,
+		NetworkMode:  container.NetworkMode(cfg.NetworkMode),
 	}
 
 	if cfg.RestartPolicy != "" {
@@ -325,6 +356,81 @@ func (c *Client) ConnectNetwork(ctx context.Context, networkName, containerID st
 	return c.cli.NetworkConnect(ctx, networkName, containerID, &network.EndpointSettings{
 		Aliases: aliases,
 	})
+}
+
+// CreateNetwork errors if the network already exists. Callers that want
+// upsert semantics can check NetworkExists first.
+func (c *Client) CreateNetwork(ctx context.Context, name string, opts NetworkCreateOpts) error {
+	driver := opts.Driver
+	if driver == "" {
+		driver = "bridge"
+	}
+	_, err := c.cli.NetworkCreate(ctx, name, network.CreateOptions{
+		Driver:     driver,
+		Labels:     opts.Labels,
+		Internal:   opts.Internal,
+		Attachable: opts.Attachable,
+	})
+	if err != nil {
+		return fmt.Errorf("create network %s: %w", name, err)
+	}
+	return nil
+}
+
+func (c *Client) NetworkExists(ctx context.Context, name string) (bool, error) {
+	_, err := c.cli.NetworkInspect(ctx, name, network.InspectOptions{})
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("inspect network %s: %w", name, err)
+	}
+	return true, nil
+}
+
+func (c *Client) RemoveNetwork(ctx context.Context, name string) error {
+	err := c.cli.NetworkRemove(ctx, name)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return fmt.Errorf("remove network %s: %w", name, err)
+	}
+	return nil
+}
+
+// CreateVolume errors if the volume already exists under the same name.
+func (c *Client) CreateVolume(ctx context.Context, name string, opts VolumeCreateOpts) error {
+	driver := opts.Driver
+	if driver == "" {
+		driver = "local"
+	}
+	_, err := c.cli.VolumeCreate(ctx, volume.CreateOptions{
+		Name:       name,
+		Driver:     driver,
+		Labels:     opts.Labels,
+		DriverOpts: opts.DriverOpts,
+	})
+	if err != nil {
+		return fmt.Errorf("create volume %s: %w", name, err)
+	}
+	return nil
+}
+
+func (c *Client) VolumeExists(ctx context.Context, name string) (bool, error) {
+	_, err := c.cli.VolumeInspect(ctx, name)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("inspect volume %s: %w", name, err)
+	}
+	return true, nil
+}
+
+func (c *Client) RemoveVolume(ctx context.Context, name string) error {
+	err := c.cli.VolumeRemove(ctx, name, false)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return fmt.Errorf("remove volume %s: %w", name, err)
+	}
+	return nil
 }
 
 func (c *Client) Ping(ctx context.Context) error {

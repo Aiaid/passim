@@ -42,6 +42,16 @@ type MockClient struct {
 	ExecInteractiveErr     error
 	ResizeExecErr          error
 	PingErr                error
+
+	// Phase 2+ stack primitives
+	ExistingNetworks  map[string]struct{}
+	ExistingVolumes   map[string]struct{}
+	CreateNetworkErr  error
+	NetworkExistsErr  error
+	RemoveNetworkErr  error
+	CreateVolumeErr   error
+	VolumeExistsErr   error
+	RemoveVolumeErr   error
 }
 
 func (m *MockClient) record(method string, args ...interface{}) {
@@ -147,4 +157,46 @@ func (m *MockClient) Ping(ctx context.Context) error {
 func (m *MockClient) Close() error {
 	m.record("Close")
 	return nil
+}
+
+// Phase 2+ stack primitives. Mocks default to no-op success; tests that need
+// failure semantics should set specific *Err fields.
+//
+//nolint:revive // allow name-shadow on Opts in tests
+func (m *MockClient) CreateNetwork(ctx context.Context, name string, opts NetworkCreateOpts) error {
+	m.record("CreateNetwork", name, opts)
+	return m.CreateNetworkErr
+}
+
+func (m *MockClient) NetworkExists(ctx context.Context, name string) (bool, error) {
+	m.record("NetworkExists", name)
+	if m.NetworkExistsErr != nil {
+		return false, m.NetworkExistsErr
+	}
+	_, ok := m.ExistingNetworks[name]
+	return ok, nil
+}
+
+func (m *MockClient) RemoveNetwork(ctx context.Context, name string) error {
+	m.record("RemoveNetwork", name)
+	return m.RemoveNetworkErr
+}
+
+func (m *MockClient) CreateVolume(ctx context.Context, name string, opts VolumeCreateOpts) error {
+	m.record("CreateVolume", name, opts)
+	return m.CreateVolumeErr
+}
+
+func (m *MockClient) VolumeExists(ctx context.Context, name string) (bool, error) {
+	m.record("VolumeExists", name)
+	if m.VolumeExistsErr != nil {
+		return false, m.VolumeExistsErr
+	}
+	_, ok := m.ExistingVolumes[name]
+	return ok, nil
+}
+
+func (m *MockClient) RemoveVolume(ctx context.Context, name string) error {
+	m.record("RemoveVolume", name)
+	return m.RemoveVolumeErr
 }

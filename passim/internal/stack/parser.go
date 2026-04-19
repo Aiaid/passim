@@ -28,6 +28,14 @@ const (
 	ErrUnsupportedNetworkDriver           ErrorCode = "stack.unsupported_network_driver"
 	ErrUnsupportedVolumeDriver            ErrorCode = "stack.unsupported_volume_driver"
 	ErrServicesRequired                   ErrorCode = "stack.services_required"
+	ErrDependsOnUnknownService            ErrorCode = "stack.depends_on_unknown_service"
+	ErrDependsOnCycle                     ErrorCode = "stack.depends_on_cycle"
+	ErrNetworkModeUnknownService          ErrorCode = "stack.network_mode_unknown_service"
+	ErrNetworkExternalMissing             ErrorCode = "stack.network_external_missing"
+	ErrVolumeExternalMissing              ErrorCode = "stack.volume_external_missing"
+	ErrStackDeployBusy                    ErrorCode = "stack.deploy_busy"
+	ErrStackNotRunning                    ErrorCode = "stack.not_running"
+	ErrStackBusy                          ErrorCode = "stack.busy"
 )
 
 // ValidationError is returned synchronously (HTTP 4xx) when a compose file

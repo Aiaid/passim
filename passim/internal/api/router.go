@@ -222,7 +222,11 @@ func NewRouter(deps Deps) http.Handler {
 			protected.POST("/stacks", createStackHandler(deps))
 			protected.GET("/stacks", listStacksHandler(deps))
 			protected.GET("/stacks/:id", getStackHandler(deps))
+			protected.PUT("/stacks/:id", updateStackHandler(deps))
 			protected.DELETE("/stacks/:id", deleteStackHandler(deps))
+			protected.POST("/stacks/:id/up", upStackHandler(deps))
+			protected.POST("/stacks/:id/down", downStackHandler(deps))
+			protected.POST("/stacks/:id/restart", restartStackHandler(deps))
 
 			// Connections
 			protected.GET("/connections", listConnectionsHandler(deps))

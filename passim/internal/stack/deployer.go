@@ -2,17 +2,19 @@ package stack
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/passim/passim/internal/docker"
 )
 
-// DeployRequest carries everything the Phase-1 deployer needs.
+// DeployRequest carries everything the deployer needs.
 type DeployRequest struct {
 	Stack        *Stack
 	Project      *types.Project
@@ -22,95 +24,477 @@ type DeployRequest struct {
 	DataHostPath string
 }
 
-// Deploy brings a stack up, running services in the order compose-go
-// provides. On any failure it rolls back every container it created,
-// so a failed deploy leaves no side effects (all-or-nothing).
+// defaultNetworkName returns "<project>_default", matching what docker
+// compose CLI names its implicit network.
+func defaultNetworkName(stackName string) string {
+	return stackName + "_default"
+}
+
+// resolveVolumeName: a top-level `volumes.<key>` becomes "<project>_<key>"
+// unless explicitly named (volume.Name) or external. Compose normalizes this
+// and puts the result in Volume.Name, but only for non-external entries —
+// treat an empty Name as "use the project prefix".
+func resolveVolumeName(stackName, key string, v types.VolumeConfig) string {
+	if v.Name != "" {
+		return v.Name
+	}
+	return stackName + "_" + key
+}
+
+// resolveNetworkName: same logic as volumes, but for networks.
+func resolveNetworkName(stackName, key string, n types.NetworkConfig) string {
+	if n.Name != "" {
+		return n.Name
+	}
+	return stackName + "_" + key
+}
+
+// Deploy brings a stack up. All-or-nothing: any step failing rolls back every
+// side effect this invocation produced.
 //
-// Phase 1: no default network, no depends_on, no configs/secrets, no
-// healthcheck. Each service is pulled + started independently on the
-// Docker daemon's default bridge network.
+// Phase 2 scope: depends_on short-form (condition=service_started),
+// top-level networks / volumes (incl. external: true), default
+// "<project>_default" network. Healthcheck / service_healthy /
+// service_completed_successfully come in phase 3.
 func Deploy(ctx context.Context, req *DeployRequest) error {
 	if req == nil || req.Stack == nil || req.Project == nil || req.Docker == nil {
 		return fmt.Errorf("invalid deploy request")
 	}
+	p := req.Project
 
-	var rollback []func()
-	addRollback := func(fn func()) { rollback = append(rollback, fn) }
-	doRollback := func() {
-		for i := len(rollback) - 1; i >= 0; i-- {
-			rollback[i]()
-		}
+	if err := mergeNetworkModeDependency(p); err != nil {
+		return err
+	}
+	topo, err := BuildTopology(p)
+	if err != nil {
+		return err
 	}
 
-	// Deterministic order so parallel Phase-2 rewrites don't flip behavior.
-	svcNames := make([]string, 0, len(req.Project.Services))
-	for name := range req.Project.Services {
-		svcNames = append(svcNames, name)
+	rb := &rollbackStack{}
+	defer func() {
+		if r := recover(); r != nil {
+			rb.run()
+			panic(r)
+		}
+	}()
+
+	// 1. Top-level networks (incl. the implicit <project>_default).
+	netNames, err := ensureNetworks(ctx, req, rb)
+	if err != nil {
+		rb.run()
+		return err
 	}
-	sort.Strings(svcNames)
 
-	for _, name := range svcNames {
-		svc := req.Project.Services[name]
-		cfg, err := TranslateService(req.Stack, svc, req.DataDir, req.DataVolume, req.DataHostPath)
-		if err != nil {
-			doRollback()
-			return fmt.Errorf("translate service %s: %w", name, err)
-		}
+	// 2. Top-level volumes.
+	if err := ensureVolumes(ctx, req, rb); err != nil {
+		rb.run()
+		return err
+	}
 
-		reader, err := req.Docker.PullImage(ctx, svc.Image)
-		if err != nil {
-			doRollback()
-			return fmt.Errorf("pull image %s: %w", svc.Image, err)
-		}
-		if reader != nil {
-			io.Copy(io.Discard, reader)
-			reader.Close()
-		}
+	// 3. Pull images (parallel).
+	if err := pullImages(ctx, req); err != nil {
+		rb.run()
+		return err
+	}
 
-		containerID, err := req.Docker.CreateAndStartContainer(ctx, cfg)
-		if err != nil {
-			doRollback()
-			return fmt.Errorf("start service %s: %w", name, err)
+	// 4. Start containers by topological layer. Map of service → container id
+	// so network_mode: service:<x> can be rewritten to container:<id>.
+	started := make(map[string]string, len(p.Services))
+	var startedMu sync.Mutex
+
+	for _, layer := range topo.Layers {
+		if err := startLayer(ctx, req, layer, netNames, started, &startedMu, rb); err != nil {
+			rb.run()
+			return err
 		}
-		id := containerID
-		addRollback(func() {
-			// Background context so rollback finishes even if the parent
-			// context was cancelled.
-			_ = req.Docker.RemoveContainer(context.Background(), id)
-		})
 	}
 	return nil
 }
 
-// TearDown removes every container that carries the stack's passim label.
-// It tolerates partial success (best-effort removal), returning a joined
-// error describing anything it couldn't clean up.
-func TearDown(ctx context.Context, client docker.DockerClient, stackName string) error {
+// ensureNetworks creates every top-level network the stack declares, plus a
+// <project>_default for services that don't name a network explicitly. For
+// external networks it verifies existence. Returns the set of top-level
+// network **names** (post-resolution) keyed by compose network key, so
+// startLayer can translate `services.x.networks.<key>` into real names.
+func ensureNetworks(ctx context.Context, req *DeployRequest, rb *rollbackStack) (map[string]string, error) {
+	p := req.Project
+	stackName := req.Stack.Name
+
+	result := make(map[string]string, len(p.Networks)+1)
+
+	// Collect key → config pairs in deterministic order.
+	keys := make([]string, 0, len(p.Networks))
+	for k := range p.Networks {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		cfg := p.Networks[key]
+		name := resolveNetworkName(stackName, key, cfg)
+		result[key] = name
+
+		if bool(cfg.External) {
+			exists, err := req.Docker.NetworkExists(ctx, name)
+			if err != nil {
+				return nil, fmt.Errorf("check external network %s: %w", name, err)
+			}
+			if !exists {
+				return nil, verr(ErrNetworkExternalMissing,
+					"external network %q does not exist", name)
+			}
+			continue
+		}
+
+		driver := cfg.Driver
+		if driver == "" {
+			driver = "bridge"
+		}
+		opts := docker.NetworkCreateOpts{
+			Driver:   driver,
+			Labels:   NetworkLabels(req.Stack.ID, stackName, key),
+			Internal: cfg.Internal,
+		}
+		if err := req.Docker.CreateNetwork(ctx, name, opts); err != nil {
+			return nil, fmt.Errorf("create network %s: %w", name, err)
+		}
+		created := name
+		rb.push(func() { _ = req.Docker.RemoveNetwork(context.Background(), created) })
+	}
+
+	// Implicit default network — every stack gets one so services can talk by
+	// DNS name without declaring a network block.
+	if _, hasDefault := result["default"]; !hasDefault {
+		name := defaultNetworkName(stackName)
+		opts := docker.NetworkCreateOpts{
+			Driver: "bridge",
+			Labels: NetworkLabels(req.Stack.ID, stackName, "default"),
+		}
+		if err := req.Docker.CreateNetwork(ctx, name, opts); err != nil {
+			return nil, fmt.Errorf("create default network %s: %w", name, err)
+		}
+		result["default"] = name
+		rb.push(func() { _ = req.Docker.RemoveNetwork(context.Background(), name) })
+	}
+	return result, nil
+}
+
+// ensureVolumes mirrors ensureNetworks for top-level volumes.
+func ensureVolumes(ctx context.Context, req *DeployRequest, rb *rollbackStack) error {
+	p := req.Project
+	stackName := req.Stack.Name
+
+	keys := make([]string, 0, len(p.Volumes))
+	for k := range p.Volumes {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		cfg := p.Volumes[key]
+		name := resolveVolumeName(stackName, key, cfg)
+
+		if bool(cfg.External) {
+			exists, err := req.Docker.VolumeExists(ctx, name)
+			if err != nil {
+				return fmt.Errorf("check external volume %s: %w", name, err)
+			}
+			if !exists {
+				return verr(ErrVolumeExternalMissing,
+					"external volume %q does not exist", name)
+			}
+			continue
+		}
+
+		driver := cfg.Driver
+		if driver == "" {
+			driver = "local"
+		}
+		opts := docker.VolumeCreateOpts{
+			Driver:     driver,
+			Labels:     VolumeLabels(req.Stack.ID, stackName, key),
+			DriverOpts: cfg.DriverOpts,
+		}
+		if err := req.Docker.CreateVolume(ctx, name, opts); err != nil {
+			return fmt.Errorf("create volume %s: %w", name, err)
+		}
+		created := name
+		rb.push(func() { _ = req.Docker.RemoveVolume(context.Background(), created) })
+	}
+	return nil
+}
+
+// pullImages pulls every service's image in parallel and drains the progress
+// stream. Returns on the first error; images already pulled stay on disk
+// (the rollback doesn't remove them — they're shared and cheap).
+func pullImages(ctx context.Context, req *DeployRequest) error {
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(req.Project.Services))
+
+	for _, svc := range req.Project.Services {
+		wg.Add(1)
+		go func(image string) {
+			defer wg.Done()
+			reader, err := req.Docker.PullImage(ctx, image)
+			if err != nil {
+				errCh <- fmt.Errorf("pull image %s: %w", image, err)
+				return
+			}
+			if reader != nil {
+				_, _ = io.Copy(io.Discard, reader)
+				_ = reader.Close()
+			}
+		}(svc.Image)
+	}
+	wg.Wait()
+	close(errCh)
+
+	var errs []string
+	for e := range errCh {
+		errs = append(errs, e.Error())
+	}
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+// startLayer creates and starts every service in a topology layer in parallel,
+// then connects each container to its declared networks. All operations feed
+// the rollback stack so a failure cleans up everything this invocation has
+// created so far.
+func startLayer(
+	ctx context.Context,
+	req *DeployRequest,
+	layer []string,
+	netNames map[string]string,
+	started map[string]string,
+	startedMu *sync.Mutex,
+	rb *rollbackStack,
+) error {
+	type result struct {
+		service     string
+		containerID string
+		err         error
+	}
+
+	results := make(chan result, len(layer))
+	for _, svcName := range layer {
+		go func(name string) {
+			svc := req.Project.Services[name]
+			cfg, err := TranslateService(req.Stack, svc, req.DataDir, req.DataVolume, req.DataHostPath)
+			if err != nil {
+				results <- result{service: name, err: err}
+				return
+			}
+			// Resolve network_mode: service:<x> → container:<id>.
+			if target, ok := serviceNetworkMode(svc.NetworkMode); ok {
+				startedMu.Lock()
+				id, present := started[target]
+				startedMu.Unlock()
+				if !present {
+					results <- result{service: name, err: fmt.Errorf(
+						"network_mode target %q has no started container (layering bug)", target)}
+					return
+				}
+				cfg.NetworkMode = "container:" + id
+			}
+			// If NetworkMode takes over, skip our own network attachments.
+			// Docker disallows ports/aliases in that mode anyway.
+			standalone := cfg.NetworkMode != ""
+
+			id, err := req.Docker.CreateAndStartContainer(ctx, cfg)
+			if err != nil {
+				results <- result{service: name, err: fmt.Errorf("start %s: %w", name, err)}
+				return
+			}
+
+			if !standalone {
+				if err := attachNetworks(ctx, req, svc, id, netNames); err != nil {
+					_ = req.Docker.RemoveContainer(ctx, id)
+					results <- result{service: name, err: err}
+					return
+				}
+			}
+
+			results <- result{service: name, containerID: id}
+		}(svcName)
+	}
+
+	var firstErr error
+	for range layer {
+		r := <-results
+		if r.err != nil {
+			if firstErr == nil {
+				firstErr = r.err
+			}
+			continue
+		}
+		containerID := r.containerID
+		rb.push(func() { _ = req.Docker.RemoveContainer(context.Background(), containerID) })
+		startedMu.Lock()
+		started[r.service] = r.containerID
+		startedMu.Unlock()
+	}
+	return firstErr
+}
+
+// attachNetworks connects the container to every network the service
+// declares, using the real (post-resolution) network name and the aliases
+// compose specifies. Services that don't declare a network block get
+// attached to <project>_default with the service name as the DNS alias.
+func attachNetworks(
+	ctx context.Context,
+	req *DeployRequest,
+	svc types.ServiceConfig,
+	containerID string,
+	netNames map[string]string,
+) error {
+	// CreateAndStartContainer already connects to cfg.NetworkName — we pass
+	// empty there and do the attachments here instead so we can control
+	// aliases per network. The first connect implicitly disconnects the
+	// daemon-default bridge so only our networks remain.
+	type attach struct {
+		name    string
+		aliases []string
+	}
+	var list []attach
+
+	if len(svc.Networks) == 0 {
+		target, ok := netNames["default"]
+		if !ok {
+			// Shouldn't happen — ensureNetworks always creates default.
+			return fmt.Errorf("default network missing for stack")
+		}
+		list = append(list, attach{name: target, aliases: []string{svc.Name}})
+	} else {
+		keys := make([]string, 0, len(svc.Networks))
+		for k := range svc.Networks {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			target, ok := netNames[k]
+			if !ok {
+				return fmt.Errorf("service %s references undeclared network %q", svc.Name, k)
+			}
+			aliases := []string{svc.Name}
+			if n := svc.Networks[k]; n != nil {
+				// Service name alias always first; merge compose-declared aliases.
+				aliases = append(aliases, n.Aliases...)
+			}
+			list = append(list, attach{name: target, aliases: uniqueStrings(aliases)})
+		}
+	}
+
+	for _, a := range list {
+		if err := req.Docker.ConnectNetwork(ctx, a.name, containerID, a.aliases); err != nil {
+			return fmt.Errorf("attach %s to %s: %w", containerID[:12], a.name, err)
+		}
+	}
+	return nil
+}
+
+func uniqueStrings(in []string) []string {
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
+}
+
+// TearDown removes every container, network and volume carrying the stack's
+// passim label. Best-effort; the return is an aggregate of anything that
+// couldn't be cleaned.
+func TearDown(ctx context.Context, client docker.DockerClient, stack *Stack, removeVolumes bool) error {
+	var errs []string
+
 	all, err := client.ListContainers(ctx)
 	if err != nil {
-		return fmt.Errorf("list containers: %w", err)
+		errs = append(errs, fmt.Sprintf("list containers: %v", err))
 	}
-	var errs []string
 	for _, c := range all {
-		if c.Labels[LabelStackName] != stackName {
+		if c.Labels[LabelStackName] != stack.Name {
 			continue
 		}
 		if err := client.RemoveContainer(ctx, c.ID); err != nil {
-			errs = append(errs, fmt.Sprintf("remove %s: %v", c.ID, err))
+			errs = append(errs, fmt.Sprintf("remove container %s: %v", c.ID[:12], err))
+		}
+	}
+
+	// Networks: try both "<project>_default" and every declared top-level
+	// network name. Non-existent ones are tolerated.
+	if stack.Name != "" {
+		candidates := []string{defaultNetworkName(stack.Name)}
+		// Declared networks come from the parsed YAML — try heuristic name
+		// lookup via the label filter would be more robust, but sticking to
+		// convention keeps TearDown cheap and predictable.
+		for _, name := range candidates {
+			_ = client.RemoveNetwork(ctx, name)
+		}
+	}
+
+	if removeVolumes {
+		// No volume-listing call in the interface yet (it'd come with
+		// prune semantics); the phase-2 deployer only creates volumes named
+		// "<project>_<key>", and TearDown currently doesn't know the keys.
+		// Callers (DELETE handler) that want volume deletion pass the parsed
+		// project via TearDownWithProject.
+	}
+
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+// TearDownWithProject extends TearDown with knowledge of the stack's parsed
+// project, so it can also remove top-level non-external volumes when
+// removeVolumes is true. Separate function to avoid changing the simpler
+// TearDown call-site.
+func TearDownWithProject(ctx context.Context, client docker.DockerClient, stack *Stack, project *types.Project, removeVolumes bool) error {
+	if err := TearDown(ctx, client, stack, removeVolumes); err != nil {
+		return err
+	}
+	var errs []string
+	if project != nil {
+		// Top-level networks (non-external) — best-effort since some may share
+		// names across stacks; we only ever create names prefixed with the
+		// stack name, so deleting those is safe.
+		for key, cfg := range project.Networks {
+			if bool(cfg.External) {
+				continue
+			}
+			name := resolveNetworkName(stack.Name, key, cfg)
+			_ = client.RemoveNetwork(ctx, name)
+		}
+		if removeVolumes {
+			for key, cfg := range project.Volumes {
+				if bool(cfg.External) {
+					continue
+				}
+				name := resolveVolumeName(stack.Name, key, cfg)
+				if err := client.RemoveVolume(ctx, name); err != nil {
+					errs = append(errs, fmt.Sprintf("remove volume %s: %v", name, err))
+				}
+			}
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("tear down: %s", strings.Join(errs, "; "))
+		return errors.New(strings.Join(errs, "; "))
 	}
 	return nil
 }
 
 // TranslateService converts a compose-go ServiceConfig into the Passim
-// Docker layer's ContainerConfig. Phase-1 scope: image / env / ports /
-// volumes / restart / labels / command / entrypoint / expose / cap_add /
-// cap_drop / sysctls / extra_hosts / user / working_dir / tty / stdin_open.
-// Other fields are ignored at this phase (they become supported in later
-// phases as ContainerConfig itself grows).
+// Docker layer's ContainerConfig. Network attachment is handled separately
+// (see attachNetworks) so this struct stays focused on the container's own
+// knobs.
 func TranslateService(s *Stack, svc types.ServiceConfig, dataDir, dataVolume, dataHostPath string) (*docker.ContainerConfig, error) {
 	labels := ContainerLabels(s.ID, s.Name, svc.Name, 1, svc.Labels)
 	cfg := &docker.ContainerConfig{
@@ -133,16 +517,12 @@ func TranslateService(s *Stack, svc types.ServiceConfig, dataDir, dataVolume, da
 }
 
 // ComposeContainerName produces the "<project>_<service>_<n>" form that
-// compose CLI itself generates, so `docker compose -p <name> ps` shows
-// them in the familiar layout.
+// compose CLI itself generates, so `docker compose -p <name> ps` lists them
+// in the familiar layout.
 func ComposeContainerName(stackName, serviceName string, containerNumber int) string {
 	return fmt.Sprintf("%s_%s_%d", stackName, serviceName, containerNumber)
 }
 
-// translateEnv converts compose MappingWithEquals (map[string]*string) into
-// the "KEY=VALUE" slice Docker SDK expects. A nil value (compose "pass-through
-// from host env") after interpolation means the variable wasn't defined — we
-// skip it rather than pass an empty-string override.
 func translateEnv(env types.MappingWithEquals) []string {
 	if len(env) == 0 {
 		return nil
@@ -163,10 +543,6 @@ func translateEnv(env types.MappingWithEquals) []string {
 	return out
 }
 
-// translatePorts renders each published port as "host:container[/proto]".
-// Ports without a Published (expose-only or "ports: - 80") get skipped in
-// Phase 1 — binding an ephemeral host port requires Docker Engine post-
-// create inspect support we haven't plumbed yet.
 func translatePorts(ports []types.ServicePortConfig) []string {
 	if len(ports) == 0 {
 		return nil
@@ -185,8 +561,6 @@ func translatePorts(ports []types.ServicePortConfig) []string {
 	return out
 }
 
-// translateVolumes renders each bind/volume entry as "source:target[:ro]".
-// Tmpfs and image types are skipped at Phase 1.
 func translateVolumes(vols []types.ServiceVolumeConfig) []string {
 	if len(vols) == 0 {
 		return nil
@@ -217,8 +591,6 @@ func translateMapping(m types.Mapping) map[string]string {
 	return out
 }
 
-// translateExtraHosts converts compose HostsList (map[string][]string) to
-// Docker's "host:ip" slice form.
 func translateExtraHosts(h types.HostsList) []string {
 	if len(h) == 0 {
 		return nil
@@ -233,9 +605,21 @@ func translateExtraHosts(h types.HostsList) []string {
 	return out
 }
 
-// translateRestart maps compose restart policy strings to Docker's. compose
-// uses `no` / `always` / `on-failure` / `unless-stopped`; Docker accepts the
-// same, so it's a direct passthrough. Empty string leaves daemon default.
-func translateRestart(r string) string {
-	return r
+func translateRestart(r string) string { return r }
+
+// rollbackStack runs pushed undo functions in LIFO order. It's a tiny helper
+// rather than a full transaction manager — deliberate, so each step's undo
+// lives next to its do.
+type rollbackStack struct {
+	actions []func()
+}
+
+func (r *rollbackStack) push(fn func()) {
+	r.actions = append(r.actions, fn)
+}
+
+func (r *rollbackStack) run() {
+	for i := len(r.actions) - 1; i >= 0; i-- {
+		r.actions[i]()
+	}
 }
