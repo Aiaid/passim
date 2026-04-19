@@ -152,8 +152,12 @@ func ParseAndValidate(ctx context.Context, name, yamlText, envText string, profi
 
 	project, err := loader.LoadWithContext(ctx, configDetails, func(opts *loader.Options) {
 		opts.SetProjectName(name, true)
-		opts.SkipValidation = false
-		opts.SkipConsistencyCheck = false
+		// Skip the compose-go JSON-schema validation — it rejects some
+		// spec-legal shapes we care about (e.g. `secrets.<x>.content:`).
+		// We do our own reject pass in validateProject(), so this just
+		// moves the guardrails under our control.
+		opts.SkipValidation = true
+		opts.SkipConsistencyCheck = true
 		opts.ResolvePaths = false
 		opts.Profiles = profiles
 	})

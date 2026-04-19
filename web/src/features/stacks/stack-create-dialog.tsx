@@ -26,6 +26,12 @@ export function StackCreateDialog({ open, onOpenChange }: StackCreateDialogProps
   const [name, setName] = useState('');
   const [yamlText, setYamlText] = useState('');
   const [envText, setEnvText] = useState('');
+  const [profilesText, setProfilesText] = useState('');
+
+  const profiles = profilesText
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
 
   const validate = useValidateStack();
   const create = useCreateStack();
@@ -36,6 +42,7 @@ export function StackCreateDialog({ open, onOpenChange }: StackCreateDialogProps
       setName('');
       setYamlText('');
       setEnvText('');
+      setProfilesText('');
       validate.reset();
       create.reset();
     }
@@ -50,16 +57,16 @@ export function StackCreateDialog({ open, onOpenChange }: StackCreateDialogProps
       return;
     }
     const handle = setTimeout(() => {
-      validate.mutate({ name, yaml_text: yamlText, env_text: envText });
+      validate.mutate({ name, yaml_text: yamlText, env_text: envText, profiles });
     }, 500);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, name, yamlText, envText]);
+  }, [open, name, yamlText, envText, profilesText]);
 
   const handleCreate = () => {
     if (!name.trim() || !yamlText.trim()) return;
     create.mutate(
-      { name, yaml_text: yamlText, env_text: envText },
+      { name, yaml_text: yamlText, env_text: envText, profiles },
       {
         onSuccess: () => {
           toast.success(t('stacks.create_queued'));
@@ -121,6 +128,20 @@ export function StackCreateDialog({ open, onOpenChange }: StackCreateDialogProps
               placeholder="DB_PASSWORD=supersecret"
               spellCheck={false}
             />
+          </div>
+
+          <div>
+            <Label htmlFor="stack-profiles">{t('stacks.profiles_optional')}</Label>
+            <Input
+              id="stack-profiles"
+              value={profilesText}
+              onChange={(e) => setProfilesText(e.target.value)}
+              placeholder="debug, monitoring"
+              autoComplete="off"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('stacks.profiles_hint')}
+            </p>
           </div>
 
           {validate.isPending && (

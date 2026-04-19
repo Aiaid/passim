@@ -16,6 +16,8 @@
     "yaml": "Compose YAML",
     "env": "Environment",
     "env_optional": "Environment (optional)",
+    "profiles_optional": "Profiles (optional)",
+    "profiles_hint": "Comma-separated. Only services belonging to one of these profiles will start.",
     "empty_title": "No stacks yet",
     "empty_desc": "Paste a docker compose YAML to deploy a stack in one click",
     "create_title": "New Stack",

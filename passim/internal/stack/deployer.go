@@ -23,6 +23,11 @@ type DeployRequest struct {
 	DataDir      string
 	DataVolume   string
 	DataHostPath string
+	// Files is populated by Deploy() after MaterializeFiles succeeds; it
+	// carries the host paths per config/secret source so TranslateService
+	// can build bind-mount specs. Callers that drive the deployer
+	// indirectly leave this nil.
+	Files *StackFiles
 }
 
 // defaultNetworkName returns "<project>_default", matching what docker
@@ -79,29 +84,42 @@ func Deploy(ctx context.Context, req *DeployRequest) error {
 		}
 	}()
 
-	// 1. Top-level networks (incl. the implicit <project>_default).
+	// 1. Materialize configs / secrets. Files land on disk before any
+	// container is started so bind mounts exist when Docker resolves them.
+	files, err := MaterializeFiles(req.DataDir, req.Stack, p)
+	if err != nil {
+		return err
+	}
+	if files.RootDir != "" {
+		stackName := req.Stack.Name
+		dataDir := req.DataDir
+		rb.push(func() { _ = RemoveStackFiles(dataDir, stackName) })
+	}
+
+	// 2. Top-level networks (incl. the implicit <project>_default).
 	netNames, err := ensureNetworks(ctx, req, rb)
 	if err != nil {
 		rb.run()
 		return err
 	}
 
-	// 2. Top-level volumes.
+	// 3. Top-level volumes.
 	if err := ensureVolumes(ctx, req, rb); err != nil {
 		rb.run()
 		return err
 	}
 
-	// 3. Pull images (parallel).
+	// 4. Pull images (parallel).
 	if err := pullImages(ctx, req); err != nil {
 		rb.run()
 		return err
 	}
 
-	// 4. Start containers by topological layer. Map of service → container id
+	// 5. Start containers by topological layer. Map of service → container id
 	// so network_mode: service:<x> can be rewritten to container:<id>.
 	started := make(map[string]string, len(p.Services))
 	var startedMu sync.Mutex
+	req.Files = files
 
 	for _, layer := range topo.Layers {
 		if err := startLayer(ctx, req, layer, netNames, started, &startedMu, rb); err != nil {
@@ -450,6 +468,20 @@ func startLayer(
 			if err != nil {
 				results <- result{service: name, err: err}
 				return
+			}
+			// Append config/secret bind mounts. TranslateService stays
+			// files-ignorant so it can be used in tests without a disk.
+			if req.Files != nil {
+				for _, ref := range svc.Configs {
+					if spec := ConfigMountSpec(req.Files, ref); spec != "" {
+						cfg.Volumes = append(cfg.Volumes, spec)
+					}
+				}
+				for _, ref := range svc.Secrets {
+					if spec := SecretMountSpec(req.Files, ref); spec != "" {
+						cfg.Volumes = append(cfg.Volumes, spec)
+					}
+				}
 			}
 			// Resolve network_mode: service:<x> → container:<id>.
 			if target, ok := serviceNetworkMode(svc.NetworkMode); ok {
