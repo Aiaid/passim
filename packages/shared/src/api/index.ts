@@ -260,8 +260,22 @@ export function createApi(request: <T>(path: string, options?: RequestInit) => P
       }),
     getStacks: () => request<{ stacks: Stack[] }>('/stacks'),
     getStack: (id: string) => request<Stack>(`/stacks/${id}`),
-    deleteStack: (id: string) =>
-      request<{ stack_id: string; task_id: string }>(`/stacks/${id}`, { method: 'DELETE' }),
+    updateStack: (id: string, data: { name: string; yaml_text: string; env_text?: string; profiles?: string[] }) =>
+      request<{ stack_id: string; task_id: string }>(`/stacks/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    deleteStack: (id: string, keepVolumes = false) =>
+      request<{ stack_id: string; task_id: string }>(
+        `/stacks/${id}${keepVolumes ? '?keep_volumes=true' : ''}`,
+        { method: 'DELETE' },
+      ),
+    stackUp: (id: string) =>
+      request<{ stack_id: string; task_id: string }>(`/stacks/${id}/up`, { method: 'POST' }),
+    stackDown: (id: string) =>
+      request<{ stack_id: string; task_id: string }>(`/stacks/${id}/down`, { method: 'POST' }),
+    stackRestart: (id: string) =>
+      request<{ stack_id: string; task_id: string }>(`/stacks/${id}/restart`, { method: 'POST' }),
   };
 }
 

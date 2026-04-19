@@ -51,9 +51,28 @@ export function useCreateStack(nodeId: string) {
 export function useDeleteStack(nodeId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => getNodeApi(nodeId).deleteStack(id),
+    mutationFn: ({ id, keepVolumes }: { id: string; keepVolumes?: boolean }) =>
+      getNodeApi(nodeId).deleteStack(id, keepVolumes ?? false),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.stacks(nodeId) });
+    },
+  });
+}
+
+export function useStackAction(nodeId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string; action: 'up' | 'down' | 'restart' }) => {
+      const api = getNodeApi(nodeId);
+      switch (action) {
+        case 'up':      return api.stackUp(id);
+        case 'down':    return api.stackDown(id);
+        case 'restart': return api.stackRestart(id);
+      }
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.stacks(nodeId) });
+      qc.invalidateQueries({ queryKey: qk.stack(nodeId, vars.id) });
     },
   });
 }

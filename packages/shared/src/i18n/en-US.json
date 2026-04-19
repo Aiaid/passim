@@ -34,6 +34,13 @@
     "delete_queued": "Queued for teardown",
     "delete_confirm_title": "Delete stack?",
     "delete_confirm_desc": "All containers for {{name}} will be stopped and removed. This cannot be undone.",
+    "services": "Services",
+    "action_up": "Up",
+    "action_down": "Down",
+    "action_restart": "Restart",
+    "up_queued": "Queued for up",
+    "down_queued": "Queued for down",
+    "restart_queued": "Queued for restart",
     "error": {
       "stack.invalid_name": "Invalid name; only lowercase letters, digits, - and _ are allowed",
       "stack.name_taken": "A stack with this name already exists",

@@ -307,6 +307,16 @@ export interface MetricsCapability {
 // Stacks (docker compose)
 export type StackStatus = 'stopped' | 'deploying' | 'running' | 'error' | 'tearing_down';
 
+export interface StackService {
+  name: string;
+  image?: string;
+  container_id?: string;
+  state?: string;   // running / exited / ...
+  status?: string;  // "Up 30 seconds (healthy)"
+  health?: string;  // healthy / unhealthy / starting / ""
+  ports?: string[];
+}
+
 export interface Stack {
   id: string;
   name: string;
@@ -317,6 +327,8 @@ export interface Stack {
   last_error?: string;
   created_at: string;
   updated_at: string;
+  /** Populated only by GET /api/stacks/:id, not by list. */
+  services?: StackService[];
 }
 
 export interface StackWarning {
