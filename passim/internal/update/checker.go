@@ -22,6 +22,14 @@ type GitHubRelease struct {
 	Draft       bool      `json:"draft"`
 }
 
+// CompareResult represents a GitHub compare API response (subset).
+// Status is one of "ahead", "behind", "identical", "diverged".
+type CompareResult struct {
+	Status   string `json:"status"`
+	AheadBy  int    `json:"ahead_by"`
+	BehindBy int    `json:"behind_by"`
+}
+
 // UpdateInfo is the result of a version check.
 type UpdateInfo struct {
 	Current     string `json:"current"`
@@ -35,6 +43,7 @@ type UpdateInfo struct {
 // Checker periodically checks for new versions.
 type Checker struct {
 	repo       string // "owner/repo"
+	apiBase    string // GitHub API base URL (overridable for tests)
 	httpClient *http.Client
 
 	mu     sync.RWMutex
@@ -44,7 +53,8 @@ type Checker struct {
 // NewChecker creates a version checker for the given GitHub repo (e.g. "aiaid/passim").
 func NewChecker(repo string) *Checker {
 	return &Checker{
-		repo: repo,
+		repo:    repo,
+		apiBase: "https://api.github.com",
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -68,7 +78,7 @@ func (c *Checker) check(ctx context.Context, includePrerelease bool) (*UpdateInf
 
 	if includePrerelease {
 		// Use /releases to get all releases including prereleases
-		url := fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=10", c.repo)
+		url := fmt.Sprintf("%s/repos/%s/releases?per_page=10", c.apiBase, c.repo)
 		r, err := c.fetchRelease(ctx, url)
 		if err != nil {
 			return nil, err
@@ -76,7 +86,7 @@ func (c *Checker) check(ctx context.Context, includePrerelease bool) (*UpdateInf
 		release = r
 	} else {
 		// Use /releases/latest for stable only
-		url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", c.repo)
+		url := fmt.Sprintf("%s/repos/%s/releases/latest", c.apiBase, c.repo)
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return nil, fmt.Errorf("create request: %w", err)
@@ -113,10 +123,18 @@ func (c *Checker) check(ctx context.Context, includePrerelease bool) (*UpdateInf
 	}
 
 	latest := release.TagName
+
+	// For non-semver (dev) builds, query the compare API to decide whether
+	// the running commit is actually behind the release tag.
+	var cmp *CompareResult
+	if !isSemver(strings.TrimPrefix(version.Version, "v")) {
+		cmp, _ = c.compareWithRelease(ctx, latest, version.Commit) // best-effort
+	}
+
 	info := &UpdateInfo{
 		Current:     version.Version,
 		Latest:      latest,
-		Available:   isNewerOrDev(version.Version, latest),
+		Available:   decideAvailable(version.Version, latest, cmp),
 		Changelog:   release.Body,
 		PublishedAt: release.PublishedAt.Format(time.RFC3339),
 		Prerelease:  release.Prerelease,
@@ -201,16 +219,57 @@ func (c *Checker) StartBackground(ctx context.Context, interval time.Duration) {
 	}()
 }
 
-// isNewerOrDev returns true if latest is newer than current,
-// or if current is a non-semver build (e.g. "dev") and latest differs.
-func isNewerOrDev(current, latest string) bool {
+// decideAvailable computes UpdateInfo.Available given the current version,
+// the latest release tag, and an optional compare result for non-semver
+// (dev) builds.
+//
+//   - Current is semver: pure version comparison (isNewer).
+//   - Current is non-semver and cmp is non-nil: use cmp.BehindBy
+//     (>0 means the release tag has commits the running build does not).
+//   - Current is non-semver and cmp is nil (API failed / unknown commit):
+//     fall back to "any valid release is considered available".
+func decideAvailable(current, latest string, cmp *CompareResult) bool {
 	curRaw := strings.TrimPrefix(current, "v")
-	if !isSemver(curRaw) {
-		// Dev/unknown build — any valid release is considered available
-		latRaw := strings.TrimPrefix(latest, "v")
-		return isSemver(latRaw)
+	if isSemver(curRaw) {
+		return isNewer(current, latest)
 	}
-	return isNewer(current, latest)
+	if cmp != nil {
+		return cmp.BehindBy > 0
+	}
+	latRaw := strings.TrimPrefix(latest, "v")
+	return isSemver(latRaw)
+}
+
+// compareWithRelease queries GitHub compare API to learn whether headSHA is
+// behind, ahead of, or identical to the given release tag. Returns nil on
+// any failure so the caller can fall back to the heuristic.
+func (c *Checker) compareWithRelease(ctx context.Context, baseTag, headSHA string) (*CompareResult, error) {
+	if headSHA == "" || headSHA == "unknown" || len(headSHA) < 7 {
+		return nil, fmt.Errorf("commit sha unavailable")
+	}
+	url := fmt.Sprintf("%s/repos/%s/compare/%s...%s", c.apiBase, c.repo, baseTag, headSHA)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "passim/"+version.Version)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github compare api returned %d", resp.StatusCode)
+	}
+
+	var cmp CompareResult
+	if err := json.NewDecoder(resp.Body).Decode(&cmp); err != nil {
+		return nil, err
+	}
+	return &cmp, nil
 }
 
 // isNewer returns true if latest is a newer semver than current.

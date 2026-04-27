@@ -36,6 +36,97 @@ func TestIsNewer(t *testing.T) {
 	}
 }
 
+func TestDecideAvailable(t *testing.T) {
+	tests := []struct {
+		name            string
+		current, latest string
+		cmp             *CompareResult
+		want            bool
+	}{
+		{"semver behind", "v1.0.0", "v1.1.0", nil, true},
+		{"semver same", "v1.1.0", "v1.1.0", nil, false},
+		{"semver ahead", "v2.0.0", "v1.9.9", nil, false},
+		{"semver ignores cmp", "v1.0.0", "v1.0.0", &CompareResult{Status: "behind", BehindBy: 5}, false},
+		{"dev compare behind", "dev", "v1.0.0", &CompareResult{Status: "behind", BehindBy: 3}, true},
+		{"dev compare diverged", "dev-abc1234", "v1.0.0", &CompareResult{Status: "diverged", BehindBy: 2, AheadBy: 4}, true},
+		{"dev compare ahead", "dev", "v1.0.0", &CompareResult{Status: "ahead", AheadBy: 5, BehindBy: 0}, false},
+		{"dev compare identical", "dev", "v1.0.0", &CompareResult{Status: "identical", BehindBy: 0}, false},
+		{"dev fallback any release", "dev", "v1.0.0", nil, true},
+		{"dev fallback non-semver latest", "dev", "weird", nil, false},
+		{"unknown fallback", "unknown", "v1.0.0", nil, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := decideAvailable(tt.current, tt.latest, tt.cmp)
+			if got != tt.want {
+				t.Errorf("decideAvailable(%q, %q, %+v) = %v, want %v",
+					tt.current, tt.latest, tt.cmp, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompareWithRelease(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		want := "/repos/test/repo/compare/v1.0.0...abcdef0123456789abcdef0123456789abcdef01"
+		if r.URL.Path != want {
+			http.Error(w, "unexpected path: "+r.URL.Path, http.StatusBadRequest)
+			return
+		}
+		json.NewEncoder(w).Encode(CompareResult{Status: "behind", BehindBy: 7, AheadBy: 0})
+	}))
+	defer srv.Close()
+
+	c := &Checker{
+		repo:       "test/repo",
+		apiBase:    srv.URL,
+		httpClient: srv.Client(),
+	}
+
+	cmp, err := c.compareWithRelease(context.Background(), "v1.0.0", "abcdef0123456789abcdef0123456789abcdef01")
+	if err != nil {
+		t.Fatalf("compareWithRelease failed: %v", err)
+	}
+	if cmp == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if cmp.Status != "behind" || cmp.BehindBy != 7 {
+		t.Errorf("unexpected result: %+v", cmp)
+	}
+}
+
+func TestCompareWithRelease_ShortOrUnknownSHASkips(t *testing.T) {
+	c := &Checker{repo: "test/repo", apiBase: "http://example.invalid", httpClient: &http.Client{Timeout: time.Second}}
+
+	cases := []string{"", "unknown", "abc12"}
+	for _, sha := range cases {
+		cmp, err := c.compareWithRelease(context.Background(), "v1.0.0", sha)
+		if err == nil {
+			t.Errorf("expected error for sha=%q, got nil (cmp=%+v)", sha, cmp)
+		}
+		if cmp != nil {
+			t.Errorf("expected nil result for sha=%q, got %+v", sha, cmp)
+		}
+	}
+}
+
+func TestCompareWithRelease_HTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := &Checker{repo: "test/repo", apiBase: srv.URL, httpClient: srv.Client()}
+	cmp, err := c.compareWithRelease(context.Background(), "v1.0.0", "abcdef0123456789abcdef0123456789abcdef01")
+	if err == nil {
+		t.Error("expected error on 404")
+	}
+	if cmp != nil {
+		t.Errorf("expected nil result, got %+v", cmp)
+	}
+}
+
 func TestNormalizeVersion(t *testing.T) {
 	tests := []struct {
 		input, want string

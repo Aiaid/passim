@@ -120,7 +120,7 @@ export function UpdateSettings() {
             <div className="flex items-center justify-between">
               <Label className="text-base">{t('settings.commit')}</Label>
               <span className="text-sm font-mono text-muted-foreground">
-                {versionInfo.commit}
+                {versionInfo.commit.slice(0, 7)}
               </span>
             </div>
           )}

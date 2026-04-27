@@ -407,6 +407,32 @@ GET /api/version/check → {
 
 检测频率: 启动后立即检查，之后每 24 小时检查一次。
 
+### 版本对比规则
+
+`available` 字段的判定分两种情况：
+
+**1. 当前是正式 semver（如 `v1.2.3`）** — 解析三段，逐位比较 major/minor/patch；同基线版本下"无预发布 > 有预发布"。纯字符串/整数比较，不需要外部 API。
+
+**2. 当前是 dev 构建**（`dev`、`unknown`、`dev-<sha>`）— 调用 GitHub compare API：
+
+```
+GET https://api.github.com/repos/{owner}/passim/compare/{latestTag}...{currentSHA}
+```
+
+依据响应 `status` + `behind_by` 字段判定：
+
+| 响应 | 含义 | available |
+|------|------|-----------|
+| `behind`（behind_by > 0） | 当前 commit 落后于 release tag | `true` |
+| `diverged`（behind_by > 0） | 双方各有提交（feature 分支） | `true` |
+| `ahead` | dev 比 release 更新 | `false` |
+| `identical` | 同一 commit | `false` |
+| API 失败 / commit 为 `unknown` | 无法判定 | 回退：任何 release 都视为 `true` |
+
+为支持此对比，**Dockerfile 必须把完整 40 字符 SHA 注入 `version.Commit`**（不再截断为 7 位）。CI 已经通过 `COMMIT=${{ github.sha }}` 传 full SHA。前端展示时自行截短到前 7 位。
+
+调用频率与 release 检查共用 24h 缓存，避免 GitHub API 限流（匿名 60 req/h/IP）。
+
 ### 更新流程
 
 ```

@@ -454,7 +454,7 @@ export default function SettingsScreen() {
 
         <SettingsSection title={t('settings.system')}>
           <SettingsRow testID="setting-version" label={t('settings.current_version')} value={version?.version ?? '--'} />
-          <SettingsRow label={t('settings.commit')} value={version?.commit ?? '--'} />
+          <SettingsRow label={t('settings.commit')} value={version?.commit?.slice(0, 7) ?? '--'} />
           <SettingsRow
             testID="btn-check-updates"
             label={t('settings.check_update')}

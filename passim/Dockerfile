@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     SHORT_VERSION=$(echo "${VERSION}" | sed "s/dev-.\{40\}/dev-${SHORT_COMMIT}/") && \
     cd passim && CGO_ENABLED=1 go build \
       -ldflags "-X github.com/passim/passim/internal/version.Version=${SHORT_VERSION} \
-                -X github.com/passim/passim/internal/version.Commit=${SHORT_COMMIT} \
+                -X github.com/passim/passim/internal/version.Commit=${COMMIT} \
                 -X github.com/passim/passim/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       -o /passim ./cmd/passim/
 
