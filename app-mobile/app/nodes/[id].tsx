@@ -50,6 +50,8 @@ export default function NodeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const node = useNodeStore((s) => s.nodes.find((n) => n.id === id));
+  const hubNode = useNodeStore((s) => s.hubNode);
+  const isHub = !!hubNode && hubNode.id === id;
   const removeNode = useNodeStore((s) => s.removeNode);
   const { getNodeSSE } = useMultiNodeSSE();
   const sse = getNodeSSE(id);
@@ -279,6 +281,22 @@ export default function NodeDetailScreen() {
                 ))}
               </View>
             </>
+          ) : null}
+
+          {/* Invite — Hub only (only the locally-connected Hub can mint invites) */}
+          {isHub ? (
+            <Pressable
+              testID="btn-invite-node"
+              className="bg-gray-900 rounded-xl py-4 items-center active:opacity-70 mt-4"
+              onPress={() => router.push('/nodes/invite')}
+            >
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="person-add-outline" size={18} color="#30d158" />
+                <Text className="text-white font-semibold">
+                  {t('node.invite.entry')}
+                </Text>
+              </View>
+            </Pressable>
           ) : null}
 
           {/* Remove Button */}

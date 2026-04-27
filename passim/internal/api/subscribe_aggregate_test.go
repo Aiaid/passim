@@ -26,6 +26,9 @@ type proxyResponse struct {
 func (m *pathAwareMockHub) AddNode(_ context.Context, _, _, _ string, _ bool) (*node.NodeInfo, error) {
 	return nil, nil
 }
+func (m *pathAwareMockHub) AddNodeFromInvite(_ context.Context, _, _, _ string, _ bool) (*node.NodeInfo, error) {
+	return nil, nil
+}
 func (m *pathAwareMockHub) RemoveNode(_ string) error    { return nil }
 func (m *pathAwareMockHub) UpdateNode(_, _ string) error  { return nil }
 func (m *pathAwareMockHub) GetNode(_ string) (*node.NodeInfo, error) { return nil, nil }

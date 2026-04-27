@@ -31,7 +31,7 @@ func testDB(t *testing.T) *sql.DB {
 func TestInitFirstTime(t *testing.T) {
 	database := testDB(t)
 
-	if err := Init(database); err != nil {
+	if _, err := Init(database); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,17 +56,25 @@ func TestInitFirstTime(t *testing.T) {
 func TestInitIdempotent(t *testing.T) {
 	database := testDB(t)
 
-	if err := Init(database); err != nil {
+	plain, err := Init(database)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if plain == "" {
+		t.Fatal("expected plaintext on first init")
 	}
 
 	// Capture values after first init
 	nodeID, _ := db.GetConfig(database, "node_id")
 	hash, _ := db.GetConfig(database, "api_key_hash")
 
-	// Run again — should be no-op
-	if err := Init(database); err != nil {
+	// Run again — should be no-op and return empty plaintext
+	plain2, err := Init(database)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if plain2 != "" {
+		t.Fatal("expected empty plaintext on second init")
 	}
 
 	nodeID2, _ := db.GetConfig(database, "node_id")
@@ -84,8 +92,12 @@ func TestInitWithAPIKeyEnv(t *testing.T) {
 	t.Setenv("API_KEY", "my-custom-key")
 
 	database := testDB(t)
-	if err := Init(database); err != nil {
+	plain, err := Init(database)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if plain != "my-custom-key" {
+		t.Fatalf("expected plain to be env key, got %q", plain)
 	}
 
 	hash, _ := db.GetConfig(database, "api_key_hash")

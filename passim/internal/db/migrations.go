@@ -125,6 +125,14 @@ var migrations = []string{
 		created_at TEXT DEFAULT (datetime('now')),
 		updated_at TEXT DEFAULT (datetime('now'))
 	)`,
+
+	`CREATE TABLE IF NOT EXISTS invite_tokens (
+		token      TEXT PRIMARY KEY,
+		note       TEXT NOT NULL DEFAULT '',
+		expires_at INTEGER NOT NULL,
+		created_at INTEGER NOT NULL,
+		revoked_at INTEGER
+	)`,
 }
 
 // alterColumns are idempotent column additions for existing tables.

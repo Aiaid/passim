@@ -245,6 +245,16 @@ export const api = {
   getConnections: () => request<ConnectionInfo[]>('/connections'),
   disconnect: (id: string) => request<void>(`/connections/${id}`, { method: 'DELETE' }),
 
+  // Cluster invites
+  createInvite: (data?: { note?: string; ttl_seconds?: number }) =>
+    request<InviteCreateResponse>('/cluster/invites', {
+      method: 'POST',
+      body: JSON.stringify(data ?? {}),
+    }),
+  listInvites: () => request<InviteToken[]>('/cluster/invites'),
+  revokeInvite: (token: string) =>
+    request<{ status: string }>(`/cluster/invites/${token}`, { method: 'DELETE' }),
+
   // Stacks (docker compose)
   validateStack: (data: { name: string; yaml_text: string; env_text?: string; profiles?: string[] }) =>
     request<StackValidateResponse>('/stacks/validate', { method: 'POST', body: JSON.stringify(data) }),
@@ -492,6 +502,20 @@ export interface ConnectionInfo {
   id: string;
   remote_ip: string;
   connected_at: string;
+}
+
+export interface InviteToken {
+  token: string;
+  note: string;
+  expires_at: number;
+  created_at: number;
+  revoked_at?: number | null;
+}
+
+export interface InviteCreateResponse extends InviteToken {
+  hub_address: string;
+  install_cmd: string;
+  docker_cmd: string;
 }
 
 // Stack status values map 1:1 with backend stack.StatusXxx constants.

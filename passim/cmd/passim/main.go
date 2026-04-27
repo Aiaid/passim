@@ -63,8 +63,11 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	// First-time setup: generate node_id, API Key, JWT secret
-	if err := setup.Init(database); err != nil {
+	// First-time setup: generate node_id, API Key, JWT secret.
+	// firstBootAPIKey is non-empty only on the first run — it's needed by
+	// MaybeJoinHub so the hub can call back into us.
+	firstBootAPIKey, err := setup.Init(database)
+	if err != nil {
 		log.Fatalf("failed to initialise: %v", err)
 	}
 
@@ -362,6 +365,11 @@ func main() {
 	updateCtx, updateCancel := context.WithCancel(context.Background())
 	defer updateCancel()
 	checker.StartBackground(updateCtx, 24*time.Hour)
+
+	// If the operator launched this node with INVITE/HUB env vars, register
+	// with the hub in the background. Runs only on first boot (when Init
+	// returned a plaintext key); subsequent boots skip silently.
+	setup.MaybeJoinHub(updateCtx, database, sslMgr, getEnvDefault("PORT", "8443"), firstBootAPIKey)
 
 	// Stop all metrics pollers on shutdown
 	if metricsCollector != nil {

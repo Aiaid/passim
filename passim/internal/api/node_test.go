@@ -50,6 +50,10 @@ func (m *mockNodeHub) AddNode(_ context.Context, address, apiKey, name string, _
 	return info, nil
 }
 
+func (m *mockNodeHub) AddNodeFromInvite(ctx context.Context, address, apiKey, name string, skipTLS bool) (*node.NodeInfo, error) {
+	return m.AddNode(ctx, address, apiKey, name, skipTLS)
+}
+
 func (m *mockNodeHub) RemoveNode(id string) error {
 	if _, ok := m.nodes[id]; !ok {
 		return fmt.Errorf("node %s not found", id)

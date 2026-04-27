@@ -92,6 +92,9 @@ func NewRouter(deps Deps) http.Handler {
 		// Public speedtest routes (no auth)
 		registerSpeedtestPublicRoutes(api)
 
+		// Cluster join — invite token in body is the auth.
+		api.POST("/cluster/join", joinClusterHandler(deps))
+
 		// Internal routes — no JWT auth, rate limited (container auth callbacks)
 		internal := api.Group("/internal", authRateLimitMiddleware())
 		{
@@ -171,6 +174,11 @@ func NewRouter(deps Deps) http.Handler {
 
 			// Unified SSE stream (replaces metrics/stream + polling)
 			protected.GET("/stream", unifiedStreamHandler(deps))
+
+			// Cluster invites (creating/listing/revoking — under JWT)
+			protected.POST("/cluster/invites", createInviteHandler(deps))
+			protected.GET("/cluster/invites", listInvitesHandler(deps))
+			protected.DELETE("/cluster/invites/:token", revokeInviteHandler(deps))
 
 			// Node management
 			protected.POST("/nodes", addNodeHandler(deps))

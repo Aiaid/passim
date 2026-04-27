@@ -114,6 +114,45 @@ export function useConnections() {
   });
 }
 
+export function useListInvites() {
+  return useQuery({
+    queryKey: ['cluster', 'invites'],
+    queryFn: () => api.listInvites(),
+  });
+}
+
+export function useCreateInvite() {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  return useMutation({
+    mutationFn: (data?: { note?: string; ttl_seconds?: number }) =>
+      api.createInvite(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cluster', 'invites'] });
+    },
+    onError: (error) => {
+      toast.error(error.message || t('common.error'));
+    },
+  });
+}
+
+export function useRevokeInvite() {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  return useMutation({
+    mutationFn: (token: string) => api.revokeInvite(token),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cluster', 'invites'] });
+      toast.success(t('node.invite.revoke'));
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
 export function useDisconnect() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();

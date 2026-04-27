@@ -13,24 +13,24 @@ import (
 
 // Init checks if this is a first-time startup. If so, it generates
 // node_id, API Key, JWT secret and auth_version=1. It prints the
-// plaintext API key to stdout (only time it's visible).
-// On subsequent starts it is a no-op.
-func Init(database *sql.DB) error {
+// plaintext API key to stdout (only time it's visible) and returns it
+// so callers (e.g. MaybeJoinHub) can use it before it's discarded.
+//
+// On subsequent starts the plaintext is empty (it is never persisted).
+func Init(database *sql.DB) (string, error) {
 	existing, err := db.GetConfig(database, "node_id")
 	if err != nil {
-		return fmt.Errorf("check node_id: %w", err)
+		return "", fmt.Errorf("check node_id: %w", err)
 	}
 	if existing != "" {
-		return nil // already initialised
+		return "", nil
 	}
 
-	// Generate node ID
 	nodeID := uuid.New().String()
 	if err := db.SetConfig(database, "node_id", nodeID); err != nil {
-		return err
+		return "", err
 	}
 
-	// Generate API Key — use API_KEY env var if set, otherwise generate random
 	var plain string
 	if envKey := os.Getenv("API_KEY"); envKey != "" {
 		plain = envKey
@@ -38,26 +38,24 @@ func Init(database *sql.DB) error {
 		var err error
 		plain, _, err = auth.GenerateAPIKey()
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 	hash := auth.HashAPIKey(plain)
 	if err := db.SetConfig(database, "api_key_hash", hash); err != nil {
-		return err
+		return "", err
 	}
 
-	// Generate JWT secret
 	secret, err := auth.GenerateSecret()
 	if err != nil {
-		return err
+		return "", err
 	}
 	if err := db.SetConfig(database, "jwt_secret", secret); err != nil {
-		return err
+		return "", err
 	}
 
-	// Initialise auth version
 	if err := db.SetConfig(database, "auth_version", "1"); err != nil {
-		return err
+		return "", err
 	}
 
 	log.Println("=== First-time setup complete ===")
@@ -65,5 +63,5 @@ func Init(database *sql.DB) error {
 	log.Printf("API Key : %s", plain)
 	log.Println("Save this API Key — it will not be shown again.")
 
-	return nil
+	return plain, nil
 }

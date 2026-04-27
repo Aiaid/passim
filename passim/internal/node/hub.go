@@ -202,12 +202,23 @@ func isTLSError(err error) bool {
 
 // AddNode registers a new remote node and starts connecting to it.
 func (h *Hub) AddNode(ctx context.Context, address, apiKey, name string, skipTLSVerify bool) (*NodeInfo, error) {
-	// Reject addresses that resolve to private/internal IPs (SSRF protection)
-	if err := h.validateAddress(address); err != nil {
-		return nil, fmt.Errorf("invalid node address: %w", err)
+	return h.addNode(ctx, address, apiKey, name, skipTLSVerify, true)
+}
+
+// AddNodeFromInvite registers a node that joined via invite token. The token
+// itself is the authorization, so SSRF validation is skipped — LAN/private
+// addresses are allowed (a common case for personal-cloud deployments).
+func (h *Hub) AddNodeFromInvite(ctx context.Context, address, apiKey, name string, skipTLSVerify bool) (*NodeInfo, error) {
+	return h.addNode(ctx, address, apiKey, name, skipTLSVerify, false)
+}
+
+func (h *Hub) addNode(ctx context.Context, address, apiKey, name string, skipTLSVerify, ssrfCheck bool) (*NodeInfo, error) {
+	if ssrfCheck {
+		if err := h.validateAddress(address); err != nil {
+			return nil, fmt.Errorf("invalid node address: %w", err)
+		}
 	}
 
-	// Validate by calling GET /api/status on the remote
 	client := nodeHTTPClient(skipTLSVerify)
 
 	// First, authenticate to get a token (auto-detects HTTPS vs HTTP)

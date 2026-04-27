@@ -404,7 +404,26 @@
     "select_targets": "Select target nodes",
     "this_server": "This Server",
     "batch_deploy": "Deploy to All",
-    "last_seen": "Last Seen"
+    "last_seen": "Last Seen",
+    "invite": {
+      "title": "Invite Node",
+      "description": "Run the command below on the new machine to auto-join this Hub",
+      "tab": {
+        "shell": "Shell",
+        "docker": "Docker",
+        "mobile": "Mobile"
+      },
+      "copy": "Copy",
+      "copied": "Copied",
+      "regenerate": "Regenerate",
+      "expires_in": "expires in {{time}}",
+      "hub_address": "Hub address",
+      "active_count": "{{count}} active invites",
+      "revoke": "Revoke",
+      "mobile_hint": "Run this command on the new machine",
+      "no_active": "No active invites",
+      "creating": "Creating invite..."
+    }
   },
   "connection": {
     "title": "Inbound Connections",

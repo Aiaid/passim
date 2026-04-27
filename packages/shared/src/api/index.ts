@@ -13,6 +13,8 @@ import type {
   PairingInfo,
   RemoteNode,
   ConnectionInfo,
+  InviteToken,
+  InviteCreateResponse,
   PublicKeyCredentialRequestOptionsJSON,
   PublicKeyCredentialCreationOptionsJSON,
   AppUser,
@@ -227,6 +229,16 @@ export function createApi(request: <T>(path: string, options?: RequestInit) => P
     // Connections
     getConnections: () => request<ConnectionInfo[]>('/connections'),
     disconnect: (id: string) => request<void>(`/connections/${id}`, { method: 'DELETE' }),
+
+    // Cluster invites (Hub-side: mint / list / revoke join tokens)
+    createInvite: (data?: { note?: string; ttl_seconds?: number }) =>
+      request<InviteCreateResponse>('/cluster/invites', {
+        method: 'POST',
+        body: JSON.stringify(data ?? {}),
+      }),
+    listInvites: () => request<InviteToken[]>('/cluster/invites'),
+    revokeInvite: (token: string) =>
+      request<{ status: string }>(`/cluster/invites/${token}`, { method: 'DELETE' }),
 
     // Push notifications (mobile only, but defined here for type safety)
     registerPush: (token: string, device: string, platform: string) =>

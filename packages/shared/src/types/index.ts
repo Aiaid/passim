@@ -221,6 +221,21 @@ export interface ConnectionInfo {
   connected_at: string;
 }
 
+// Cluster invite (one-shot token to enroll a new node into the Hub).
+export interface InviteToken {
+  token: string;
+  note: string;
+  expires_at: number;   // unix seconds
+  created_at: number;   // unix seconds
+  revoked_at?: number | null;
+}
+
+export interface InviteCreateResponse extends InviteToken {
+  hub_address: string;
+  install_cmd: string;
+  docker_cmd: string;
+}
+
 export interface PublicKeyCredentialCreationOptionsJSON {
   rp: { name: string; id: string };
   user: { id: string; name: string; displayName: string };

@@ -19,6 +19,7 @@ import (
 // Implemented by *node.Hub.
 type NodeHub interface {
 	AddNode(ctx context.Context, address, apiKey, name string, skipTLSVerify bool) (*node.NodeInfo, error)
+	AddNodeFromInvite(ctx context.Context, address, apiKey, name string, skipTLSVerify bool) (*node.NodeInfo, error)
 	RemoveNode(id string) error
 	UpdateNode(id, name string) error
 	ListNodes() []node.NodeInfo
