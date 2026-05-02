@@ -39,10 +39,26 @@ type Guide struct {
 }
 
 type GuidePlatform struct {
-	Name        string   `yaml:"name"`
-	StoreURL    string   `yaml:"store_url,omitempty"`
-	DownloadURL string   `yaml:"download_url,omitempty"`
-	Steps       []string `yaml:"steps"`
+	Name        string            `yaml:"name"`
+	StoreURL    string            `yaml:"store_url,omitempty"`
+	DownloadURL string            `yaml:"download_url,omitempty"`
+	Steps       []string          `yaml:"steps,omitempty"`         // legacy, single-app flat steps
+	Clients     []GuideClient     `yaml:"clients,omitempty"`       // preferred: multiple apps per platform
+	Notes       map[string]string `yaml:"notes,omitempty"`         // localized tips/warnings
+}
+
+// GuideClient is a recommended client app for a given platform.
+// Steps are localized: map[locale][]string. The UI falls back across locales.
+type GuideClient struct {
+	Name        string              `yaml:"name"`
+	StoreURL    string              `yaml:"store_url,omitempty"`    // App Store / Play Store
+	DownloadURL string              `yaml:"download_url,omitempty"` // direct download (e.g. GitHub release)
+	HomepageURL string              `yaml:"homepage_url,omitempty"` // project homepage
+	Recommended bool                `yaml:"recommended,omitempty"`  // mark as the suggested default
+	Paid        bool                `yaml:"paid,omitempty"`         // costs money (e.g. Stash, Surge)
+	Builtin     bool                `yaml:"builtin,omitempty"`      // already in OS, no install needed
+	Steps       map[string][]string `yaml:"steps,omitempty"`        // map[locale][]step
+	Note        map[string]string   `yaml:"note,omitempty"`         // optional per-client tip
 }
 
 type Setting struct {

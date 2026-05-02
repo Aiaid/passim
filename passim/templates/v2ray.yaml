@@ -95,18 +95,80 @@ guide:
     zh-CN: "使用服务器地址、端口和 UUID 配置 V2Ray 客户端。协议：VMess，alterId：0。"
   platforms:
     - name: iOS
-      steps:
-        - "Install Shadowrocket"
-        - "Scan the QR code to import"
+      notes:
+        en-US: "iOS V2Ray clients are mostly paid; there is no widely-trusted free option on the App Store."
+        zh-CN: "iOS 上 V2Ray 客户端基本都是付费应用，App Store 没有广泛认可的免费版。"
+      clients:
+        - name: Shadowrocket
+          recommended: true
+          paid: true
+          homepage_url: https://shadowrocket.cloud/
+          store_url: https://apps.apple.com/app/shadowrocket/id932747118
+          steps:
+            en-US:
+              - "Buy and install Shadowrocket from the App Store."
+              - "Tap '+' at the top right of the home screen."
+              - "Choose 'Type: VMess'. Tap the QR icon to scan the code shown above, or paste the connection URL."
+              - "Back on the home screen, toggle the connection on. iOS will request VPN permission the first time."
+            zh-CN:
+              - "在 App Store 购买并安装 Shadowrocket。"
+              - "在首页点击右上角 '+'。"
+              - "类型选 VMess。点二维码图标扫描上方二维码，或直接粘贴连接链接。"
+              - "返回首页打开顶部开关。第一次会请求 VPN 权限。"
     - name: Android
-      steps:
-        - "Install v2rayNG"
-        - "Scan the QR code or paste the link"
+      clients:
+        - name: v2rayNG
+          recommended: true
+          homepage_url: https://github.com/2dust/v2rayNG
+          download_url: https://github.com/2dust/v2rayNG/releases
+          steps:
+            en-US:
+              - "Download the latest v2rayNG APK from GitHub Releases (link above) and install it. You may need to allow installation from unknown sources."
+              - "Open v2rayNG and tap '+' at the top right."
+              - "Choose 'Import config from clipboard' (after copying the URL above) or 'Scan QR code'."
+              - "Tap and hold the imported profile, choose 'Set as active config'."
+              - "Tap the V-shaped icon at the bottom right to connect."
+            zh-CN:
+              - "从上方 GitHub Releases 下载最新版 v2rayNG APK 并安装（可能需要允许安装未知来源 App）。"
+              - "打开 v2rayNG，点击右上角 '+'。"
+              - "选择「从剪贴板导入」（先复制上方链接）或「扫描二维码」。"
+              - "长按导入的配置选「设为活动配置」。"
+              - "点右下角 V 字图标连接。"
     - name: Windows
-      steps:
-        - "Download v2rayN"
-        - "Add VMess server with address, port, UUID, alterId 0"
+      clients:
+        - name: v2rayN
+          recommended: true
+          homepage_url: https://github.com/2dust/v2rayN
+          download_url: https://github.com/2dust/v2rayN/releases
+          steps:
+            en-US:
+              - "Download v2rayN-windows-64.zip from GitHub Releases (link above)."
+              - "Unzip and run v2rayN.exe (no installation needed)."
+              - "Right-click in the server list → 'Add VMess server', then fill in address, port, UUID."
+              - "Or use menu 'Subscriptions → Subscribe settings' to add the subscription URL above."
+              - "Right-click the system tray icon → 'System Proxy → Set system proxy'."
+            zh-CN:
+              - "从上方 GitHub Releases 下载 v2rayN-windows-64.zip。"
+              - "解压后直接运行 v2rayN.exe（免安装）。"
+              - "在服务器列表右键 → 「添加 VMess 服务器」，填入地址、端口、UUID。"
+              - "或用菜单「订阅 → 订阅设置」添加上方订阅链接。"
+              - "右键系统托盘图标 → 「系统代理 → 设置系统代理」。"
     - name: macOS
-      steps:
-        - "Download V2RayXS or Qv2ray"
-        - "Add VMess server with address, port, UUID, alterId 0"
+      clients:
+        - name: V2rayU
+          recommended: true
+          homepage_url: https://github.com/yanue/V2rayU
+          download_url: https://github.com/yanue/V2rayU/releases
+          steps:
+            en-US:
+              - "Download V2rayU.dmg from GitHub Releases (link above)."
+              - "Open the .dmg and drag V2rayU to Applications."
+              - "Launch V2rayU; it lives in the menu bar."
+              - "Menu bar icon → 'Subscribe → Manage' → '+', paste the subscription URL above."
+              - "Menu bar → 'Servers' → pick a server, then 'Turn V2rayU On'."
+            zh-CN:
+              - "从上方 GitHub Releases 下载 V2rayU.dmg。"
+              - "打开 .dmg 把 V2rayU 拖到「应用程序」。"
+              - "启动 V2rayU，会出现在菜单栏。"
+              - "菜单栏图标 → 「Subscribe → Manage」→ '+'，粘贴上方订阅链接。"
+              - "菜单栏 → 「Servers」选一个，然后「Turn V2rayU On」。"

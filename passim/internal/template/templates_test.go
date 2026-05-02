@@ -829,8 +829,18 @@ func TestTemplatesWithPlatformGuides(t *testing.T) {
 					if p.Name == "" {
 						t.Errorf("platforms[%d]: name is empty", i)
 					}
-					if len(p.Steps) == 0 {
-						t.Errorf("platforms[%d] (%s): steps is empty", i, p.Name)
+					// Each platform must teach the user how to connect — either
+					// the legacy flat steps[] or the richer clients[] entries.
+					hasSteps := len(p.Steps) > 0
+					hasClients := false
+					for _, c := range p.Clients {
+						if c.Name != "" && len(c.Steps) > 0 {
+							hasClients = true
+							break
+						}
+					}
+					if !hasSteps && !hasClients {
+						t.Errorf("platforms[%d] (%s): no steps or clients with steps", i, p.Name)
 					}
 				}
 			}

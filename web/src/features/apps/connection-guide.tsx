@@ -55,7 +55,7 @@ export function ConnectionGuide({ template }: ConnectionGuideProps) {
                       )}
                     </div>
                     <ol className="list-decimal list-inside text-xs text-muted-foreground space-y-0.5">
-                      {platform.steps.map((step, i) => (
+                      {(platform.steps ?? []).map((step, i) => (
                         <li key={i}>{step}</li>
                       ))}
                     </ol>

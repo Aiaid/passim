@@ -411,22 +411,30 @@ type shareRemoteGroup struct {
 }
 
 type shareResponse struct {
-	Type         string              `json:"type"`
-	QR           bool                `json:"qr,omitempty"`
-	Files        []clientConfigFile  `json:"files,omitempty"`
-	Fields       []clientConfigField `json:"fields,omitempty"`
-	URLs         []clientConfigURL   `json:"urls,omitempty"`
-	ImportURLs   map[string]string   `json:"import_urls,omitempty"`
-	RemoteGroups []shareRemoteGroup  `json:"remote_groups,omitempty"`
-	Guide        interface{}         `json:"guide,omitempty"`
-	Limitations  []string            `json:"limitations,omitempty"`
+	Type                string              `json:"type"`
+	QR                  bool                `json:"qr,omitempty"`
+	Files               []clientConfigFile  `json:"files,omitempty"`
+	Fields              []clientConfigField `json:"fields,omitempty"`
+	URLs                []clientConfigURL   `json:"urls,omitempty"`
+	ImportURLs          map[string]string   `json:"import_urls,omitempty"`
+	RemoteGroups        []shareRemoteGroup  `json:"remote_groups,omitempty"`
+	Guide               interface{}         `json:"guide,omitempty"`
+	Limitations         []string            `json:"limitations,omitempty"`
+	TemplateName        string              `json:"template_name,omitempty"`
+	TemplateCategory    string              `json:"template_category,omitempty"`
+	TemplateDescription map[string]string   `json:"template_description,omitempty"`
+	TemplateIcon        string              `json:"template_icon,omitempty"`
 }
 
 func buildShareResponse(resolved *clientcfg.ResolvedConfig, t *tmpl.Template) shareResponse {
 	resp := shareResponse{
-		Type:        resolved.Type,
-		QR:          resolved.QR,
-		Limitations: t.Limitations,
+		Type:                resolved.Type,
+		QR:                  resolved.QR,
+		Limitations:         t.Limitations,
+		TemplateName:        t.Name,
+		TemplateCategory:    t.Category,
+		TemplateDescription: t.Description,
+		TemplateIcon:        t.Icon,
 	}
 
 	if t.Guide != nil {

@@ -4,13 +4,135 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Download, QrCode, Copy, Check, FileText, ShieldCheck, Globe,
   ExternalLink, Smartphone, Monitor, AlertTriangle, X,
+  Zap, Lock, Shield, HardDrive, Folder, Terminal,
+  HelpCircle, Sparkles, AppWindow, Star, Lightbulb, BadgeDollarSign, BadgeCheck,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '@/lib/api-client';
-import type { ShareConfigResponse, GuidePlatform } from '@/lib/api-client';
+import type { ShareConfigResponse, GuidePlatform, GuideClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CredentialField } from '@/components/shared/credential-field';
+
+// ─── Locale + plain-language strings ────────────────────
+// Share page is viewed by recipients whose locale we don't know — pick by browser.
+
+type Lang = 'en-US' | 'zh-CN';
+function pickLang(): Lang {
+  if (typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('zh')) {
+    return 'zh-CN';
+  }
+  return 'en-US';
+}
+function pickLocalized(map: Record<string, string> | undefined, lang: Lang): string | undefined {
+  if (!map) return undefined;
+  return map[lang] ?? map['en-US'] ?? Object.values(map)[0];
+}
+
+const STR = {
+  'en-US': {
+    your_connection: 'Your Connection',
+    what_is_this: 'What is this?',
+    what_you_need: 'What you need',
+    what_you_can_do: 'What you can do',
+    install_app_below: 'A small app on your phone or computer — see install steps below.',
+    how_to_connect: 'How to connect',
+    limitations: 'Good to know',
+    link_unavailable: 'Link unavailable',
+    link_unavailable_desc: 'This share link has expired or been revoked. Ask the sender for a new link.',
+    recommended: 'Recommended',
+    free: 'Free',
+    paid: 'Paid',
+    builtin: 'Built-in',
+    app_store: 'App Store',
+    play_store: 'Play Store',
+    download: 'Download',
+    homepage: 'Homepage',
+    note: 'Tip',
+    no_steps: 'See the app\'s own help for setup steps.',
+  },
+  'zh-CN': {
+    your_connection: '你的连接',
+    what_is_this: '这是什么？',
+    what_you_need: '需要安装什么',
+    what_you_can_do: '可以用来做什么',
+    install_app_below: '在手机或电脑上装一个小 App — 安装步骤见下方。',
+    how_to_connect: '如何连接',
+    limitations: '注意事项',
+    link_unavailable: '链接不可用',
+    link_unavailable_desc: '该分享链接已过期或被撤销，请向发送者索取新链接。',
+    recommended: '推荐',
+    free: '免费',
+    paid: '付费',
+    builtin: '系统自带',
+    app_store: 'App Store',
+    play_store: 'Play 商店',
+    download: '下载',
+    homepage: '官网',
+    note: '提示',
+    no_steps: '请查看 App 自带的帮助文档了解配置方法。',
+  },
+} satisfies Record<Lang, Record<string, string>>;
+
+// "What you can do" blurbs by template category — written for non-technical readers.
+const CATEGORY_PURPOSE: Record<string, Record<Lang, string>> = {
+  vpn: {
+    'en-US': 'Encrypt your internet traffic, hide your real location, and reach websites or services that may be blocked on your current network.',
+    'zh-CN': '加密你的网络流量，隐藏真实位置，访问当前网络下被封锁的网站或服务（俗称"翻墙 / 科学上网"）。',
+  },
+  storage: {
+    'en-US': 'Open and save files stored on a remote computer, as if they were on your own device.',
+    'zh-CN': '像访问本地文件一样，打开和保存远程电脑上的文件。',
+  },
+  tools: {
+    'en-US': 'Connect to a remote machine — view its desktop, transfer files, or run apps from anywhere.',
+    'zh-CN': '连接到一台远程电脑 — 查看桌面、传输文件，或在任何地方使用上面的应用。',
+  },
+};
+
+// Friendly fallback descriptions per template name (used when the template's
+// own description is too jargon-heavy — kept short, no protocol acronyms).
+const TEMPLATE_PLAIN: Record<string, Record<Lang, string>> = {
+  hysteria: {
+    'en-US': 'Hysteria 2 — a fast, hard-to-block VPN designed for poor or restricted networks.',
+    'zh-CN': 'Hysteria 2 — 一种快速、难以封锁的 VPN，专为网络质量差或受限的环境设计。',
+  },
+  wireguard: {
+    'en-US': 'WireGuard — a modern, lightweight VPN that connects your device to a private network.',
+    'zh-CN': 'WireGuard — 一种现代、轻量的 VPN，把你的设备接入一个专属的私有网络。',
+  },
+  v2ray: {
+    'en-US': 'V2Ray — a flexible proxy that helps you bypass network restrictions.',
+    'zh-CN': 'V2Ray — 一种灵活的代理工具，可帮助你绕过网络限制。',
+  },
+  l2tp: {
+    'en-US': 'L2TP/IPSec — a classic VPN supported out-of-the-box on most phones and computers.',
+    'zh-CN': 'L2TP/IPSec — 一种经典 VPN，绝大多数手机和电脑系统自带支持，无需额外安装。',
+  },
+  samba: {
+    'en-US': 'Samba — share folders over your local network so other devices can read and write files.',
+    'zh-CN': 'Samba — 在局域网内共享文件夹，让其他设备可以读写文件。',
+  },
+  webdav: {
+    'en-US': 'WebDAV — access remote folders from a file manager, just like a local drive.',
+    'zh-CN': 'WebDAV — 在文件管理器里访问远程文件夹，像本地磁盘一样使用。',
+  },
+  rdesktop: {
+    'en-US': 'Remote Desktop — see and control a computer\'s screen from another device.',
+    'zh-CN': '远程桌面 — 在另一台设备上查看并操控这台电脑的屏幕。',
+  },
+};
+
+// Map template icon name → lucide component, for the page header.
+const TEMPLATE_ICONS: Record<string, typeof Zap> = {
+  zap: Zap,
+  lock: Lock,
+  shield: Shield,
+  globe: Globe,
+  monitor: Monitor,
+  'hard-drive': HardDrive,
+  folder: Folder,
+};
 
 // ─── Page ────────────────────────────────────────────────
 
@@ -36,6 +158,9 @@ export function SharePage() {
     );
   }
 
+  const lang = pickLang();
+  const t = STR[lang];
+
   if (error || !data) {
     return (
       <Shell>
@@ -43,9 +168,9 @@ export function SharePage() {
           <div className="inline-flex items-center justify-center size-14 rounded-full bg-destructive/10">
             <AlertTriangle className="size-7 text-destructive" />
           </div>
-          <h1 className="text-xl font-semibold text-foreground">Link unavailable</h1>
+          <h1 className="text-xl font-semibold text-foreground">{t.link_unavailable}</h1>
           <p className="text-sm text-muted-foreground max-w-xs">
-            This share link has expired or been revoked. Ask the sender for a new link.
+            {t.link_unavailable_desc}
           </p>
         </div>
       </Shell>
@@ -55,13 +180,11 @@ export function SharePage() {
   return (
     <Shell>
       <div className="w-full max-w-lg space-y-6 share-stagger">
-        {/* Header */}
-        <header className="text-center space-y-2">
-          <TypeBadge type={data.type} />
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">
-            Your Connection
-          </h1>
-        </header>
+        {/* Header — name + plain-language explainer */}
+        <ShareHeader config={data} lang={lang} fallbackTitle={t.your_connection} />
+
+        {/* Plain-language "What this is / What you need / What you can do" */}
+        <ExplainerCard config={data} lang={lang} t={t} />
 
         {/* Content by type */}
         {data.type === 'file_per_user' && <ShareFiles token={token!} config={data} />}
@@ -70,14 +193,14 @@ export function SharePage() {
 
         {/* Guide */}
         {data.guide?.platforms && data.guide.platforms.length > 0 && (
-          <ShareGuide platforms={data.guide.platforms} />
+          <ShareGuide platforms={data.guide.platforms} title={t.how_to_connect} lang={lang} t={t} />
         )}
 
         {/* Limitations */}
         {data.limitations && data.limitations.length > 0 && (
           <div className="share-card">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              Limitations
+              {t.limitations}
             </h3>
             <ul className="text-xs text-muted-foreground space-y-1">
               {data.limitations.map((l, i) => (
@@ -114,7 +237,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Type Badge ──────────────────────────────────────────
+// ─── Header (template name + icon) ──────────────────────
 
 const TYPE_ICONS = {
   file_per_user: FileText,
@@ -122,12 +245,83 @@ const TYPE_ICONS = {
   url: Globe,
 } as const;
 
-function TypeBadge({ type }: { type: ShareConfigResponse['type'] }) {
-  const Icon = TYPE_ICONS[type];
+function ShareHeader({
+  config, lang, fallbackTitle,
+}: {
+  config: ShareConfigResponse; lang: Lang; fallbackTitle: string;
+}) {
+  const TemplateIcon = config.template_icon
+    ? (TEMPLATE_ICONS[config.template_icon] ?? TYPE_ICONS[config.type])
+    : TYPE_ICONS[config.type];
+  // Capitalize template name (e.g. "hysteria" → "Hysteria")
+  const title = config.template_name
+    ? config.template_name.charAt(0).toUpperCase() + config.template_name.slice(1)
+    : fallbackTitle;
+  const subtitle = pickLocalized(config.template_description, lang);
+
   return (
-    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-primary/10 text-primary">
-      <Icon className="size-3.5" />
-      {type === 'file_per_user' ? 'Config Files' : type === 'credentials' ? 'Credentials' : 'Connection'}
+    <header className="text-center space-y-3">
+      <div className="inline-flex items-center justify-center size-14 rounded-2xl bg-primary/10 text-primary">
+        <TemplateIcon className="size-7" />
+      </div>
+      <div className="space-y-1">
+        <h1 className="text-xl font-semibold text-foreground tracking-tight">{title}</h1>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+            {subtitle}
+          </p>
+        )}
+      </div>
+    </header>
+  );
+}
+
+// ─── Explainer (what / what-you-need / what-you-can-do) ──
+
+function ExplainerCard({
+  config, lang, t,
+}: {
+  config: ShareConfigResponse;
+  lang: Lang;
+  t: (typeof STR)[Lang];
+}) {
+  // "What is this?" — prefer the friendly per-template blurb, fall back to template description.
+  const whatIsThis = (config.template_name && TEMPLATE_PLAIN[config.template_name]?.[lang])
+    ?? pickLocalized(config.template_description, lang);
+
+  // "What you can do" — by category.
+  const whatYouCanDo = config.template_category
+    ? CATEGORY_PURPOSE[config.template_category]?.[lang]
+    : undefined;
+
+  // If we have nothing useful to say, hide the card entirely.
+  if (!whatIsThis && !whatYouCanDo) return null;
+
+  return (
+    <div className="share-card space-y-3">
+      {whatIsThis && (
+        <ExplainerRow icon={HelpCircle} label={t.what_is_this} body={whatIsThis} />
+      )}
+      <ExplainerRow icon={AppWindow} label={t.what_you_need} body={t.install_app_below} />
+      {whatYouCanDo && (
+        <ExplainerRow icon={Sparkles} label={t.what_you_can_do} body={whatYouCanDo} />
+      )}
+    </div>
+  );
+}
+
+function ExplainerRow({
+  icon: Icon, label, body,
+}: {
+  icon: typeof HelpCircle; label: string; body: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <Icon className="size-4 text-primary mt-0.5 shrink-0" />
+      <div className="space-y-0.5">
+        <p className="text-xs font-semibold text-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{body}</p>
+      </div>
     </div>
   );
 }
@@ -381,46 +575,240 @@ function ShareURIEntry({ url, onQR }: { url: { name: string; scheme: string; qr?
 
 const platformIcons: Record<string, typeof Smartphone> = {
   iOS: Smartphone,
+  iPadOS: Smartphone,
   Android: Smartphone,
   Windows: Monitor,
   macOS: Monitor,
-  Linux: Monitor,
+  Linux: Terminal,
 };
 
-function ShareGuide({ platforms }: { platforms: GuidePlatform[] }) {
+function ShareGuide({
+  platforms, title, lang, t,
+}: {
+  platforms: GuidePlatform[];
+  title: string;
+  lang: Lang;
+  t: (typeof STR)[Lang];
+}) {
+  // Default to the first platform's tab.
+  const [active, setActive] = useState(platforms[0]?.name ?? '');
+  const current = platforms.find((p) => p.name === active) ?? platforms[0];
+  if (!current) return null;
+
   return (
     <div className="share-card">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-        How to connect
+        {title}
       </h3>
-      <div className="space-y-3">
-        {platforms.map((platform) => {
-          const Icon = platformIcons[platform.name] || Monitor;
-          const storeLink = platform.store_url || platform.download_url;
+
+      {/* Platform tabs */}
+      <div className="flex flex-wrap gap-1 mb-4 border-b border-border/50 -mx-1 px-1 overflow-x-auto">
+        {platforms.map((p) => {
+          const Icon = platformIcons[p.name] || Monitor;
+          const selected = p.name === current.name;
           return (
-            <div key={platform.name} className="flex items-start gap-3 rounded-lg border-l-2 border-primary/30 pl-3 py-2">
-              <Icon className="size-4 text-muted-foreground mt-0.5 shrink-0" />
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">{platform.name}</p>
-                  {storeLink && (
-                    <a href={storeLink} target="_blank" rel="noopener"
-                      className="text-xs text-primary hover:underline inline-flex items-center gap-0.5">
-                      <ExternalLink className="size-3" />
-                    </a>
-                  )}
-                </div>
-                <ol className="list-decimal list-inside text-xs text-muted-foreground space-y-0.5">
-                  {platform.steps.map((step, i) => (
-                    <li key={i}>{step}</li>
-                  ))}
-                </ol>
-              </div>
-            </div>
+            <button
+              key={p.name}
+              type="button"
+              onClick={() => setActive(p.name)}
+              className={
+                'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ' +
+                (selected
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground')
+              }
+            >
+              <Icon className="size-3.5" />
+              {p.name}
+            </button>
           );
         })}
       </div>
+
+      {/* Selected platform body */}
+      <PlatformBody platform={current} lang={lang} t={t} />
     </div>
+  );
+}
+
+function PlatformBody({
+  platform, lang, t,
+}: {
+  platform: GuidePlatform;
+  lang: Lang;
+  t: (typeof STR)[Lang];
+}) {
+  const platformNote = pickLocalized(platform.notes, lang);
+
+  // Rich path: clients[]
+  if (platform.clients && platform.clients.length > 0) {
+    return (
+      <div className="space-y-3">
+        {platform.clients.map((c) => (
+          <ClientCard key={c.name} client={c} lang={lang} t={t} />
+        ))}
+        {platformNote && (
+          <div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2">
+            <Lightbulb className="size-3.5 text-amber-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-muted-foreground leading-relaxed">{platformNote}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Legacy path: flat steps[] (single app per platform)
+  const storeLink = platform.store_url || platform.download_url;
+  return (
+    <div className="space-y-2">
+      {storeLink && (
+        <a
+          href={storeLink}
+          target="_blank"
+          rel="noopener"
+          className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+        >
+          <ExternalLink className="size-3.5" />
+          {t.download}
+        </a>
+      )}
+      {platform.steps && platform.steps.length > 0 ? (
+        <ol className="list-decimal list-inside text-xs text-muted-foreground space-y-1 leading-relaxed">
+          {platform.steps.map((step, i) => (
+            <li key={i}>{step}</li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-xs text-muted-foreground italic">{t.no_steps}</p>
+      )}
+      {platformNote && (
+        <div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2">
+          <Lightbulb className="size-3.5 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-xs text-muted-foreground leading-relaxed">{platformNote}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClientCard({
+  client, lang, t,
+}: {
+  client: GuideClient;
+  lang: Lang;
+  t: (typeof STR)[Lang];
+}) {
+  const steps = client.steps?.[lang] ?? client.steps?.['en-US'] ?? [];
+  const note = pickLocalized(client.note, lang);
+
+  // Pick the best store link label by URL host.
+  const storeLink = client.store_url || client.download_url;
+  const storeLabel = (() => {
+    if (!storeLink) return null;
+    try {
+      const u = new URL(storeLink);
+      if (u.hostname.includes('apps.apple.com') || u.hostname.includes('itunes.apple.com')) return t.app_store;
+      if (u.hostname.includes('play.google.com')) return t.play_store;
+      return t.download;
+    } catch {
+      return t.download;
+    }
+  })();
+
+  return (
+    <div className="rounded-lg border border-border/60 p-3 space-y-2.5">
+      {/* Header: name + badges */}
+      <div className="flex items-start justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-sm font-semibold">{client.name}</span>
+          {client.recommended && (
+            <Badge tone="primary" icon={Star}>
+              {t.recommended}
+            </Badge>
+          )}
+          {client.builtin && (
+            <Badge tone="muted" icon={BadgeCheck}>
+              {t.builtin}
+            </Badge>
+          )}
+          {client.paid && (
+            <Badge tone="muted" icon={BadgeDollarSign}>
+              {t.paid}
+            </Badge>
+          )}
+          {!client.paid && !client.builtin && (
+            <Badge tone="muted">{t.free}</Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Action links */}
+      <div className="flex flex-wrap gap-1.5">
+        {storeLink && storeLabel && (
+          <a
+            href={storeLink}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline rounded-md border border-primary/30 px-2 py-1"
+          >
+            <Download className="size-3" />
+            {storeLabel}
+          </a>
+        )}
+        {client.homepage_url && (
+          <a
+            href={client.homepage_url}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground rounded-md border border-border px-2 py-1"
+          >
+            <ExternalLink className="size-3" />
+            {t.homepage}
+          </a>
+        )}
+      </div>
+
+      {/* Steps */}
+      {steps.length > 0 ? (
+        <ol className="list-decimal list-inside text-xs text-muted-foreground space-y-1 leading-relaxed pl-1">
+          {steps.map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-xs text-muted-foreground italic">{t.no_steps}</p>
+      )}
+
+      {/* Per-client note */}
+      {note && (
+        <div className="flex items-start gap-2 rounded-md bg-amber-500/5 border border-amber-500/20 px-2.5 py-1.5">
+          <Lightbulb className="size-3 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            <span className="font-medium text-foreground">{t.note}: </span>
+            {note}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Badge({
+  children, tone, icon: Icon,
+}: {
+  children: React.ReactNode;
+  tone: 'primary' | 'muted';
+  icon?: typeof Star;
+}) {
+  const cls =
+    tone === 'primary'
+      ? 'bg-primary/15 text-primary'
+      : 'bg-muted text-muted-foreground';
+  return (
+    <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}>
+      {Icon && <Icon className="size-2.5" />}
+      {children}
+    </span>
   );
 }
 

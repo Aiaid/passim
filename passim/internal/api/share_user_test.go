@@ -105,6 +105,20 @@ func TestSharePerUserURI(t *testing.T) {
 		t.Fatalf("expected type=url, got %q", shareResp.Type)
 	}
 
+	// Template metadata should be surfaced for the recipient explainer.
+	if shareResp.TemplateName != "hysteria" {
+		t.Errorf("expected template_name=hysteria, got %q", shareResp.TemplateName)
+	}
+	if shareResp.TemplateCategory != "vpn" {
+		t.Errorf("expected template_category=vpn, got %q", shareResp.TemplateCategory)
+	}
+	if shareResp.TemplateDescription["en-US"] == "" {
+		t.Error("expected non-empty en-US template_description")
+	}
+	if shareResp.TemplateIcon == "" {
+		t.Error("expected non-empty template_icon")
+	}
+
 	// The URI in the share response should contain user's credentials, not admin's
 	if len(shareResp.URLs) == 0 {
 		t.Fatal("expected at least one URL in share response")

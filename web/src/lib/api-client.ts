@@ -330,11 +330,25 @@ export interface TemplateClients {
   import_urls?: Record<string, string>;
 }
 
+export interface GuideClient {
+  name: string;
+  store_url?: string;
+  download_url?: string;
+  homepage_url?: string;
+  recommended?: boolean;
+  paid?: boolean;
+  builtin?: boolean;
+  steps?: Record<string, string[]>; // localized steps: { 'en-US': [...], 'zh-CN': [...] }
+  note?: Record<string, string>;
+}
+
 export interface GuidePlatform {
   name: string;
   store_url?: string;
   download_url?: string;
-  steps: string[];
+  steps?: string[];                  // legacy flat steps
+  clients?: GuideClient[];           // preferred: multiple apps with download links
+  notes?: Record<string, string>;    // localized platform-level tip
 }
 
 export interface TemplateGuide {
@@ -402,6 +416,10 @@ export interface ShareConfigResponse {
   }[];
   guide?: TemplateGuide;
   limitations?: string[];
+  template_name?: string;
+  template_category?: string;
+  template_description?: Record<string, string>;
+  template_icon?: string;
 }
 
 export interface SettingOptionInfo {

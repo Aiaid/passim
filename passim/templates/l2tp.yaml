@@ -101,22 +101,105 @@ guide:
     zh-CN: "使用服务器 IP、PSK、用户名和密码配置设备自带的 L2TP/IPSec VPN 客户端。"
   platforms:
     - name: iOS
-      steps:
-        - "Settings → General → VPN → Add VPN Configuration"
-        - "Type: L2TP, Server: your server IP"
-        - "Enter username, password, and pre-shared key"
+      notes:
+        en-US: "L2TP/IPSec is built into iOS — no app to install."
+        zh-CN: "L2TP/IPSec 是 iOS 自带功能，无需安装任何 App。"
+      clients:
+        - name: iOS Settings
+          recommended: true
+          builtin: true
+          steps:
+            en-US:
+              - "Open the Settings app on your iPhone."
+              - "General → VPN & Device Management → VPN → Add VPN Configuration."
+              - "Type: 'L2TP'."
+              - "Description: anything you like (e.g. 'My VPN')."
+              - "Server: copy the 'Server' value from the credentials shown above."
+              - "Account: copy the 'Username' value."
+              - "Password: copy the 'Password' value."
+              - "Secret: copy the 'Pre-Shared Key' value."
+              - "Tap 'Done', then toggle the connection on at the top of the VPN list."
+            zh-CN:
+              - "打开「设置」App。"
+              - "通用 → VPN 与设备管理 → VPN → 添加 VPN 配置。"
+              - "类型选「L2TP」。"
+              - "描述：随便起一个名字（例如 'My VPN'）。"
+              - "服务器：复制上方凭据中的「服务器」值。"
+              - "账户：复制「用户名」值。"
+              - "密码：复制「密码」值。"
+              - "密钥（Secret）：复制「预共享密钥」值。"
+              - "点「完成」，然后在 VPN 列表顶部打开开关。"
     - name: Android
-      steps:
-        - "Settings → Network → VPN → Add VPN"
-        - "Type: L2TP/IPSec PSK"
-        - "Enter server, username, password, and PSK"
+      notes:
+        en-US: "Android removed the built-in L2TP client in Android 12. On newer phones, use a third-party app such as 'OpenL2TP' or switch to WireGuard / Hysteria."
+        zh-CN: "Android 12 起系统去掉了自带 L2TP 客户端。新机请安装第三方 App（如 OpenL2TP），或改用 WireGuard / Hysteria。"
+      clients:
+        - name: Android Settings (Android 11 and below)
+          builtin: true
+          steps:
+            en-US:
+              - "Open Settings → Network & Internet → VPN."
+              - "Tap '+' to add a new VPN."
+              - "Name: anything you like."
+              - "Type: 'L2TP/IPSec PSK'."
+              - "Server address: copy 'Server' from above."
+              - "IPSec pre-shared key: copy 'Pre-Shared Key'."
+              - "Save, tap the new entry, enter Username and Password, then 'Connect'."
+            zh-CN:
+              - "打开「设置」→「网络和互联网」→「VPN」。"
+              - "点 '+' 添加 VPN。"
+              - "名称：随便起。"
+              - "类型：选「L2TP/IPSec PSK」。"
+              - "服务器地址：复制上方「服务器」。"
+              - "IPSec 预共享密钥：复制上方「预共享密钥」。"
+              - "保存后点新条目，输入用户名和密码，点「连接」。"
     - name: Windows
-      steps:
-        - "Settings → Network → VPN → Add VPN connection"
-        - "VPN type: L2TP/IPSec with pre-shared key"
-        - "Enter server, username, password, and PSK"
+      clients:
+        - name: Windows Settings
+          recommended: true
+          builtin: true
+          steps:
+            en-US:
+              - "Open Settings → Network & Internet → VPN → Add VPN."
+              - "VPN provider: 'Windows (built-in)'."
+              - "Connection name: anything you like."
+              - "Server name or address: copy 'Server' from above."
+              - "VPN type: 'L2TP/IPSec with pre-shared key'."
+              - "Pre-shared key: copy 'Pre-Shared Key' from above."
+              - "Sign-in info: 'User name and password'."
+              - "User name + Password: copy from above. Save."
+              - "Click the connection in the VPN list and 'Connect'."
+            zh-CN:
+              - "打开「设置」→「网络和 Internet」→「VPN」→ 添加 VPN。"
+              - "VPN 提供商：选「Windows（内置）」。"
+              - "连接名称：随便起。"
+              - "服务器名称或地址：复制上方「服务器」。"
+              - "VPN 类型：选「使用预共享密钥的 L2TP/IPSec」。"
+              - "预共享密钥：复制上方「预共享密钥」。"
+              - "登录信息类型：选「用户名和密码」。"
+              - "用户名和密码：复制上方对应值。保存。"
+              - "在 VPN 列表点新连接 →「连接」。"
     - name: macOS
-      steps:
-        - "System Settings → Network → + → VPN → L2TP over IPSec"
-        - "Enter server address, account name"
-        - "Authentication Settings: enter password and shared secret"
+      notes:
+        en-US: "macOS Ventura (13.0) removed the built-in L2TP client. On newer macOS, use a third-party tool or switch to WireGuard."
+        zh-CN: "macOS Ventura（13.0）起去掉了自带 L2TP。新版 macOS 请使用第三方工具或改用 WireGuard。"
+      clients:
+        - name: macOS Network Settings (macOS 12 and earlier)
+          builtin: true
+          steps:
+            en-US:
+              - "Open System Preferences → Network."
+              - "Click '+' at the bottom left → Interface: 'VPN', VPN Type: 'L2TP over IPSec'."
+              - "Service name: anything you like. Click 'Create'."
+              - "Server Address: copy 'Server' from above."
+              - "Account Name: copy 'Username' from above."
+              - "Click 'Authentication Settings…': User Authentication → Password (paste from above), Machine Authentication → Shared Secret (paste 'Pre-Shared Key')."
+              - "Check 'Show VPN status in menu bar', click 'Apply', then 'Connect'."
+            zh-CN:
+              - "打开「系统偏好设置」→「网络」。"
+              - "左下 '+' → 接口：VPN，VPN 类型：L2TP over IPSec。"
+              - "服务名称：随便起。点「创建」。"
+              - "服务器地址：复制上方「服务器」。"
+              - "账户名：复制「用户名」。"
+              - "点「鉴定设置…」：用户鉴定 → 密码（粘贴上方密码），机器鉴定 → 共享密钥（粘贴「预共享密钥」）。"
+              - "勾选「在菜单栏显示 VPN 状态」，点「应用」→「连接」。"

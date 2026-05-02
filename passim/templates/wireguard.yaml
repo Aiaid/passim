@@ -58,22 +58,130 @@ guide:
     zh-CN: "下载生成的 .conf 文件或扫描二维码，然后导入 WireGuard 客户端应用。"
   platforms:
     - name: iOS
-      store_url: "https://apps.apple.com/app/wireguard/id1441195209"
-      steps:
-        - "Install WireGuard from the App Store"
-        - "Tap + and scan the QR code or import the .conf file"
+      clients:
+        - name: WireGuard
+          recommended: true
+          homepage_url: https://www.wireguard.com/install/
+          store_url: https://apps.apple.com/app/wireguard/id1441195209
+          steps:
+            en-US:
+              - "Install the official WireGuard app from the App Store (it's free)."
+              - "Open WireGuard and tap the blue '+' button at the top right."
+              - "Tap 'Create from QR code'."
+              - "Scan the QR code shown above (next to your peer file)."
+              - "Give the tunnel any name and tap 'Save'. iOS will ask for VPN permission — allow it."
+              - "Toggle the switch next to the tunnel to connect."
+            zh-CN:
+              - "在 App Store 安装官方 WireGuard（免费）。"
+              - "打开 WireGuard，点击右上角蓝色 '+'。"
+              - "选择「从二维码创建」。"
+              - "扫描上方对应配置文件旁的二维码。"
+              - "随便起个名字，点「保存」。iOS 会询问是否允许 VPN 配置 — 点允许。"
+              - "在隧道旁拨动开关即可连接。"
     - name: Android
-      store_url: "https://play.google.com/store/apps/details?id=com.wireguard.android"
-      steps:
-        - "Install WireGuard from Google Play"
-        - "Tap + and import from file or scan QR code"
-    - name: Windows
-      download_url: "https://download.wireguard.com/windows-client/wireguard-installer.exe"
-      steps:
-        - "Download and install WireGuard"
-        - "Click Import tunnel(s) from file"
+      clients:
+        - name: WireGuard
+          recommended: true
+          homepage_url: https://www.wireguard.com/install/
+          store_url: https://play.google.com/store/apps/details?id=com.wireguard.android
+          steps:
+            en-US:
+              - "Install the official WireGuard app from Google Play (it's free)."
+              - "Open WireGuard and tap the blue '+' button at the bottom right."
+              - "Tap 'SCAN FROM QR CODE'."
+              - "Scan the QR code shown above."
+              - "Give the tunnel a name and tap the checkmark."
+              - "Toggle the switch next to the tunnel to connect. Android will request VPN permission the first time."
+            zh-CN:
+              - "在 Play 商店安装官方 WireGuard（免费）。"
+              - "打开 WireGuard，点击右下角蓝色 '+'。"
+              - "选择「扫描二维码」。"
+              - "扫描上方二维码。"
+              - "起个名字，点对勾保存。"
+              - "拨动隧道旁的开关连接。第一次会请求 VPN 权限。"
+        - name: WireGuard (F-Droid)
+          homepage_url: https://f-droid.org/packages/com.wireguard.android/
+          download_url: https://f-droid.org/packages/com.wireguard.android/
+          steps:
+            en-US:
+              - "If you don't use Google Play, install F-Droid first, then search for 'WireGuard' inside F-Droid."
+              - "Steps after install are identical to the Google Play version above."
+            zh-CN:
+              - "若不使用 Google Play，可先安装 F-Droid，然后在 F-Droid 内搜索 'WireGuard'。"
+              - "安装后步骤与上面 Play 商店版相同。"
     - name: macOS
-      store_url: "https://apps.apple.com/app/wireguard/id1451685025"
-      steps:
-        - "Install WireGuard from the App Store"
-        - "Click Import Tunnel(s) from File"
+      clients:
+        - name: WireGuard
+          recommended: true
+          homepage_url: https://www.wireguard.com/install/
+          store_url: https://apps.apple.com/app/wireguard/id1451685025
+          steps:
+            en-US:
+              - "Install the official WireGuard app from the Mac App Store (free)."
+              - "Open the app — it lives in the menu bar."
+              - "Click the menu bar icon, then 'Manage Tunnels'."
+              - "Click '+' at the bottom left → 'Import Tunnel(s) from File…'"
+              - "Pick the .conf file you downloaded above."
+              - "Click 'Activate' next to the tunnel. macOS will request VPN permission the first time."
+            zh-CN:
+              - "在 Mac App Store 安装官方 WireGuard（免费）。"
+              - "启动后会出现在菜单栏。"
+              - "点击菜单栏图标 → 「管理隧道」。"
+              - "左下角 '+' → 「从文件导入隧道」。"
+              - "选择上方下载的 .conf 文件。"
+              - "点击隧道旁的「激活」。第一次会请求 VPN 权限。"
+    - name: Windows
+      clients:
+        - name: WireGuard
+          recommended: true
+          homepage_url: https://www.wireguard.com/install/
+          download_url: https://download.wireguard.com/windows-client/wireguard-installer.exe
+          steps:
+            en-US:
+              - "Download the WireGuard for Windows installer (link above)."
+              - "Run the installer; it adds WireGuard to your Start menu."
+              - "Open WireGuard, click 'Import tunnel(s) from file' at the bottom."
+              - "Pick the .conf file you downloaded above."
+              - "Click 'Activate'. Windows may prompt to install a network driver — accept."
+            zh-CN:
+              - "从上方链接下载 WireGuard for Windows 安装包。"
+              - "运行安装程序，安装后开始菜单会出现 WireGuard。"
+              - "打开 WireGuard，点击底部「Import tunnel(s) from file」。"
+              - "选择上方下载的 .conf 文件。"
+              - "点击「Activate」。Windows 可能弹窗安装网络驱动 — 同意即可。"
+    - name: Linux
+      notes:
+        en-US: "On modern distros, WireGuard is in the kernel. NetworkManager has built-in support."
+        zh-CN: "现代发行版的内核已自带 WireGuard。NetworkManager 也直接支持。"
+      clients:
+        - name: NetworkManager (GUI)
+          recommended: true
+          builtin: true
+          homepage_url: https://networkmanager.dev/
+          steps:
+            en-US:
+              - "Open your distro's network settings (GNOME / KDE)."
+              - "Click '+' to add a new VPN connection → 'Import from file…'"
+              - "Pick the .conf file you downloaded above."
+              - "Toggle the connection on."
+            zh-CN:
+              - "打开发行版的「网络设置」（GNOME / KDE 等）。"
+              - "点击 '+' 添加新 VPN → 「从文件导入」。"
+              - "选择上方下载的 .conf 文件。"
+              - "打开连接开关。"
+        - name: wg-quick (CLI)
+          builtin: true
+          homepage_url: https://www.wireguard.com/quickstart/
+          steps:
+            en-US:
+              - "Install wireguard-tools from your distro's package manager (e.g. apt install wireguard-tools)."
+              - "Copy the .conf file: sudo cp peer1.conf /etc/wireguard/wg0.conf"
+              - "Bring it up: sudo wg-quick up wg0"
+              - "Auto-start at boot: sudo systemctl enable wg-quick@wg0"
+              - "Tear down: sudo wg-quick down wg0"
+            zh-CN:
+              - "用发行版包管理器安装 wireguard-tools（例如 apt install wireguard-tools）。"
+              - "复制配置：sudo cp peer1.conf /etc/wireguard/wg0.conf"
+              - "启动：sudo wg-quick up wg0"
+              - "开机自启：sudo systemctl enable wg-quick@wg0"
+              - "停止：sudo wg-quick down wg0"
